@@ -1,0 +1,23 @@
+[33mcommit c1dcd1ba44d41c4762774be12b6fe95a15d06039[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdaniel/officer/backend[m[33m)[m
+Author: Daniel <danielvetriolo21@gmail.com>
+Date:   Fri Nov 29 15:28:41 2024 +0800
+
+    Working Demographic Analysis
+
+[33mcommit 3ed05b0abf03df2c1bc3048cd41007f3218be9c1[m
+Author: Daniel <danielvetriolo21@gmail.com>
+Date:   Fri Nov 29 10:19:52 2024 +0800
+
+    Working Event Management
+
+[33mcommit a55b6d7dac2400b6640a5432d561bafb3be264e0[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mmain[m[33m)[m
+Author: Daniel <danielvetriolo21@gmail.com>
+Date:   Fri Nov 15 02:14:59 2024 +0800
+
+    Created officer dashboard
+
+[33mcommit b156613eb6e88d5e5e8d645085ca77b4661223ee[m
+Author: Daniel <danielvetriolo21@gmail.com>
+Date:   Fri Nov 15 01:19:11 2024 +0800
+
+    Initial commit from Create Next App
