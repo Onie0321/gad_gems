@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -27,28 +27,142 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { getEvents, getParticipants } from "@/lib/appwrite"; // Import Appwrite functions
 
-const longitudinalData = [
-  { year: 2019, genderBalance: 0.8, ageDistribution: 0.6, ethnicDiversity: 0.4 },
-  { year: 2020, genderBalance: 0.85, ageDistribution: 0.65, ethnicDiversity: 0.45 },
-  { year: 2021, genderBalance: 0.9, ageDistribution: 0.7, ethnicDiversity: 0.5 },
-  { year: 2022, genderBalance: 0.95, ageDistribution: 0.75, ethnicDiversity: 0.55 },
-  { year: 2023, genderBalance: 1, ageDistribution: 0.8, ethnicDiversity: 0.6 },
-];
-
-const kpiData = [
-  { kpi: 'Gender Parity', current: 0.9, target: 1 },
-  { kpi: 'Minority Representation', current: 0.6, target: 0.8 },
-  { kpi: 'Youth Engagement', current: 0.7, target: 0.9 },
-];
-
-const COLORS = ['#257180', '#F2E5BF', '#FD8B51', '#CB6040'];
+const COLORS = ["#257180", "#F2E5BF", "#FD8B51", "#CB6040"];
 
 export default function ReportsAnalytics() {
-  const [selectedMetric, setSelectedMetric] = useState('genderBalance');
-  const [selectedTimeframe, setSelectedTimeframe] = useState('5-years');
-  const [selectedKPI, setSelectedKPI] = useState('Gender Parity');
+  const [selectedMetric, setSelectedMetric] = useState("genderBalance");
+  const [selectedTimeframe, setSelectedTimeframe] = useState("5-years");
+  const [selectedKPI, setSelectedKPI] = useState("Gender Parity");
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [eventMetrics, setEventMetrics] = useState(null);
+  const [longitudinalData, setLongitudinalData] = useState([]);
+  const [kpiData, setKpiData] = useState([]);
+
+  useEffect(() => {
+    fetchEvents();
+    fetchLongitudinalData();
+    fetchKPIData();
+  }, []);
+
+  const fetchEvents = async () => {
+    try {
+      const fetchedEvents = await getEvents();
+      setEvents(fetchedEvents);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+    }
+  };
+
+  const fetchEventMetrics = async (eventId) => {
+    try {
+      const participants = await getParticipants(eventId);
+      const metrics = calculateEventMetrics(participants);
+      setEventMetrics(metrics);
+    } catch (error) {
+      console.error("Error fetching event metrics:", error);
+    }
+  };
+
+  const calculateEventMetrics = (participants) => {
+    const totalParticipants = participants.length;
+    const genderCounts = participants.reduce((acc, p) => {
+      acc[p.sex] = (acc[p.sex] || 0) + 1;
+      return acc;
+    }, {});
+    const ageCounts = participants.reduce((acc, p) => {
+      const ageGroup = getAgeGroup(p.age);
+      acc[ageGroup] = (acc[ageGroup] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      totalParticipants,
+      genderBalance: `${Math.round(
+        ((genderCounts["Male"] || 0) / totalParticipants) * 100
+      )}% Male, ${Math.round(
+        ((genderCounts["Female"] || 0) / totalParticipants) * 100
+      )}% Female`,
+      ageDistribution: Object.entries(ageCounts)
+        .map(
+          ([group, count]) =>
+            `${group}: ${Math.round((count / totalParticipants) * 100)}%`
+        )
+        .join(", "),
+    };
+  };
+
+  const getAgeGroup = (age) => {
+    if (age <= 25) return "18-25";
+    if (age <= 35) return "26-35";
+    return "36+";
+  };
+
+  const fetchLongitudinalData = async () => {
+    // This would typically involve fetching historical data from Appwrite
+    // For now, we'll use mock data
+    setLongitudinalData([
+      {
+        year: 2019,
+        genderBalance: 0.8,
+        ageDistribution: 0.6,
+        ethnicDiversity: 0.4,
+      },
+      {
+        year: 2020,
+        genderBalance: 0.85,
+        ageDistribution: 0.65,
+        ethnicDiversity: 0.45,
+      },
+      {
+        year: 2021,
+        genderBalance: 0.9,
+        ageDistribution: 0.7,
+        ethnicDiversity: 0.5,
+      },
+      {
+        year: 2022,
+        genderBalance: 0.95,
+        ageDistribution: 0.75,
+        ethnicDiversity: 0.55,
+      },
+      {
+        year: 2023,
+        genderBalance: 1,
+        ageDistribution: 0.8,
+        ethnicDiversity: 0.6,
+      },
+    ]);
+  };
+
+  const fetchKPIData = async () => {
+    // This would typically involve fetching KPI data from Appwrite
+    // For now, we'll use mock data
+    setKpiData([
+      { kpi: "Gender Parity", current: 0.9, target: 1 },
+      { kpi: "Minority Representation", current: 0.6, target: 0.8 },
+      { kpi: "Youth Engagement", current: 0.7, target: 0.9 },
+    ]);
+  };
+
+  const handleEventChange = (eventId) => {
+    setSelectedEvent(eventId);
+    fetchEventMetrics(eventId);
+  };
 
   return (
     <Tabs defaultValue="event-reports" className="space-y-4">
@@ -67,42 +181,43 @@ export default function ReportsAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <Select>
+              <Select onValueChange={handleEventChange}>
                 <SelectTrigger className="w-[250px]">
                   <SelectValue placeholder="Select event" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="gad-seminar-2024">
-                    GAD Seminar 2024
-                  </SelectItem>
-                  <SelectItem value="women-leadership-2023">
-                    Women in Leadership 2023
-                  </SelectItem>
+                  {events.map((event) => (
+                    <SelectItem key={event.$id} value={event.$id}>
+                      {event.eventName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <Table>
-                <TableCaption>Event metrics summary</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Metric</TableHead>
-                    <TableHead>Value</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Total Participants</TableCell>
-                    <TableCell>250</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Gender Balance</TableCell>
-                    <TableCell>45% Male, 55% Female</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Age Distribution</TableCell>
-                    <TableCell>18-25: 30%, 26-35: 40%, 36+: 30%</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              {eventMetrics && (
+                <Table>
+                  <TableCaption>Event metrics summary</TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Metric</TableHead>
+                      <TableHead>Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Total Participants</TableCell>
+                      <TableCell>{eventMetrics.totalParticipants}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Gender Balance</TableCell>
+                      <TableCell>{eventMetrics.genderBalance}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Age Distribution</TableCell>
+                      <TableCell>{eventMetrics.ageDistribution}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              )}
               <div className="flex space-x-2">
                 <Button>
                   <FileText className="mr-2 h-4 w-4" />
@@ -162,7 +277,11 @@ export default function ReportsAnalytics() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey={selectedMetric} stroke={COLORS[0]} />
+                  <Line
+                    type="monotone"
+                    dataKey={selectedMetric}
+                    stroke={COLORS[0]}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -194,7 +313,9 @@ export default function ReportsAnalytics() {
                 </SelectContent>
               </Select>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={kpiData.filter(item => item.kpi === selectedKPI)}>
+                <BarChart
+                  data={kpiData.filter((item) => item.kpi === selectedKPI)}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="kpi" />
                   <YAxis />
