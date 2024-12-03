@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+"use client"
+
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,22 +19,33 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectTrigger,
   SelectContent,
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, HelpCircle, Loader2 } from "lucide-react";
+import { Plus, HelpCircle, Loader2 } from 'lucide-react';
 import {
   capitalizeWords,
   formatStudentId,
   schoolOptions,
+  debouncedCheckDuplicates,
+  handleAutofill,
 } from "@/utils/participantUtils";
 import {
   createParticipant,
   checkDuplicateParticipant,
-  getEvents,
 } from "@/lib/appwrite";
 import { toast } from "react-toastify";
 
@@ -41,7 +54,6 @@ const AddParticipant = ({
   eventId,
   isEventSelected,
   currentEvent,
-  participants,
 }) => {
   const [participantData, setParticipantData] = useState({
     studentId: "",
@@ -55,11 +67,14 @@ const AddParticipant = ({
     otherEthnicGroup: "",
   });
   const [errors, setErrors] = useState({});
-  const [duplicateError, setDuplicateError] = useState("");
   const [loading, setLoading] = useState(false);
   const [totalParticipants, setTotalParticipants] = useState(0);
   const [totalMaleParticipants, setTotalMaleParticipants] = useState(0);
   const [totalFemaleParticipants, setTotalFemaleParticipants] = useState(0);
+  const [showAutofillDialog, setShowAutofillDialog] = useState(false);
+  const [autofillData, setAutofillData] = useState(null);
+  const [duplicateErrors, setDuplicateErrors] = useState({});
+  const [newEntryInfo, setNewEntryInfo] = useState({});
 
   useEffect(() => {
     if (currentEvent && currentEvent.participants) {
@@ -77,7 +92,20 @@ const AddParticipant = ({
       setTotalFemaleParticipants(0);
     }
   }, [currentEvent]);
-  
+
+  const handleAutofillConfirm = () => {
+    setParticipantData((prev) => ({
+      ...prev,
+      ...autofillData,
+    }));
+    setShowAutofillDialog(false);
+    toast.info("Participant data from another event has been loaded.");
+  };
+
+  const handleAutofillCancel = () => {
+    setShowAutofillDialog(false);
+  };
+
   const validateFields = () => {
     const newErrors = {};
     if (!participantData.studentId)
@@ -114,7 +142,6 @@ const AddParticipant = ({
     try {
       const participants = currentEvent?.participants || [];
 
-      // Safely check for duplicate ID and name
       const isDuplicateId = await checkDuplicateParticipant(
         eventId,
         participantData.studentId
@@ -150,7 +177,6 @@ const AddParticipant = ({
       onAddParticipant(createdParticipant);
       toast.success("Participant added successfully");
 
-      // Update participant counts
       setTotalParticipants((prev) => prev + 1);
       if (newParticipant.sex === "Male") {
         setTotalMaleParticipants((prev) => prev + 1);
@@ -158,7 +184,6 @@ const AddParticipant = ({
         setTotalFemaleParticipants((prev) => prev + 1);
       }
 
-      // Reset form
       setParticipantData({
         studentId: "",
         name: "",
@@ -171,11 +196,46 @@ const AddParticipant = ({
         otherEthnicGroup: "",
       });
       setErrors({});
-      setDuplicateError("");
     } catch (error) {
       toast.error(`Error adding participant: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleInputChange = async (field, value) => {
+    setParticipantData((prev) => ({ ...prev, [field]: value }));
+
+    if (field === "studentId" || field === "name") {
+      try {
+        const result = await debouncedCheckDuplicates(field, value, eventId);
+        if (result) {
+          const { duplicateError, newEntryInfo } = result;
+          setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
+          setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
+        } else {
+          setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
+          setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
+        }
+
+        if (value) {
+          const autofillData = await handleAutofill(value, eventId);
+          if (autofillData) {
+            console.log("Autofill data found:", autofillData);
+            setAutofillData(autofillData);
+            setShowAutofillDialog(true);
+          } else {
+            console.log("No autofill data found");
+            setNewEntryInfo((prev) => ({
+              ...prev,
+              [field]: "This entry is new and not found in any event.",
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("Error in handleInputChange:", error);
+        toast.error("An error occurred while checking for duplicates or autofill data.");
+      }
     }
   };
 
@@ -212,7 +272,6 @@ const AddParticipant = ({
             </p>
           )}
           <div className="grid grid-cols-2 gap-4">
-            {/* Student ID field */}
             <div className="space-y-2">
               <Label htmlFor="studentId">Student ID</Label>
               <TooltipProvider>
@@ -222,12 +281,16 @@ const AddParticipant = ({
                       <Input
                         id="studentId"
                         value={participantData.studentId}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const formattedStudentId = formatStudentId(
+                            e.target.value
+                          );
+                          handleInputChange("studentId", formattedStudentId);
                           setParticipantData({
                             ...participantData,
-                            studentId: formatStudentId(e.target.value),
-                          })
-                        }
+                            studentId: formattedStudentId,
+                          });
+                        }}
                         placeholder="00-00-0000"
                         maxLength={10}
                         disabled={!isEventSelected}
@@ -243,27 +306,43 @@ const AddParticipant = ({
               {errors.studentId && (
                 <p className="text-sm text-red-500">{errors.studentId}</p>
               )}
+              {duplicateErrors.studentId && (
+                <p className="text-sm text-red-500">
+                  {duplicateErrors.studentId}
+                </p>
+              )}
+              {newEntryInfo.studentId && (
+                <p className="text-sm text-green-500">
+                  {newEntryInfo.studentId}
+                </p>
+              )}
             </div>
-            {/* Name field */}
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
                 id="name"
                 value={participantData.name}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const formattedName = capitalizeWords(e.target.value);
+                  handleInputChange("name", formattedName);
                   setParticipantData({
                     ...participantData,
-                    name: capitalizeWords(e.target.value),
-                  })
-                }
+                    name: formattedName,
+                  });
+                }}
                 placeholder="Enter full name"
                 disabled={!isEventSelected}
               />
               {errors.name && (
                 <p className="text-sm text-red-500">{errors.name}</p>
               )}
+              {duplicateErrors.name && (
+                <p className="text-sm text-red-500">{duplicateErrors.name}</p>
+              )}
+              {newEntryInfo.name && (
+                <p className="text-sm text-green-500">{newEntryInfo.name}</p>
+              )}
             </div>
-            {/* Sex field */}
             <div className="space-y-2">
               <Label htmlFor="sex">Sex</Label>
               <Select
@@ -285,7 +364,6 @@ const AddParticipant = ({
                 <p className="text-sm text-red-500">{errors.sex}</p>
               )}
             </div>
-            {/* Age field */}
             <div className="space-y-2">
               <Label htmlFor="age">Age</Label>
               <Input
@@ -310,7 +388,6 @@ const AddParticipant = ({
                 <p className="text-sm text-red-500">{errors.age}</p>
               )}
             </div>
-            {/* School field */}
             <div className="space-y-2">
               <Label htmlFor="school">School</Label>
               <Select
@@ -340,7 +417,6 @@ const AddParticipant = ({
                 <p className="text-sm text-red-500">{errors.school}</p>
               )}
             </div>
-            {/* Year field */}
             <div className="space-y-2">
               <Label htmlFor="year">Year</Label>
               <Select
@@ -381,7 +457,6 @@ const AddParticipant = ({
                 <p className="text-sm text-red-500">{errors.year}</p>
               )}
             </div>
-            {/* Section field */}
             <div className="space-y-2">
               <Label htmlFor="section">Section</Label>
               <Input
@@ -400,7 +475,6 @@ const AddParticipant = ({
                 <p className="text-sm text-red-500">{errors.section}</p>
               )}
             </div>
-            {/* Ethnic Group field */}
             <div className="space-y-2">
               <Label htmlFor="ethnicGroup">Ethnic Group</Label>
               <Select
@@ -431,7 +505,6 @@ const AddParticipant = ({
                 <p className="text-sm text-red-500">{errors.ethnicGroup}</p>
               )}
             </div>
-            {/* Other Ethnic Group field */}
             {participantData.ethnicGroup === "Other" && (
               <div className="space-y-2">
                 <Label htmlFor="otherEthnicGroup">Specify Ethnic Group</Label>
@@ -471,8 +544,31 @@ const AddParticipant = ({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <AlertDialog
+        open={showAutofillDialog}
+        onOpenChange={setShowAutofillDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Autofill Participant Data</AlertDialogTitle>
+            <AlertDialogDescription>
+              Participant data from another event has been found. Would you like
+              to autofill the form with this data?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleAutofillCancel}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleAutofillConfirm}>
+              Yes, Autofill
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };
 
 export default AddParticipant;
+

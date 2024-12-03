@@ -49,6 +49,9 @@ import AddParticipant from "./add-participant-dialog/page";
 import EditEvent from "./edit-event-dialog/page";
 import DeleteEvent from "./delete-event-dialog/page";
 import ViewParticipants from "./view-participant-dialog/page";
+import ExportEventsButton from "./export-event/page";
+import GenerateReportButton from "./import-event/page";
+
 
 export default function EventParticipantLog() {
   const [events, setEvents] = useState([]);
@@ -359,15 +362,9 @@ export default function EventParticipantLog() {
             </Select>
           </div>
           <div className="flex space-x-2">
-            <Button variant="outline">
-              <Users className="mr-2 h-4 w-4" />
-              Export Events
-            </Button>
-            <Button variant="outline">
-              <BarChart className="mr-2 h-4 w-4" />
-              Generate Report
-            </Button>
-          </div>
+  <ExportEventsButton />
+  <GenerateReportButton />
+</div>
         </div>
         <div className="max-h-[330px] overflow-y-auto">
           <Table>

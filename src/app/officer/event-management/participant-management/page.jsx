@@ -58,11 +58,11 @@ import {
   validateParticipantForm,
   formatStudentId,
   schoolOptions,
+  debouncedCheckDuplicates,
+  handleAutofill,
 } from "@/utils/participantUtils";
 import {
   createParticipant,
-  checkDuplicateParticipant,
-  fetchParticipantData,
 } from "@/lib/appwrite";
 import EditParticipantDialog from "./edit-participant-dialog/page";
 import DeleteParticipantDialog from "./delete-participant-dialog/page";
@@ -123,62 +123,23 @@ export default function ParticipantManagement({
     );
   }, [participants, currentEventId]);
 
-  const checkDuplicates = useCallback(async (field, value) => {
-    if (!value) {
-      setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
-      setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-      return false;
-    }
-
-    const isDuplicate = await checkDuplicateParticipant(currentEventId, field === "studentId" ? value : "", field === "name" ? value : "");
-
-    setDuplicateErrors((prev) => ({
-      ...prev,
-      [field]: isDuplicate
-        ? `This ${field === "studentId" ? "Student ID" : "Name"} is already added this event.`
-        : "",
-    }));
-
-    if (!isDuplicate) {
-      const existingData = await fetchParticipantData(value, currentEventId);
-      if (!existingData) {
-        setNewEntryInfo((prev) => ({
-          ...prev,
-          [field]: `This ${field === "studentId" ? "Student ID" : "Name"} is new and not found in any event.`,
-        }));
-      } else {
-        setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-      }
-    } else {
-      setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-    }
-
-    return isDuplicate;
-  }, [currentEventId]);
-
-
-  const debouncedCheckDuplicates = useCallback(
-    debounce((field, value) => checkDuplicates(field, value), 300),
-    [checkDuplicates]
-  );
-
-
   const handleInputChange = async (field, value) => {
     setParticipantData((prev) => ({ ...prev, [field]: value }));
 
     if (field === "studentId" || field === "name") {
-      debouncedCheckDuplicates(field, value);
+      const { duplicateError, newEntryInfo } = await debouncedCheckDuplicates(field, value, currentEventId);
+      setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
+      setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
 
       if (value) {
         try {
-          const data = await fetchParticipantData(value, currentEventId);
-          if (data && data.eventId !== currentEventId) {
-            setAutofillData(data);
+          const autofillData = await handleAutofill(value, currentEventId);
+          if (autofillData) {
+            setAutofillData(autofillData);
             setShowAutofillDialog(true);
           }
         } catch (error) {
-          console.error("Error fetching participant data:", error);
-          toast.error("Error fetching participant data. Please try again.");
+          toast.error(error.message);
         }
       }
     }
@@ -220,6 +181,9 @@ export default function ParticipantManagement({
         eventId: currentEventId,
       };
 
+      console.log("New participant data:", newParticipant); // Add this line for debugging
+
+
       const createdParticipant = await createParticipant(newParticipant);
       setParticipants((prev) => [...prev, createdParticipant]);
       toast.success(`Participant added to ${currentEvent.eventName}`);
@@ -238,6 +202,7 @@ export default function ParticipantManagement({
       setShowFinishButton(true);
       setNewEntryInfo({});
     } catch (error) {
+      console.error("Error details:", error); // Add this line for debugging
       toast.error(`Error adding participant: ${error.message}`);
     } finally {
       setLoading(false);

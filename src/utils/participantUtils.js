@@ -1,4 +1,5 @@
 import { debounce } from 'lodash';
+import { checkDuplicateParticipant, fetchParticipantData } from "@/lib/appwrite";
 
 export const formatStudentId = (input) => {
     const numbers = input.replace(/\D/g, "").slice(0, 8);
@@ -62,15 +63,9 @@ export const formatStudentId = (input) => {
   
   export const validateParticipantForm = (participant) => {
     const errors = {};
-
-    if (!participant) {
-      errors.general = "Participant data is missing.";
-      return errors;
-  }
   
-    // Validate Name
-    if (!participant.name || participant.name.trim() === "") {
-      errors.name = "Name is required.";
+    if (!participant.studentId || participant.studentId.trim() === "") {
+      errors.studentId = "Student ID is required.";
     }
   
     // Validate Age
@@ -133,17 +128,49 @@ export const formatStudentId = (input) => {
     { name: "School of Industrial Technology", abbr: "SIT" },
     { name: "School of Information Technology", abbr: "SITech" },
   ];
+
+  export const checkDuplicates = async (field, value, currentEventId) => {
+    if (!value) {
+      return { duplicateError: "", newEntryInfo: "" };
+    }
   
-  export const checkDuplicateParticipant = debounce(async (eventId, studentId, name) => {
-    // Implement the server-side check for duplicate Student ID and Name
-    const response = await fetch(`/api/check-duplicate?eventId=${eventId}&studentId=${studentId}&name=${name}`);
-    const data = await response.json();
-    return data.isDuplicate;
-  }, 300);
+    const isDuplicate = await checkDuplicateParticipant(
+      currentEventId,
+      field === "studentId" ? value : "",
+      field === "name" ? value : ""
+    );
   
-  export const fetchParticipantData = debounce(async (studentId) => {
-    // Implement the server-side fetch for participant data from previous events
-    const response = await fetch(`/api/fetch-participant?studentId=${studentId}`);
-    const data = await response.json();
-    return data.participant;
-  }, 300);
+    if (isDuplicate) {
+      return {
+        duplicateError: `This ${field === "studentId" ? "Student ID" : "Name"} is already added to this event.`,
+        newEntryInfo: "",
+      };
+    } else {
+      const existingData = await fetchParticipantData(value, currentEventId);
+      if (!existingData) {
+        return {
+          duplicateError: "",
+          newEntryInfo: `This ${field === "studentId" ? "Student ID" : "Name"} is new and not found in any event.`,
+        };
+      }
+    }
+  
+    return { duplicateError: "", newEntryInfo: "" };
+  };
+  
+  export const debouncedCheckDuplicates = debounce(checkDuplicates, 300);
+  
+  export const handleAutofill = async (value, currentEventId) => {
+    try {
+      const data = await fetchParticipantData(value, currentEventId);
+      if (data && data.eventId !== currentEventId) {
+        return data;
+      }
+    } catch (error) {
+      console.error("Error fetching participant data:", error);
+      throw new Error("Error fetching participant data. Please try again.");
+    }
+    return null;
+  };
+  
+  
