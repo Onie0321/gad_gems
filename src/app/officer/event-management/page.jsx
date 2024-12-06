@@ -14,10 +14,11 @@ import { getEvents, getParticipants, subscribeToRealTimeUpdates } from '@/lib/ap
 export default function EventManagement() {
   const [events, setEvents] = useState([])
   const [participants, setParticipants] = useState([])
-  const [activeSection, setActiveSection] = React.useState("overview")
-  const [currentEventId, setCurrentEventId] = React.useState(null)
+  const [activeSection, setActiveSection] = useState("overview")
+  const [currentEventId, setCurrentEventId] = useState(null)
   const [loading, setLoading] = useState(true)
 
+ 
   useEffect(() => {
     fetchEvents()
     const unsubscribe = subscribeToRealTimeUpdates(fetchEvents)
@@ -100,7 +101,7 @@ export default function EventManagement() {
           onParticipantAdded={handleParticipantAdded}
           setParticipants={setParticipants}
           currentEventId={currentEventId}
-                    setActiveSection={setActiveSection}
+          setActiveSection={setActiveSection}
           loading={loading}
           setCurrentEventId={setCurrentEventId}
         />
@@ -112,3 +113,4 @@ export default function EventManagement() {
     </Tabs>
   )
 }
+

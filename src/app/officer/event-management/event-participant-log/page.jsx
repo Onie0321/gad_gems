@@ -84,7 +84,7 @@ export default function EventParticipantLog() {
   useEffect(() => {
     // Simulate fetching event data
     const fetchEvent = async () => {
-      const event = await getEvents(); // Replace with your actual API call
+      const event = await getEvents(); 
       setCurrentEvent(event);
       setSelectedEventId(event?.$id);
     };
@@ -144,7 +144,7 @@ export default function EventParticipantLog() {
       return {
         ...event,
         participantCount: eventParticipants.length,
-        status: event.status || "Pending", // Assuming event status is stored, otherwise defaulting to 'Pending'
+        status: event.status || "Pending", 
       };
     });
   }, [events, participants]);
@@ -163,8 +163,11 @@ export default function EventParticipantLog() {
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     if (sortCriteria === "eventDate")
       return new Date(b.eventDate) - new Date(a.eventDate);
-    if (sortCriteria === "eventName")
-      return (a.eventName || "").localeCompare(b.eventName || "");
+    if (sortCriteria === "eventName") {
+      const eventNameA = (a.eventName || "").toLowerCase(); // Ensure we handle null or undefined
+      const eventNameB = (b.eventName || "").toLowerCase(); // Same here for eventB
+      return eventNameA.localeCompare(eventNameB); // Compare both event names
+    }
     if (sortCriteria === "participantCount")
       return getParticipantCount(b.$id) - getParticipantCount(a.$id);
     return 0;

@@ -26,7 +26,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Plus, Loader2, ArrowUpDown, RotateCcw } from 'lucide-react';
+import { Plus, Loader2, ArrowUpDown, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
   getEvents,
@@ -90,8 +90,12 @@ export default function EventOverView({ setActiveSection }) {
 
   const summaryStats = useMemo(() => {
     const totalParticipants = participants.length;
-    const maleParticipants = participants.filter(p => p.sex === "Male").length;
-    const femaleParticipants = participants.filter(p => p.sex === "Female").length;
+    const maleParticipants = participants.filter(
+      (p) => p.sex === "Male"
+    ).length;
+    const femaleParticipants = participants.filter(
+      (p) => p.sex === "Female"
+    ).length;
 
     return {
       total: events.length,
@@ -108,10 +112,12 @@ export default function EventOverView({ setActiveSection }) {
       event.eventName,
       event.eventVenue,
       event.eventType,
-      format(parseISO(event.eventDate), "MMMM d, yyyy")
-    ].map(field => field ? field.toLowerCase() : '');
+      format(parseISO(event.eventDate), "MMMM d, yyyy"),
+    ].map((field) => (field ? field.toLowerCase() : ""));
 
-    return searchableFields.some(field => field.includes(searchTerm.toLowerCase()));
+    return searchableFields.some((field) =>
+      field.includes(searchTerm.toLowerCase())
+    );
   });
 
   const getParticipantCounts = (eventId) => {
@@ -223,9 +229,12 @@ export default function EventOverView({ setActiveSection }) {
           </div>
           <div className="mt-4 text-center">
             <h3 className="text-lg font-semibold">Total Participants</h3>
-            <p className="text-3xl font-bold">{summaryStats.totalParticipants}</p>
+            <p className="text-3xl font-bold">
+              {summaryStats.totalParticipants}
+            </p>
             <p className="text-sm text-muted-foreground">
-              (Male: {summaryStats.maleParticipants} | Female: {summaryStats.femaleParticipants})
+              (Male: {summaryStats.maleParticipants} | Female:{" "}
+              {summaryStats.femaleParticipants})
             </p>
           </div>
         </CardContent>
@@ -268,7 +277,10 @@ export default function EventOverView({ setActiveSection }) {
             </TableHead>
             <TableHead>Location</TableHead>
             <TableHead className="text-right">
-              <Button variant="ghost" onClick={() => handleSort("totalParticipants")}>
+              <Button
+                variant="ghost"
+                onClick={() => handleSort("totalParticipants")}
+              >
                 Participants
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
@@ -289,7 +301,8 @@ export default function EventOverView({ setActiveSection }) {
                 <TableCell className="text-right">
                   <div>(Total: {participantCounts.total})</div>
                   <div className="text-sm text-muted-foreground">
-                    (M: {participantCounts.male} | F: {participantCounts.female})
+                    (M: {participantCounts.male} | F: {participantCounts.female}
+                    )
                   </div>
                 </TableCell>
               </TableRow>

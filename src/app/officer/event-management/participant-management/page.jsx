@@ -127,8 +127,8 @@ export default function ParticipantManagement({
     setParticipantData((prev) => ({ ...prev, [field]: value }));
 
     if (field === "studentId" || field === "name") {
-      const { duplicateError, newEntryInfo } = await debouncedCheckDuplicates(field, value, currentEventId);
-      setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
+      const { duplicateErrors, newEntryInfo } = await debouncedCheckDuplicates(field, value, currentEventId);
+      setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateErrors }));
       setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
 
       if (value) {
@@ -340,7 +340,6 @@ export default function ParticipantManagement({
                         }}
                         placeholder="00-00-0000"
                         maxLength={10}
-                        onFocus={(e) => (e.target.value = "")}
                         disabled={!isEventSelected}
                       />
                       <HelpCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />

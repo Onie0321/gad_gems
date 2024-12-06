@@ -8,15 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import {
-  UserCircle,
-  Lock,
-  Mail,
-  Eye,
-  EyeOff,
-  Facebook,
-  Twitter,
-} from "lucide-react";
+import { UserCircle, Lock, Mail, Eye, EyeOff, Facebook, Twitter } from 'lucide-react';
 import { FcGoogle } from "react-icons/fc";
 import { FaDiscord } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
@@ -60,6 +52,7 @@ export default function SignInPage() {
       toast.error("Failed to fetch active sessions. Please try again.")
     }
   }
+
   useEffect(() => {
     setEmail("");
     setPassword("");
@@ -328,3 +321,4 @@ Gender and Development         </h1>
     </div>
   );
 }
+

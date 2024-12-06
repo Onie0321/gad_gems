@@ -1,15 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, FileText, PieChart, Settings, Menu, X } from 'lucide-react'
+import { Calendar, FileText, PieChart, Settings, Menu, X, SquareUser } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-
 import EventManagement from './event-management/page'
 import DemographicAnalysis from './demographic-analysis/page'
-import ReportsAnalytics from './reports-analytics/page'
+import PersonnelStatistic from './personnel/page'
 import { Notifications } from './notifications/page'
 import { UserMenu } from './user-menu/page'
+import SettingsForm from './settings/page'
+import StudentDashboard from './student/page'
+import Questionnaires from './Questionnaires/page'
 
 export default function OfficerDashboard() {
   const [activeTab, setActiveTab] = useState('event-management')
@@ -46,14 +48,28 @@ export default function OfficerDashboard() {
           <Button variant="ghost" className={cn(
             "w-full justify-start",
             !isSidebarOpen && "justify-center px-0"
-          )} onClick={() => setActiveTab('reports-analytics')}>
-            <FileText className="h-4 w-4" />
-            {isSidebarOpen && <span className="ml-2">Reports & Analytics</span>}
+          )} onClick={() => setActiveTab('Questionnaires')}>
+            <PieChart className="h-4 w-4" />
+            {isSidebarOpen && <span className="ml-2">Questionnaires</span>}
           </Button>
           <Button variant="ghost" className={cn(
             "w-full justify-start",
             !isSidebarOpen && "justify-center px-0"
-          )} onClick={() => setActiveTab('admin-controls')}>
+          )} onClick={() => setActiveTab('personnel')}>
+            <FileText className="h-4 w-4" />
+            {isSidebarOpen && <span className="ml-2">Personnel Statistic</span>}
+          </Button>
+          <Button variant="ghost" className={cn(
+            "w-full justify-start",
+            !isSidebarOpen && "justify-center px-0"
+          )} onClick={() => setActiveTab('student')}>
+            <SquareUser className="h-4 w-4" />
+            {isSidebarOpen && <span className="ml-2">Student</span>}
+          </Button>
+          <Button variant="ghost" className={cn(
+            "w-full justify-start",
+            !isSidebarOpen && "justify-center px-0"
+          )} onClick={() => setActiveTab('settings')}>
             <Settings className="h-4 w-4" />
             {isSidebarOpen && <span className="ml-2">Settings</span>}
           </Button>
@@ -80,7 +96,10 @@ export default function OfficerDashboard() {
         <div className="p-6">
           {activeTab === 'event-management' && <EventManagement />}
           {activeTab === 'demographic-analysis' && <DemographicAnalysis />}
-          {activeTab === 'reports-analytics' && <ReportsAnalytics />}
+          {activeTab === 'Questionnaires' && <Questionnaires />}
+          {activeTab === 'personnel' && <PersonnelStatistic />}
+          {activeTab === 'student' && <StudentDashboard />}
+          {activeTab === 'settings' && <SettingsForm />}
         </div>
       </main>
     </div>

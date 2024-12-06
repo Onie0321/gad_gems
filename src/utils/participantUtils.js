@@ -158,8 +158,14 @@ export const formatStudentId = (input) => {
     return { duplicateError: "", newEntryInfo: "" };
   };
   
-  export const debouncedCheckDuplicates = debounce(checkDuplicates, 300);
-  
+  export const debouncedCheckDuplicates = (...args) =>
+    new Promise((resolve) => {
+      debounce(async () => {
+        const result = await checkDuplicates(...args);
+        resolve(result);
+      }, 300)();
+    });
+    
   export const handleAutofill = async (value, currentEventId) => {
     try {
       const data = await fetchParticipantData(value, currentEventId);
