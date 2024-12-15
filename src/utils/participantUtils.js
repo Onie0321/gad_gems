@@ -26,6 +26,10 @@ export const formatStudentId = (input) => {
       errors.age = "Age must be between 1 and 125.";
     }
   
+    if (!participant.homeAddress || participant.homeAddress.trim() === "") {
+      errors.homeAddress = "Home Address is required.";
+    }
+
     // Validate Sex
     if (!participant.sex || !["Male", "Female"].includes(participant.sex)) {
       errors.sex = "Sex is required and must be Male or Female.";
@@ -76,6 +80,10 @@ export const formatStudentId = (input) => {
       participant.age > 125
     ) {
       errors.age = "Age must be between 1 and 125.";
+    }
+
+    if (!participant.homeAddress || participant.homeAddress.trim() === "") {
+      errors.homeAddress = "Home Address is required.";
     }
   
     // Validate Sex
@@ -158,8 +166,18 @@ export const formatStudentId = (input) => {
     return { duplicateError: "", newEntryInfo: "" };
   };
   
-  export const debouncedCheckDuplicates = debounce(checkDuplicates, 300);
-  
+  export const debouncedCheckDuplicates = (...args) =>
+    new Promise((resolve) => {
+      debounce(async () => {
+        const result = await checkDuplicates(...args);
+        resolve(result);
+      }, 300)();
+    });
+    
+    export const isStudentIdComplete = (studentId) => {
+      return /^\d{2}-\d{2}-\d{4}$/.test(studentId);
+    };
+
   export const handleAutofill = async (value, currentEventId) => {
     try {
       const data = await fetchParticipantData(value, currentEventId);
