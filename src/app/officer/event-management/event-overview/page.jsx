@@ -26,7 +26,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Plus, Loader2, ArrowUpDown, RotateCcw } from "lucide-react";
+import { Plus, Loader2, ArrowUpDown, RotateCcw } from 'lucide-react';
 import { format, parseISO } from "date-fns";
 import {
   getEvents,
@@ -35,6 +35,7 @@ import {
   participantCollectionId,
   getParticipants,
   subscribeToRealTimeUpdates,
+  getCurrentUser,
 } from "@/lib/appwrite";
 
 export default function EventOverView({ setActiveSection }) {
@@ -49,32 +50,44 @@ export default function EventOverView({ setActiveSection }) {
   const [eventsPerPage, setEventsPerPage] = useState(5);
 
   useEffect(() => {
-    fetchData();
+    const fetchUserAndData = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        if (currentUser) {
+          fetchData(currentUser.id);
 
-    const unsubscribeEvents = subscribeToRealTimeUpdates(
-      eventCollectionId,
-      fetchData
-    );
-    const unsubscribeParticipants = subscribeToRealTimeUpdates(
-      participantCollectionId,
-      fetchData
-    );
+          const unsubscribeEvents = subscribeToRealTimeUpdates(
+            eventCollectionId,
+            () => fetchData(currentUser.id)
+          );
+          const unsubscribeParticipants = subscribeToRealTimeUpdates(
+            participantCollectionId,
+            () => fetchData(currentUser.id)
+          );
 
-    return () => {
-      unsubscribeEvents();
-      unsubscribeParticipants();
+          return () => {
+            unsubscribeEvents();
+            unsubscribeParticipants();
+          };
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+        setError("Failed to authenticate user.");
+      }
     };
+
+    fetchUserAndData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (userId) => {
     try {
       setLoading(true);
-      const fetchedEvents = await getEvents();
+      const fetchedEvents = await getEvents(userId);
       setEvents(fetchedEvents || []);
 
       if (fetchedEvents.length > 0) {
         const allParticipants = await Promise.all(
-          fetchedEvents.map((event) => getParticipants(event.$id))
+          fetchedEvents.map((event) => getParticipants(event.$id, userId))
         );
         setParticipants(allParticipants.flat() || []);
       } else {
@@ -96,6 +109,9 @@ export default function EventOverView({ setActiveSection }) {
     const femaleParticipants = participants.filter(
       (p) => p.sex === "Female"
     ).length;
+    const intersexParticipants = participants.filter(
+      (p) => p.sex === "Intersex"
+    ).length;
 
     return {
       total: events.length,
@@ -104,6 +120,7 @@ export default function EventOverView({ setActiveSection }) {
       totalParticipants,
       maleParticipants,
       femaleParticipants,
+      intersexParticipants,
     };
   }, [events, participants]);
 
@@ -126,10 +143,14 @@ export default function EventOverView({ setActiveSection }) {
     const femaleCount = eventParticipants.filter(
       (p) => p.sex === "Female"
     ).length;
+    const intersexCount = eventParticipants.filter(
+      (p) => p.sex === "Intersex"
+    ).length;
     return {
       total: eventParticipants.length,
       male: maleCount,
       female: femaleCount,
+      intersex: intersexCount,
     };
   };
 
@@ -184,7 +205,10 @@ export default function EventOverView({ setActiveSection }) {
     return (
       <div className="text-center text-red-500">
         <p>{error}</p>
-        <Button onClick={fetchData} className="mt-4">
+        <Button
+          onClick={() => getCurrentUser().then((user) => fetchData(user.id))}
+          className="mt-4"
+        >
           Retry
         </Button>
       </div>
@@ -234,7 +258,8 @@ export default function EventOverView({ setActiveSection }) {
             </p>
             <p className="text-sm text-muted-foreground">
               (Male: {summaryStats.maleParticipants} | Female:{" "}
-              {summaryStats.femaleParticipants})
+              {summaryStats.femaleParticipants} | Intersex:{" "}
+              {summaryStats.intersexParticipants})
             </p>
           </div>
         </CardContent>
@@ -301,8 +326,8 @@ export default function EventOverView({ setActiveSection }) {
                 <TableCell className="text-right">
                   <div>(Total: {participantCounts.total})</div>
                   <div className="text-sm text-muted-foreground">
-                    (M: {participantCounts.male} | F: {participantCounts.female}
-                    )
+                    (M: {participantCounts.male} | F: {participantCounts.female}{" "}
+                    | I: {participantCounts.intersex})
                   </div>
                 </TableCell>
               </TableRow>
@@ -343,3 +368,4 @@ export default function EventOverView({ setActiveSection }) {
     </div>
   );
 }
+

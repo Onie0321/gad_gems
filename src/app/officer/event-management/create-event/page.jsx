@@ -25,27 +25,18 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "react-toastify";
 import { Loader2, CalendarIcon } from "lucide-react";
-import {
-  format,
-  parse,
-  differenceInHours,
-  differenceInMinutes,
-  isBefore,
-} from "date-fns";
+import { format, parse, isBefore } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   createEvent,
   checkDuplicateEvent,
   checkTimeConflict,
+  createNotification,
 } from "@/lib/appwrite";
 import { schoolOptions } from "@/utils/participantUtils";
+import { getNonAcademicCategories } from "@/utils/eventUtils";
 
-export default function CreateEvent({
-  events,
-  setEvents,
-  setCurrentEventId,
-  setActiveSection,
-}) {
+export default function CreateEvent({ onEventCreated, user }) {
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState(null);
   const [eventTimeFrom, setEventTimeFrom] = useState("");
@@ -57,10 +48,7 @@ export default function CreateEvent({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [isTimeValid, setIsTimeValid] = useState(true);
-
-  const [participants, setParticipants] = useState([]);
-  const [participantName, setParticipantName] = useState("");
-  const [eventCreated, setEventCreated] = useState(false); // This tracks whether the event is created
+  const nonAcademicCategories = getNonAcademicCategories();
 
   useEffect(() => {
     if (eventTimeFrom && eventTimeTo) {
@@ -73,8 +61,12 @@ export default function CreateEvent({
         toast.warning("End time cannot be earlier than start time.");
       } else {
         setIsTimeValid(true);
-        const hours = Math.floor((end - start) / (1000 * 60 * 60));
-        const minutes = Math.floor(((end - start) / (1000 * 60)) % 60);
+        const hours = Math.floor(
+          (end.getTime() - start.getTime()) / (1000 * 60 * 60)
+        );
+        const minutes = Math.floor(
+          ((end.getTime() - start.getTime()) / (1000 * 60)) % 60
+        );
         setDuration(`${hours} hours ${minutes} minutes`);
       }
     }
@@ -101,25 +93,16 @@ export default function CreateEvent({
     e.preventDefault();
     if (!validateEventForm()) return;
 
-    // Check for duplicate event on the frontend
-    if (
-      events.some(
-        (event) =>
-          event.name && event.name.toLowerCase() === eventName.toLowerCase()
-      )
-    ) {
-      toast.error(
-        "An event with this name already exists. Please choose a unique name."
-      );
+    if (!user || !user.$id) {
+      toast.error("User not authenticated. Please log in and try again.");
       return;
     }
 
     setLoading(true);
     try {
-      // Format the event date
+      if (!eventDate) throw new Error("Event date is required");
       const formattedDate = format(eventDate, "yyyy-MM-dd");
 
-      // Check for duplicate event using the backend
       const isDuplicate = await checkDuplicateEvent(
         eventName,
         formattedDate,
@@ -133,7 +116,6 @@ export default function CreateEvent({
         return;
       }
 
-      // Check for time conflict using the backend
       const hasTimeConflict = await checkTimeConflict(
         formattedDate,
         eventVenue,
@@ -146,7 +128,6 @@ export default function CreateEvent({
         return;
       }
 
-      // Create the new event object
       const newEvent = {
         eventName,
         eventDate: formattedDate,
@@ -155,18 +136,27 @@ export default function CreateEvent({
         eventVenue,
         eventType,
         eventCategory,
-        numberOfHours: parseFloat(duration.split(" ")[0]), // Extract hours from the duration
-        participants: participants || [], // Ensure participants is an array
+        numberOfHours: parseFloat(duration.split(" ")[0]),
         approvalStatus: "pending",
+        createdBy: user.$id,
       };
 
-      const createdEvent = await createEvent(newEvent);
-      setEvents([...events, createdEvent]);
-      setCurrentEventId(createdEvent.$id);
-      toast.success(
-        "Event created successfully. You can now add participants."
-      );
-      setActiveSection("participants");
+      const createdEvent = await createEvent(newEvent, user.$id);
+      onEventCreated(createdEvent);
+
+      /*  try {
+        await createNotification({
+          userId: "admin",
+          message: `New event "${eventName}" created by ${user.name}`,
+          type: "approval",
+          title: "New Event Approval Required",
+          status: "unread",
+          actionType: "event_approval",
+          approvalStatus: "pending",
+        });
+      } catch (notificationError) {
+        console.error("Failed to create notification:", notificationError);
+      }*/
 
       // Reset form fields
       setEventName("");
@@ -179,7 +169,11 @@ export default function CreateEvent({
       setDuration("");
     } catch (error) {
       console.error("Error creating event: ", error);
-      toast.error("Error creating event. Please try again.");
+      if (error instanceof Error) {
+        toast.error(`Error creating event: ${error.message}`);
+      } else {
+        toast.error("An unexpected error occurred. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -307,14 +301,7 @@ export default function CreateEvent({
                       </SelectItem>
                     ))}
                   {eventType === "Non-Academic" &&
-                    [
-                      "Student Organizations",
-                      "Sports",
-                      "Cultural",
-                      "Community Service",
-                      "Career Development",
-                      "Other",
-                    ].map((category) => (
+                    nonAcademicCategories.map((category) => (
                       <SelectItem key={category} value={category}>
                         {category}
                       </SelectItem>

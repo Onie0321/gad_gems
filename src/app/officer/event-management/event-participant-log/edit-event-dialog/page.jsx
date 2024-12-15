@@ -35,7 +35,7 @@ import {
   schoolOptions,
   capitalizeWords,
 } from "../../../../../utils/participantUtils";
-import { editEvent, updateEvent } from "@/lib/appwrite";
+import { editEvent } from "@/lib/appwrite";
 
 const EditEvent = ({ event, onUpdateEvent }) => {
   const [editingEvent, setEditingEvent] = useState(() => ({
@@ -123,7 +123,7 @@ const EditEvent = ({ event, onUpdateEvent }) => {
       setIsDialogOpen(false); // Close dialog on success
     } catch (error) {
       console.error("Error updating event:", error);
-      toast.error("Error updating event.");
+      toast.error("Failed to update event.");
     } finally {
       setLoading(false);
     }
@@ -320,6 +320,7 @@ const EditEvent = ({ event, onUpdateEvent }) => {
                 id="duration"
                 value={duration}
                 readOnly
+                disabled
                 className={isTimeValid ? "" : "border-red-500"}
               />
               {!isTimeValid && (

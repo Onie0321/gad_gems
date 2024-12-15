@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { listQuestions, listResponses } from '@/lib/appwrite'
-import { useToast } from 'react-toastify'
+import { useToast } from '@/hooks/use-toast'
 
 export default function ChartsAndTables() {
   const [chartData, setChartData] = useState([])

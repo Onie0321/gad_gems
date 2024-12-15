@@ -60,54 +60,50 @@ import {
   schoolOptions,
   debouncedCheckDuplicates,
   handleAutofill,
+  isStudentIdComplete,
+  checkDuplicates,
 } from "@/utils/participantUtils";
-import {
-  createParticipant,
-} from "@/lib/appwrite";
+import { createParticipant, getCurrentUser } from "@/lib/appwrite";
 import EditParticipantDialog from "./edit-participant-dialog/page";
 import DeleteParticipantDialog from "./delete-participant-dialog/page";
-import {debounce} from "lodash"
+import { debounce } from "lodash";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function ParticipantManagement({
   events,
-  participants,
-  setParticipants,
   currentEventId,
   setCurrentEventId,
-  setActiveSection,
+  user,
 }) {
   const [participantData, setParticipantData] = useState({
     studentId: "",
     name: "",
     sex: "",
     age: "",
+    homeAddress: "",
     school: "",
     year: "",
     section: "",
     ethnicGroup: "",
     otherEthnicGroup: "",
   });
+  const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [addButtonText, setAddButtonText] = useState("Add Participant");
-  const [isEditingParticipant, setIsEditingParticipant] = useState(false);
   const [totalParticipants, setTotalParticipants] = useState(0);
   const [totalMaleParticipants, setTotalMaleParticipants] = useState(0);
   const [totalFemaleParticipants, setTotalFemaleParticipants] = useState(0);
-  const [duplicateErrors, setDuplicateErrors] = useState("");
-  const [showFinishButton, setShowFinishButton] = useState(false);
+  const [totalIntersexParticipants, setTotalIntersexParticipants] = useState(0);
   const [showAutofillDialog, setShowAutofillDialog] = useState(false);
   const [autofillData, setAutofillData] = useState(null);
   const [newEntryInfo, setNewEntryInfo] = useState({});
+  const [duplicateErrors, setDuplicateErrors] = useState({});
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  //const router = useRouter();
+  //const pathname = usePathname();
 
   const currentEvent = events.find((e) => e.$id === currentEventId);
   const isEventSelected = !!currentEvent;
-
-  useEffect(() => {
-    if (!isEventSelected) {
-      toast.error("Please select a valid event.");
-    }
-  }, [isEventSelected]);
 
   // Effect to update counters whenever participants change
   useEffect(() => {
@@ -121,29 +117,56 @@ export default function ParticipantManagement({
     setTotalFemaleParticipants(
       currentEventParticipants.filter((p) => p.sex === "Female").length
     );
+    setTotalIntersexParticipants(
+      currentEventParticipants.filter((p) => p.sex === "Intersex").length
+    );
   }, [participants, currentEventId]);
 
   const handleInputChange = async (field, value) => {
     setParticipantData((prev) => ({ ...prev, [field]: value }));
 
     if (field === "studentId" || field === "name") {
-      const { duplicateErrors, newEntryInfo } = await debouncedCheckDuplicates(field, value, currentEventId);
-      setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateErrors }));
-      setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
+      if (field === "studentId" && !isStudentIdComplete(value)) {
+        setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
+        setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
+        return;
+      }
 
-      if (value) {
-        try {
+      try {
+        const result = await debouncedCheckDuplicates(
+          field,
+          value,
+          currentEventId
+        );
+        if (result) {
+          const { duplicateError, newEntryInfo } = result;
+          setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
+          setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
+        }
+
+        if (value && field === "studentId") {
           const autofillData = await handleAutofill(value, currentEventId);
           if (autofillData) {
             setAutofillData(autofillData);
             setShowAutofillDialog(true);
           }
-        } catch (error) {
-          toast.error(error.message);
         }
+      } catch (error) {
+        console.error("Error checking duplicates:", error);
+        toast.error("An error occurred while checking for duplicates.");
       }
     }
   };
+
+  const debouncedCheckDuplicates = debounce(async (field, value) => {
+    const { duplicateError, newEntryInfo } = await checkDuplicates(
+      field,
+      value,
+      currentEventId
+    );
+    setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
+    setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
+  }, 500);
 
   const handleAutofillConfirm = () => {
     setParticipantData((prev) => ({
@@ -158,7 +181,7 @@ export default function ParticipantManagement({
     setShowAutofillDialog(false);
   };
 
-   const handleAddParticipant = async (e) => {
+  const handleAddParticipant = async (e) => {
     e.preventDefault();
 
     if (!validateParticipantForm(participantData, setErrors)) return;
@@ -168,8 +191,15 @@ export default function ParticipantManagement({
       return;
     }
 
+    if (!user || !user.$id) {
+      toast.error("User not authenticated. Please log in and try again.");
+      return;
+    }
+
     if (duplicateErrors.studentId || duplicateErrors.name) {
-      toast.error("Please resolve duplicate entries before adding the participant.");
+      toast.error(
+        "Please resolve duplicate entries before adding the participant."
+      );
       return;
     }
 
@@ -179,12 +209,16 @@ export default function ParticipantManagement({
         ...participantData,
         age: parseInt(participantData.age),
         eventId: currentEventId,
+        createdBy: user.$id,
+        createdByName: user.name, // Add the user's name
+        createdAt: new Date().toISOString(), // Add the creation timestamp
+        status: "pending", // Set the initial status to pending
       };
 
-      console.log("New participant data:", newParticipant); // Add this line for debugging
-
-
-      const createdParticipant = await createParticipant(newParticipant);
+      const createdParticipant = await createParticipant(
+        newParticipant,
+        user.$id
+      );
       setParticipants((prev) => [...prev, createdParticipant]);
       toast.success(`Participant added to ${currentEvent.eventName}`);
       setParticipantData({
@@ -199,10 +233,9 @@ export default function ParticipantManagement({
         otherEthnicGroup: "",
       });
       setDuplicateErrors({});
-      setShowFinishButton(true);
       setNewEntryInfo({});
     } catch (error) {
-      console.error("Error details:", error); // Add this line for debugging
+      console.error("Error details:", error);
       toast.error(`Error adding participant: ${error.message}`);
     } finally {
       setLoading(false);
@@ -215,6 +248,7 @@ export default function ParticipantManagement({
       name: "",
       sex: "",
       age: "",
+      homeAddress: "",
       school: "",
       year: "",
       section: "",
@@ -222,16 +256,16 @@ export default function ParticipantManagement({
       otherEthnicGroup: "",
     });
 
-    // Reset participants state
     setParticipants([]);
-    setCurrentEventId(null); // Clear the selected event
+    setCurrentEventId(null);
 
-    // Reset event selection and counts
-    setActiveSection("overview"); // Navigate to the overview or another section
     setTotalParticipants(0);
     setTotalMaleParticipants(0);
     setTotalFemaleParticipants(0);
-    setShowFinishButton(false);
+    setTotalIntersexParticipants(0);
+
+    setShowSuccessMessage(true);
+    toast.success("Event created successfully. Waiting for admin approval.");
   };
 
   const handleUpdateParticipant = (updatedParticipant) => {
@@ -249,39 +283,13 @@ export default function ParticipantManagement({
   };
 
   useEffect(() => {
-    // Retrieve saved state from localStorage
-    const savedParticipantData = localStorage.getItem("participantData");
-    const savedParticipants = localStorage.getItem("participants");
-
-    if (savedParticipantData) {
-      setParticipantData(JSON.parse(savedParticipantData));
-    } else {
-      // Initialize default participant data
-      setParticipantData({
-        studentId: "",
-        name: "",
-        sex: "",
-        age: "",
-        school: "",
-        year: "",
-        section: "",
-        ethnicGroup: "",
-        otherEthnicGroup: "",
-      });
+    if (showSuccessMessage) {
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 5000);
+      return () => clearTimeout(timer);
     }
-
-    if (savedParticipants) {
-      setParticipants(JSON.parse(savedParticipants));
-    } else {
-      setParticipants([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Save participant data and participants list to localStorage
-    localStorage.setItem("participantData", JSON.stringify(participantData));
-    localStorage.setItem("participants", JSON.stringify(participants));
-  }, [participantData, participants]); // Save changes when these states are updated
+  }, [showSuccessMessage]);
 
   return (
     <Card>
@@ -289,12 +297,10 @@ export default function ParticipantManagement({
         <CardTitle>Add Participant</CardTitle>
         <CardDescription>
           {currentEvent
-            ? `Add participants to ${
-                events.find((e) => e.$id === currentEventId)?.eventName
-              }`
+            ? `Add participants to ${currentEvent.eventName}`
             : "No active event selected"}
-        </CardDescription>{" "}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        </CardDescription>
+        <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="bg-primary text-primary-foreground p-4 rounded-lg">
             <h3 className="text-lg font-semibold">Total Participants</h3>
             <p className="text-3xl font-bold">{totalParticipants}</p>
@@ -307,6 +313,10 @@ export default function ParticipantManagement({
             <h3 className="text-lg font-semibold">Female Participants</h3>
             <p className="text-3xl font-bold">{totalFemaleParticipants}</p>
           </div>
+          <div className="bg-purple-500 text-white p-4 rounded-lg">
+            <h3 className="text-lg font-semibold">Intersex Participants</h3>
+            <p className="text-3xl font-bold">{totalIntersexParticipants}</p>
+          </div>
         </div>
         {!isEventSelected && (
           <Alert variant="destructive" className="mb-4">
@@ -317,6 +327,14 @@ export default function ParticipantManagement({
           </Alert>
         )}
       </CardHeader>
+      {showSuccessMessage && (
+        <Alert variant="success" className="mb-4">
+          <AlertTitle>Success</AlertTitle>
+          <AlertDescription>
+            Event created successfully. Waiting for admin approval.
+          </AlertDescription>
+        </Alert>
+      )}
       <form onSubmit={handleAddParticipant}>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -331,12 +349,12 @@ export default function ParticipantManagement({
                         value={participantData.studentId}
                         onChange={(e) => {
                           const newStudentId = formatStudentId(e.target.value);
-                          handleInputChange("studentId", e.target.value); // Calling the existing function with the raw value
+                          handleInputChange("studentId", e.target.value);
                           setParticipantData({
                             ...participantData,
-                            studentId: newStudentId, // Update the studentId after formatting
+                            studentId: newStudentId,
                           });
-                          setDuplicateErrors(""); // Clear any previous duplicate errors
+                          setDuplicateErrors("");
                         }}
                         placeholder="00-00-0000"
                         maxLength={10}
@@ -350,16 +368,22 @@ export default function ParticipantManagement({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {errors.studentId && (
-                <p className="text-sm text-red-500">{errors.studentId}</p>
-              )}
-              {duplicateErrors.studentId && (
-                <p className="text-sm text-red-500">
-                  {duplicateErrors.studentId}
-                </p>
-              )}
-                 {newEntryInfo.studentId && (
-                <p className="text-sm text-green-500">{newEntryInfo.studentId}</p>
+              {isStudentIdComplete(participantData.studentId) && (
+                <>
+                  {errors.studentId && (
+                    <p className="text-sm text-red-500">{errors.studentId}</p>
+                  )}
+                  {duplicateErrors.studentId && (
+                    <p className="text-sm text-red-500">
+                      {duplicateErrors.studentId}
+                    </p>
+                  )}
+                  {newEntryInfo.studentId && (
+                    <p className="text-sm text-green-500">
+                      {newEntryInfo.studentId}
+                    </p>
+                  )}
+                </>
               )}
             </div>
             <div className="space-y-2">
@@ -368,13 +392,13 @@ export default function ParticipantManagement({
                 id="name"
                 value={participantData.name}
                 onChange={(e) => {
-                  const formattedName = capitalizeWords(e.target.value); // Capitalize the name
-                  handleInputChange("name", e.target.value); // Calling the existing function with the raw value
+                  const formattedName = capitalizeWords(e.target.value);
+                  handleInputChange("name", e.target.value);
                   setParticipantData({
                     ...participantData,
-                    name: formattedName, // Update the name after capitalizing
+                    name: formattedName,
                   });
-                  setDuplicateErrors(""); // Clear any previous duplicate errors
+                  setDuplicateErrors("");
                 }}
                 placeholder="Enter full name"
                 disabled={!isEventSelected}
@@ -385,31 +409,31 @@ export default function ParticipantManagement({
               {duplicateErrors.name && (
                 <p className="text-sm text-red-500">{duplicateErrors.name}</p>
               )}
-                {newEntryInfo.name && (
+              {newEntryInfo.name && (
                 <p className="text-sm text-green-500">{newEntryInfo.name}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sex">Sex</Label>
+              <Label htmlFor="sex">Sex at Birth</Label>
               <Select
-                value={participantData.sex} // Ensure this value comes from participantData
+                value={participantData.sex}
                 onValueChange={(value) =>
                   setParticipantData({ ...participantData, sex: value })
                 }
                 disabled={!isEventSelected}
               >
                 <SelectTrigger id="sex">
-                  <SelectValue placeholder="Select sex" />
+                  <SelectValue placeholder="Select sex at Birth" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Male">Male</SelectItem>
                   <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Intersex">Intersex</SelectItem>
                 </SelectContent>
               </Select>
               {errors.sex && (
                 <p className="text-sm text-red-500">{errors.sex}</p>
               )}
-              
             </div>
             <div className="space-y-2">
               <Label htmlFor="age">Age</Label>
@@ -448,6 +472,24 @@ export default function ParticipantManagement({
               </TooltipProvider>
               {errors.age && (
                 <p className="text-sm text-red-500">{errors.age}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="homeAddress">Home Address</Label>
+              <Input
+                id="homeAddress"
+                value={participantData.homeAddress}
+                onChange={(e) =>
+                  setParticipantData({
+                    ...participantData,
+                    homeAddress: capitalizeWords(e.target.value),
+                  })
+                }
+                placeholder="Enter home address"
+                disabled={!isEventSelected}
+              />
+              {errors.homeAddress && (
+                <p className="text-sm text-red-500">{errors.homeAddress}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -540,7 +582,7 @@ export default function ParticipantManagement({
             <div className="space-y-2">
               <Label htmlFor="ethnicGroup">Ethnic Group</Label>
               <Select
-                value={participantData.ethnicGroup} // Ensure this value comes from participantData
+                value={participantData.ethnicGroup}
                 onValueChange={(value) =>
                   setParticipantData({
                     ...participantData,
@@ -589,13 +631,12 @@ export default function ParticipantManagement({
               </div>
             )}
           </div>
-        
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button
             type="button"
             variant="outline"
-            onClick={() => setActiveSection("create")}
+            onClick={() => setCurrentEventId(null)}
           >
             Back to Events
           </Button>
@@ -619,7 +660,7 @@ export default function ParticipantManagement({
             <Button
               type="button"
               onClick={handleFinishAddingParticipants}
-              disabled={totalParticipants === 0} // Disabled if no participants added
+              disabled={totalParticipants === 0}
               className={
                 totalParticipants === 0 ? "opacity-50 cursor-not-allowed" : ""
               }
@@ -636,10 +677,7 @@ export default function ParticipantManagement({
             <TableHead>Name</TableHead>
             <TableHead>Sex</TableHead>
             <TableHead>Age</TableHead>
-            <TableHead className="text-center">School</TableHead>
-            <TableHead>Year</TableHead>
-            <TableHead>Section</TableHead>
-            <TableHead>Ethnic Group</TableHead>
+            <TableHead>School</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -651,13 +689,6 @@ export default function ParticipantManagement({
               <TableCell>{participant.sex}</TableCell>
               <TableCell>{participant.age}</TableCell>
               <TableCell>{participant.school}</TableCell>
-              <TableCell>{participant.year}</TableCell>
-              <TableCell>{participant.section}</TableCell>
-              <TableCell>
-                {participant.ethnicGroup === "Other"
-                  ? participant.otherEthnicGroup
-                  : participant.ethnicGroup}
-              </TableCell>
               <TableCell>
                 <EditParticipantDialog
                   participant={participant}
