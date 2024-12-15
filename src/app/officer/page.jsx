@@ -32,8 +32,12 @@ export default function OfficerDashboard() {
           router.push("/sign-in");
         } else {
           setUser(currentUser);
-          setShowWelcomeModal(true);
-        }
+          if (currentUser.isFirstLogin === true) {
+            setShowWelcomeModal(true);
+            // Update the user's first login status
+            await updateUserFirstLogin(currentUser.$id);
+          }
+                }
       } catch (err) {
         console.error("Error checking user role:", err);
         setError(

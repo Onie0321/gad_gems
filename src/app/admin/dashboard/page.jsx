@@ -145,6 +145,25 @@ export default function DashboardOverview() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsers}</div>
+            <div className="flex flex-col space-y-1 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Approved:</span>
+                <Badge variant="success">{approvedUsers}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Pending:</span>
+                <Badge variant="warning">{pendingUsers}</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Sex Distribution
             </CardTitle>
@@ -198,25 +217,6 @@ export default function DashboardOverview() {
                   </span>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}</div>
-            <div className="flex flex-col space-y-1 text-xs text-muted-foreground">
-              <div className="flex items-center justify-between">
-                <span>Approved:</span>
-                <Badge variant="success">{approvedUsers}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Pending:</span>
-                <Badge variant="warning">{pendingUsers}</Badge>
-              </div>
             </div>
           </CardContent>
         </Card>
