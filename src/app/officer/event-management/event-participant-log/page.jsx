@@ -2,15 +2,6 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   Card,
   CardContent,
   CardHeader,
@@ -32,8 +23,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Label } from "@/components/ui/label";
-import { Users, BarChart, Edit, Trash2, Plus, Eye } from "lucide-react";
+import {
+  Users,
+  BarChart,
+  Edit,
+  Trash2,
+  Plus,
+  Eye,
+  Loader2,
+} from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import {
@@ -43,6 +41,13 @@ import {
   participantCollectionId,
   getParticipants,
   subscribeToRealTimeUpdates,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  createParticipant,
+  updateParticipant,
+  deleteParticipant,
+  getCurrentUser,
 } from "@/lib/appwrite";
 
 import AddParticipant from "./add-participant-dialog/page";
@@ -52,10 +57,9 @@ import ViewParticipants from "./view-participant-dialog/page";
 import ExportEventsButton from "./export-event/page";
 import GenerateReportButton from "./import-event/page";
 
-
 export default function EventParticipantLog() {
   const [events, setEvents] = useState([]);
-  const [participants, setParticipants] = useState([]); // Define participants with useState
+  const [participants, setParticipants] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -78,48 +82,54 @@ export default function EventParticipantLog() {
   const [isAddingParticipant, setIsAddingParticipant] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showParticipants, setShowParticipants] = useState(false);
-  const [currentEvent, setCurrentEvent] = useState(null);
-  const [selectedEventId, setSelectedEventId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    // Simulate fetching event data
-    const fetchEvent = async () => {
-      const event = await getEvents(); // Replace with your actual API call
-      setCurrentEvent(event);
-      setSelectedEventId(event?.$id);
+    const fetchUserAndData = async () => {
+      try {
+        const user = await getCurrentUser();
+        console.log("Current user:", user);
+        setCurrentUser(user);
+        if (user) {
+          fetchData(user.$id);
+
+          const unsubscribeEvents = subscribeToRealTimeUpdates(
+            eventCollectionId,
+            () => fetchData(user.$id)
+          );
+          const unsubscribeParticipants = subscribeToRealTimeUpdates(
+            participantCollectionId,
+            () => fetchData(user.$id)
+          );
+
+          return () => {
+            unsubscribeEvents();
+            unsubscribeParticipants();
+          };
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+        setError("Failed to authenticate user.");
+        setLoading(false);
+      }
     };
 
-    fetchEvent();
+    fetchUserAndData();
   }, []);
 
-  useEffect(() => {
-    fetchData();
-
-    const unsubscribeEvents = subscribeToRealTimeUpdates(
-      eventCollectionId,
-      fetchData
-    );
-    const unsubscribeParticipants = subscribeToRealTimeUpdates(
-      participantCollectionId,
-      fetchData
-    );
-
-    return () => {
-      unsubscribeEvents();
-      unsubscribeParticipants();
-    };
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = async (userId) => {
     try {
       setLoading(true);
-      const fetchedEvents = await getEvents();
+      console.log("Fetching data for user ID:", userId);
+      const fetchedEvents = await getEvents(userId);
+      console.log("Fetched events:", fetchedEvents);
       setEvents(fetchedEvents || []);
 
       if (fetchedEvents.length > 0) {
         const allParticipants = await Promise.all(
-          fetchedEvents.map((event) => getParticipants(event.$id))
+          fetchedEvents.map((event) => getParticipants(event.$id, userId))
         );
+        console.log("Fetched participants:", allParticipants);
         setParticipants(allParticipants.flat() || []);
       } else {
         setParticipants([]);
@@ -136,19 +146,6 @@ export default function EventParticipantLog() {
     return participants.filter((p) => p.eventId === eventId).length;
   };
 
-  const eventData = useMemo(() => {
-    return events.map((event) => {
-      const eventParticipants = participants.filter(
-        (p) => p.eventId === event.id
-      );
-      return {
-        ...event,
-        participantCount: eventParticipants.length,
-        status: event.status || "Pending", // Assuming event status is stored, otherwise defaulting to 'Pending'
-      };
-    });
-  }, [events, participants]);
-
   const filteredEvents = events.filter((event) => {
     const eventName = event.eventName?.toLowerCase() || "";
     const eventVenue = event.eventVenue?.toLowerCase() || "";
@@ -163,29 +160,42 @@ export default function EventParticipantLog() {
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     if (sortCriteria === "eventDate")
       return new Date(b.eventDate) - new Date(a.eventDate);
-    if (sortCriteria === "eventName")
-      return (a.eventName || "").localeCompare(b.eventName || "");
+    if (sortCriteria === "eventName") {
+      return a.eventName.localeCompare(b.eventName);
+    }
     if (sortCriteria === "participantCount")
       return getParticipantCount(b.$id) - getParticipantCount(a.$id);
     return 0;
   });
 
-  const handleUpdateEvent = (updatedEvent) => {
-    setEvents((prevEvents) =>
-      prevEvents.map((event) =>
-        event.$id === updatedEvent.$id ? { ...event, ...updatedEvent } : event
-      )
-    );
+  const handleUpdateEvent = async (updatedEvent) => {
+    if (!currentUser) return;
+    try {
+      const updated = await updateEvent(updatedEvent.$id, {
+        ...updatedEvent,
+        updatedBy: currentUser.id,
+      });
+      setEvents((prevEvents) =>
+        prevEvents.map((event) =>
+          event.$id === updatedEvent.$id ? { ...event, ...updated } : event
+        )
+      );
+      toast.success("Event updated successfully");
+    } catch (error) {
+      console.error("Error updating event:", error);
+      toast.error("Failed to update event.");
+    }
   };
 
   const handleDeleteEvent = async (eventId) => {
+    if (!currentUser) return;
     if (
       window.confirm(
         "Are you sure you want to delete this event? This action cannot be undone."
       )
     ) {
       try {
-        await deleteEvent(eventId); // Call deleteEvent function
+        await deleteEvent(eventId, currentUser.id);
         setEvents((prevEvents) =>
           prevEvents.filter((event) => event.$id !== eventId)
         );
@@ -197,15 +207,25 @@ export default function EventParticipantLog() {
     }
   };
 
-  const handleAddEvent = () => {
-    const eventId = Date.now().toString(); // Simple ID generation
-    setEvents([...events, { ...newEvent, id: eventId }]);
-    setNewEvent({ name: "", date: "", venue: "", status: "Pending" });
-    setIsAddingEvent(false);
-    toast.success("New event added successfully");
+  const handleAddEvent = async () => {
+    if (!currentUser) return;
+    try {
+      const createdEvent = await createEvent({
+        ...newEvent,
+        createdBy: currentUser.id,
+      });
+      setEvents([...events, createdEvent]);
+      setNewEvent({ name: "", date: "", venue: "", status: "Pending" });
+      setIsAddingEvent(false);
+      toast.success("New event added successfully");
+    } catch (error) {
+      console.error("Error adding event:", error);
+      toast.error("Failed to add event.");
+    }
   };
 
-  const handleAddParticipant = () => {
+  const handleAddParticipant = async () => {
+    if (!currentUser) return;
     if (
       participants.some(
         (p) =>
@@ -218,22 +238,29 @@ export default function EventParticipantLog() {
       );
       return;
     }
-    setParticipants([
-      ...participants,
-      { ...newParticipant, id: Date.now().toString() },
-    ]);
-    setNewParticipant({ name: "", studentId: "", eventId: "" });
-    setIsAddingParticipant(false);
-    toast.success("New participant added successfully");
-  };
-
-  const handleEditParticipant = (participant) => {
-    setEditingParticipant({ ...participant });
+    try {
+      const createdParticipant = await createParticipant({
+        ...newParticipant,
+        createdBy: currentUser.id,
+        eventId: selectedEvent.$id,
+      });
+      setParticipants([...participants, createdParticipant]);
+      setNewParticipant({ name: "", studentId: "", eventId: "" });
+      setIsAddingParticipant(false);
+      toast.success("New participant added successfully");
+    } catch (error) {
+      console.error("Error adding participant:", error);
+      toast.error("Failed to add participant.");
+    }
   };
 
   const handleSaveParticipantEdit = async () => {
+    if (!currentUser) return;
     try {
-      await updateParticipant(editingParticipant.$id, editingParticipant);
+      await updateParticipant(editingParticipant.$id, {
+        ...editingParticipant,
+        updatedBy: currentUser.id,
+      });
       setParticipants(
         participants.map((p) =>
           p.$id === editingParticipant.$id ? editingParticipant : p
@@ -248,13 +275,14 @@ export default function EventParticipantLog() {
   };
 
   const handleDeleteParticipant = async (participantId) => {
+    if (!currentUser) return;
     if (
       window.confirm(
         "Are you sure you want to delete this participant? This action cannot be undone."
       )
     ) {
       try {
-        await deleteParticipant(participantId);
+        await deleteParticipant(participantId, currentUser.id);
         setParticipants(participants.filter((p) => p.$id !== participantId));
         toast.success("Participant deleted successfully");
       } catch (error) {
@@ -264,27 +292,26 @@ export default function EventParticipantLog() {
     }
   };
 
-  const handleViewParticipants = (event) => {
-    setSelectedEvent(event);
-    setShowParticipants(true);
-  };
-
   const getParticipantCounts = (eventId) => {
     const eventParticipants = participants.filter((p) => p.eventId === eventId);
     const maleCount = eventParticipants.filter((p) => p.sex === "Male").length;
     const femaleCount = eventParticipants.filter(
       (p) => p.sex === "Female"
     ).length;
+    const intersexCount = eventParticipants.filter(
+      (p) => p.sex === "Intersex"
+    ).length;
 
     return {
       total: eventParticipants.length,
       male: maleCount,
       female: femaleCount,
+      intersex: intersexCount,
     };
   };
 
   const getStatusStyles = (status) => {
-    if (!status || status.trim() === "") status = "Pending"; // Default to Pending if no status is set
+    if (!status || status.trim() === "") status = "Pending";
     switch (status) {
       case "Pending":
         return "bg-yellow-100 text-yellow-800";
@@ -297,14 +324,40 @@ export default function EventParticipantLog() {
     }
   };
 
-  const summaryStats = React.useMemo(
+  const summaryStats = useMemo(
     () => ({
       total: events.length,
-      academic: events.filter((e) => e.eventType === "Academic").length, // Use eventType attribute
-      nonAcademic: events.filter((e) => e.eventType === "Non-Academic").length, // Use eventType attribute
+      academic: events.filter((e) => e.eventType === "Academic").length,
+      nonAcademic: events.filter((e) => e.eventType === "Non-Academic").length,
     }),
     [events]
   );
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center text-red-500">
+        <p>{error}</p>
+        <Button
+          onClick={() => getCurrentUser().then((user) => fetchData(user.id))}
+          className="mt-4"
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <div>Please log in to view the Event Participant Log.</div>;
+  }
 
   return (
     <Card>
@@ -313,6 +366,7 @@ export default function EventParticipantLog() {
         <CardDescription>
           View and manage all events and their participants
         </CardDescription>
+
         <div className="mt-4 grid grid-cols-3 gap-4">
           <div className="bg-primary text-primary-foreground p-4 rounded-lg">
             <h3 className="text-lg font-semibold">Total Events</h3>
@@ -343,7 +397,7 @@ export default function EventParticipantLog() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="eventDate">Event Date</SelectItem>
-                <SelectItem value="name">Event Name</SelectItem>
+                <SelectItem value="eventName">Event Name</SelectItem>
                 <SelectItem value="participantCount">
                   Participant Count
                 </SelectItem>
@@ -362,9 +416,9 @@ export default function EventParticipantLog() {
             </Select>
           </div>
           <div className="flex space-x-2">
-  <ExportEventsButton />
-  <GenerateReportButton />
-</div>
+            <ExportEventsButton />
+            <GenerateReportButton />
+          </div>
         </div>
         <div className="max-h-[330px] overflow-y-auto">
           <Table>
@@ -397,7 +451,8 @@ export default function EventParticipantLog() {
                       <div>Total: {participantCounts.total}</div>
                       <div className="text-sm text-muted-foreground">
                         (M: {participantCounts.male} | F:{" "}
-                        {participantCounts.female})
+                        {participantCounts.female} | I:{" "}
+                        {participantCounts.intersex})
                       </div>
                     </TableCell>
                     <TableCell>
@@ -454,10 +509,77 @@ export default function EventParticipantLog() {
           onClose={() => setShowParticipants(false)}
           participants={participants}
           selectedEvent={selectedEvent}
-          onEditParticipant={handleEditParticipant}
+          onEditParticipant={setEditingParticipant}
           onDeleteParticipant={handleDeleteParticipant}
           onAddParticipant={handleAddParticipant}
-        />
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Sex</TableHead>
+                <TableHead>Age</TableHead>
+                <TableHead>School</TableHead>
+                <TableHead>Added By</TableHead>
+                <TableHead>Added On</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {participants
+                .filter((p) => p.eventId === selectedEvent.$id)
+                .map((participant) => (
+                  <TableRow key={participant.$id}>
+                    <TableCell>{participant.studentId}</TableCell>
+                    <TableCell>{participant.name}</TableCell>
+                    <TableCell>{participant.sex}</TableCell>
+                    <TableCell>{participant.age}</TableCell>
+                    <TableCell>{participant.school}</TableCell>
+                    <TableCell>{participant.createdByName}</TableCell>
+                    <TableCell>
+                      {format(
+                        new Date(participant.$createdAt),
+                        "MM/dd/yyyy HH:mm"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          participant.status === "pending"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {participant.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingParticipant(participant)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            handleDeleteParticipant(participant.$id)
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </ViewParticipants>
       )}
     </Card>
   );

@@ -18,17 +18,6 @@ export const validateEventForm = (event) => {
     return errors;
   };  
 
-export const getNonAcademicCategories = () => {
-    return [
-      "Student Organizations",
-      "Sports",
-      "Cultural",
-      "Community Service",
-      "Career Development",
-      "Other",
-    ];
-  };
-  
   
   export const schoolOptions = [
     { name: "School of Accountancy and Business Management", abbr: "SABM" },
@@ -41,3 +30,39 @@ export const getNonAcademicCategories = () => {
     { name: "School of Industrial Technology", abbr: "SIT" },
     { name: "School of Information Technology", abbr: "SITech" },
   ];
+
+  // src/utils/participantUtils.js
+
+export const getNonAcademicCategories = () => {
+  return [
+    "Accounting Unit",
+    "Admission Office",
+    "Budget Unit",
+    "Cash Unit",
+    "Data Protection Office",
+    "Disaster Risk Reduction Management Office",
+    "Extension and Rural Development Office",
+    "Gender and Development Office",
+    "General Services Unit",
+    "Guidance Office",
+    "Health Services Unit",
+    "ICT Unit",
+    "IGP and Auxiliary Office",
+    "International, External, and Alumni Services Office",
+    "Legal Unit",
+    "Library",
+    "National Service Training Program",
+    "Office of Internal Audit",
+    "Planning Unit",
+    "Procurement Management Unit",
+    "Project Management Unit",
+    "Quality Assurance Management Office",
+    "Records Unit",
+    "Research and Development Office",
+    "Scholarship Office",
+    "Sentro ng Wika at Kultura",
+    "Sports Development Unit",
+    "Supply Unit",
+    "Testing and Evaluation Center",
+  ];
+};

@@ -86,3 +86,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+card {
+  @apply bg-card text-card-foreground shadow-sm;
+}
+
+.chart-container {
+  @apply rounded-md border p-4;
+}
+
+@media (max-width: 640px) {
+  .chart-container {
+    @apply p-2;
+  }
+}
