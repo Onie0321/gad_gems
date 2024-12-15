@@ -179,7 +179,6 @@ export async function getCurrentUser() {
 
     console.log("Current user response:", currentUserResponse); // Add this log
 
-
     if (
       !currentUserResponse ||
       !Array.isArray(currentUserResponse.documents) ||
@@ -1275,4 +1274,121 @@ export async function fetchNotifications(filters = []) {
     console.error("Error fetching notifications:", error);
     throw error;
   }
+}
+
+export async function fetchTotals() {
+  try {
+    // Fetch events
+    const eventsResponse = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [Query.orderDesc("eventDate")] // Order by date descending
+    );
+    const totalEvents = eventsResponse.total;
+    const events = eventsResponse.documents;
+
+    // Count events by type
+    const academicEvents = events.filter(
+      (event) => event.eventType === "Academic"
+    ).length;
+    const nonAcademicEvents = events.filter(
+      (event) => event.eventType === "Non-Academic"
+    ).length;
+
+    // Fetch participants for each event
+    const participantsResponse = await databases.listDocuments(
+      databaseId,
+      participantCollectionId,
+      [Query.limit(1000)]
+    );
+
+    // Count participants per event
+    const participantCountByEvent = participantsResponse.documents.reduce(
+      (acc, participant) => {
+        const eventId = participant.eventId;
+        acc[eventId] = (acc[eventId] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    // Add participant count to each event
+    const eventsWithParticipants = events.map((event) => ({
+      ...event,
+      participantCount: participantCountByEvent[event.$id] || 0,
+    }));
+    const totalParticipants = participantsResponse.total;
+
+    // Calculate sex distribution
+    const sexCounts = participantsResponse.documents.reduce(
+      (acc, participant) => {
+        const sex = participant.sex?.toLowerCase() || "unknown";
+        acc[sex] = (acc[sex] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+    const sexDistribution = [
+      { name: "Male", value: sexCounts["male"] || 0 },
+      { name: "Female", value: sexCounts["female"] || 0 },
+      { name: "Intersex", value: sexCounts["intersex"] || 0 },
+    ];
+
+    // Calculate age distribution
+    const ageDistribution = participantsResponse.documents.reduce(
+      (acc, participant) => {
+        const age = participant.age;
+        if (age === undefined) return acc;
+
+        const ageRange = getAgeRange(age);
+        const existingRange = acc.find((item) => item.age === ageRange);
+        if (existingRange) {
+          existingRange.count += 1;
+        } else {
+          acc.push({ age: ageRange, count: 1 });
+        }
+        return acc;
+      },
+      []
+    );
+
+    // Calculate location distribution
+    const locationCounts = eventsResponse.documents.reduce((acc, event) => {
+      const venue = event.eventVenue || "Unknown";
+      acc[venue] = (acc[venue] || 0) + 1;
+      return acc;
+    }, {});
+
+    const locationDistribution = Object.entries(locationCounts).map(
+      ([name, value]) => ({
+        name,
+        value,
+      })
+    );
+
+    return {
+      events: eventsWithParticipants,
+      totalEvents,
+      academicEvents,
+      nonAcademicEvents,
+      totalParticipants,
+      sexDistribution,
+      ageDistribution,
+      locationDistribution,
+    };
+  } catch (error) {
+    console.error("Error fetching totals:", error);
+    throw error;
+  }
+}
+
+// Helper function to get age range
+function getAgeRange(age) {
+  if (age < 18) return "0-17";
+  if (age < 25) return "18-24";
+  if (age < 35) return "25-34";
+  if (age < 45) return "35-44";
+  if (age < 55) return "45-54";
+  if (age < 65) return "55-64";
+  return "65+";
 }

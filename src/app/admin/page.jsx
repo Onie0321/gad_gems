@@ -59,6 +59,7 @@ export default function AdminDashboard() {
   const [events, setEvents] = React.useState([]);
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   useEffect(() => {
     const checkUserRole = async () => {
