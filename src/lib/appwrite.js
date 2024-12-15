@@ -13,8 +13,8 @@ import {
 } from "appwrite";
 
 export const client = new Client()
-  .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
-  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+  .setEndpoint("https://cloud.appwrite.io/v1")
+  .setProject("670e7a740019d9d38739");
 
 export const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID;
 export const userCollectionId =
@@ -178,7 +178,6 @@ export async function getCurrentUser() {
     );
 
     console.log("Current user response:", currentUserResponse); // Add this log
-
 
     if (
       !currentUserResponse ||
