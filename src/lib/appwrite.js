@@ -77,7 +77,7 @@ export const updateUserFirstLogin = async (userId) => {
       process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID,
       userId,
       {
-        isFirstLogin: false
+        isFirstLogin: false,
       }
     );
   } catch (error) {
@@ -86,13 +86,15 @@ export const updateUserFirstLogin = async (userId) => {
 };
 
 export const subscribe = (collectionId, callback) => {
-  const unsubscribe = client.subscribe(`databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${collectionId}.documents`, (response) => {
+  const unsubscribe = client.subscribe(
+    `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${collectionId}.documents`,
+    (response) => {
       callback(response.payload);
-  });
+    }
+  );
 
   return unsubscribe;
 };
-
 
 export async function createUser(email, password, name, role = "user") {
   try {
