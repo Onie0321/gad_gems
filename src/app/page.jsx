@@ -9,10 +9,9 @@ import FAQSection from "./homepage/faq-section/page";
 import Header from "./homepage/header/page";
 import Footer from "./homepage/footer/page";
 
-
 export default function EnhancedGadLandingPage() {
   return (
-    <div>
+    <div className="bg-[#F5F5F5]">
       <main className="flex-grow">
         <Header />
         <HeroSection />
@@ -22,7 +21,7 @@ export default function EnhancedGadLandingPage() {
         <ArchivedContentSection />
         <FeedbackSection />
         <FAQSection />
-        <Footer/>
+        <Footer />
       </main>
     </div>
   );
