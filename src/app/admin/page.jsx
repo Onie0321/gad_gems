@@ -247,7 +247,7 @@ export default function AdminDashboard() {
               onClick={() => setActiveSection("events")}
             >
               <Calendar className="mr-2 h-4 w-4" />
-              Events
+              Event Management
             </Button>
             <Button
               variant={activeSection === "data-import" ? "default" : "ghost"}

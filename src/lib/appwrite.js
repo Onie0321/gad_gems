@@ -10,6 +10,7 @@ import {
   Permission,
   Role,
   Teams,
+  RealtimeResponseEvent,
 } from "appwrite";
 
 export const client = new Client()
@@ -65,6 +66,33 @@ export async function createGoogleUser(userId, email, name) {
     throw new Error("Error creating Google user");
   }
 }
+// src/lib/appwrite.js
+
+// ... other imports and configurations ...
+
+export const updateUserFirstLogin = async (userId) => {
+  try {
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID,
+      userId,
+      {
+        isFirstLogin: false
+      }
+    );
+  } catch (error) {
+    console.error("Error updating user first login status:", error);
+  }
+};
+
+export const subscribe = (collectionId, callback) => {
+  const unsubscribe = client.subscribe(`databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${collectionId}.documents`, (response) => {
+      callback(response.payload);
+  });
+
+  return unsubscribe;
+};
+
 
 export async function createUser(email, password, name, role = "user") {
   try {
@@ -79,6 +107,7 @@ export async function createUser(email, password, name, role = "user") {
       ID.unique(),
       {
         accountId: newAccount.$id,
+        isFirstLogin: true,
         email: email,
         name: name,
         role: role, // Set role to 'admin' or 'user' as needed
