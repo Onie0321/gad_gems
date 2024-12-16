@@ -40,7 +40,10 @@ export const validateEditParticipantForm = (participant) => {
   }
 
   // Validate Sex
-  if (!participant.sex || !["Male", "Female"].includes(participant.sex)) {
+  if (
+    !participant.sex ||
+    !["Male", "Female", "Intersex"].includes(participant.sex)
+  ) {
     errors.sex = "Sex is required and must be Male or Female.";
   }
 

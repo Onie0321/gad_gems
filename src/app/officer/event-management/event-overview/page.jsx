@@ -26,16 +26,17 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Plus, Loader2, ArrowUpDown, RotateCcw } from 'lucide-react';
+import { Plus, Loader2, ArrowUpDown, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
-  getEvents,
   databases,
   eventCollectionId,
   participantCollectionId,
   getParticipants,
   subscribeToRealTimeUpdates,
   getCurrentUser,
+  Query,
+  getEvents,
 } from "@/lib/appwrite";
 
 export default function EventOverView({ setActiveSection }) {
@@ -48,21 +49,31 @@ export default function EventOverView({ setActiveSection }) {
   const [sortDirection, setSortDirection] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [eventsPerPage, setEventsPerPage] = useState(5);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     const fetchUserAndData = async () => {
       try {
-        const currentUser = await getCurrentUser();
-        if (currentUser) {
-          fetchData(currentUser.id);
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+        if (user) {
+          await fetchData(user.$id);
 
+          // Set up real-time listeners
           const unsubscribeEvents = subscribeToRealTimeUpdates(
             eventCollectionId,
-            () => fetchData(currentUser.id)
+            async (response) => {
+              console.log("Event update received:", response);
+              await fetchData(user.$id);
+            }
           );
+
           const unsubscribeParticipants = subscribeToRealTimeUpdates(
             participantCollectionId,
-            () => fetchData(currentUser.id)
+            async (response) => {
+              console.log("Participant update received:", response);
+              await fetchData(user.$id);
+            }
           );
 
           return () => {
@@ -83,15 +94,32 @@ export default function EventOverView({ setActiveSection }) {
     try {
       setLoading(true);
       const fetchedEvents = await getEvents(userId);
-      setEvents(fetchedEvents || []);
+      console.log("Fetched events:", fetchedEvents);
+
+      // Update events while preserving existing data
+      setEvents((prevEvents) => {
+        return fetchedEvents.map((newEvent) => {
+          const existingEvent = prevEvents.find((e) => e.$id === newEvent.$id);
+          return existingEvent ? { ...existingEvent, ...newEvent } : newEvent;
+        });
+      });
 
       if (fetchedEvents.length > 0) {
         const allParticipants = await Promise.all(
           fetchedEvents.map((event) => getParticipants(event.$id, userId))
         );
-        setParticipants(allParticipants.flat() || []);
-      } else {
-        setParticipants([]);
+
+        setParticipants((prevParticipants) => {
+          const newParticipants = allParticipants.flat();
+          return newParticipants.map((newParticipant) => {
+            const existingParticipant = prevParticipants.find(
+              (p) => p.$id === newParticipant.$id
+            );
+            return existingParticipant
+              ? { ...existingParticipant, ...newParticipant }
+              : newParticipant;
+          });
+        });
       }
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -301,6 +329,8 @@ export default function EventOverView({ setActiveSection }) {
               </Button>
             </TableHead>
             <TableHead>Location</TableHead>
+            <TableHead>Status</TableHead> {/* Add status column */}
+
             <TableHead className="text-right">
               <Button
                 variant="ghost"
@@ -323,6 +353,17 @@ export default function EventOverView({ setActiveSection }) {
                   {format(parseISO(event.eventDate), "MMMM d, yyyy")}
                 </TableCell>
                 <TableCell>{event.eventVenue}</TableCell>
+                <TableCell>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                      event.status === "approved"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {event.status || "Pending"}
+                  </span>
+                </TableCell>
                 <TableCell className="text-right">
                   <div>(Total: {participantCounts.total})</div>
                   <div className="text-sm text-muted-foreground">
@@ -368,4 +409,3 @@ export default function EventOverView({ setActiveSection }) {
     </div>
   );
 }
-

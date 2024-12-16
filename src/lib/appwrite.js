@@ -39,6 +39,8 @@ export const employeesSurveyCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_EMPLOYEESURVEY_COLLECTION_ID;
 export const notificationsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID;
+export const activityLogsCollectionId =
+  process.env.NEXT_PUBLIC_APPWRITE_ACTIVITYLOGS_COLLECTION_ID;
 
 export const account = new Account(client);
 //const avatars = new Avatars(client);
@@ -585,15 +587,54 @@ const updateEventParticipants = async (eventId, participantId) => {
   }
 };
 
-export const deleteParticipant = async (participantId) => {
+export const updateEvent = async (eventId, updateData) => {
   try {
-    await databases.deleteDocument(
-      databaseId,
-      participantCollectionId,
+    const updatedEvent = await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID,
+      eventId,
+      updateData
+    );
+    return updatedEvent;
+  } catch (error) {
+    console.error("Error updating event:", error);
+    throw error;
+  }
+};
+
+export const deleteParticipant = async (participantId, userId) => {
+  try {
+    // Verify user session first
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error("No authenticated user found");
+    }
+
+    // Fetch the participant to check ownership
+    const participant = await databases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID,
       participantId
     );
+
+    // Check if the user is the creator or has admin rights
+    if (
+      participant.createdBy !== currentUser.$id &&
+      currentUser.role !== "admin"
+    ) {
+      throw new Error("You don't have permission to delete this participant");
+    }
+
+    // Proceed with deletion
+    await databases.deleteDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID,
+      participantId
+    );
+
+    return true;
   } catch (error) {
-    console.error("Error deleting participant:", error);
+    console.error("Error in deleteParticipant:", error);
     throw error;
   }
 };
@@ -1278,20 +1319,66 @@ export async function getEmployeeData(employeeId) {
   }
 }
 
-export async function createNotification(notificationData) {
+// src/lib/appwrite.js
+
+// Add these functions to your existing appwrite.js
+export const createNotification = async (data) => {
   try {
-    const response = await databases.createDocument(
+    return await databases.createDocument(
       databaseId,
-      notificationsCollectionId, // Make sure this collection exists in your Appwrite database
+      notificationsCollectionId,
       ID.unique(),
-      notificationData
+      {
+        userId: data.userId,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        read: false,
+        ...data,
+      }
     );
-    return response;
   } catch (error) {
     console.error("Error creating notification:", error);
     throw error;
   }
-}
+};
+
+// Helper functions for specific notification types
+export const notifyAccountCreation = async (userId, userName) => {
+  await createNotification({
+    type: "account",
+    title: "New Account Created",
+    message: `New user ${userName} has registered.`,
+    userId: userId,
+  });
+};
+
+export const notifyAccountUpdate = async (userId, userName) => {
+  await createNotification({
+    type: "account",
+    title: "Account Updated",
+    message: `User ${userName} has updated their profile.`,
+    userId: userId,
+  });
+};
+
+export const notifyEventCreation = async (userId, eventName) => {
+  await createNotification({
+    type: "event",
+    title: "New Event Created",
+    message: `New event "${eventName}" has been created and is pending approval.`,
+    userId: userId,
+  });
+};
+
+export const notifyEventStatusChange = async (userId, eventName, status) => {
+  await createNotification({
+    type: "approval",
+    title: "Event Status Updated",
+    message: `Event "${eventName}" has been ${status}.`,
+    userId: userId,
+  });
+};
 
 export async function fetchNotifications(filters = []) {
   try {
@@ -1423,3 +1510,128 @@ function getAgeRange(age) {
   if (age < 65) return "55-64";
   return "65+";
 }
+
+export const logActivity = async (userId, activityType) => {
+  try {
+    await databases.createDocument(
+      databaseId,
+      activityLogsCollectionId,
+      ID.unique(),
+      {
+        userId,
+        activityType,
+        timestamp: new Date().toISOString(),
+      }
+    );
+  } catch (error) {
+    console.error("Error logging activity:", error);
+  }
+};
+
+// Function to log sign out
+export const logSignOut = async (userId) => {
+  await logActivity(userId, "Sign Out");
+};
+
+// Function to log event creation
+export const logEventCreation = async (userId, eventName) => {
+  await logActivity(userId, `Created Event: ${eventName}`);
+};
+
+// Function to log participant addition
+export const logParticipantAdded = async (
+  userId,
+  eventName,
+  participantName
+) => {
+  await logActivity(
+    userId,
+    `Added Participant: ${participantName} to ${eventName}`
+  );
+};
+
+export const logSignOutActivity = async (userId, userRole) => {
+  try {
+    await databases.createDocument(
+      databaseId,
+      activityLogsCollectionId, // make sure this matches your collection ID
+      ID.unique(),
+      {
+        userId,
+        activityType: `${userRole} Sign Out`,
+        timestamp: new Date().toISOString(),
+      }
+    );
+  } catch (error) {
+    console.error("Error logging sign out activity:", error);
+  }
+};
+
+export const updateUserStatus = async (userId, newStatus) => {
+  try {
+    if (!databaseId || !userCollectionId) {
+      throw new Error("Database or Collection ID not configured");
+    }
+
+    const response = await databases.updateDocument(
+      databaseId,
+      userCollectionId,
+      userId,
+      {
+        approvalStatus: newStatus,
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error("Error updating user status:", error);
+    throw error;
+  }
+};
+
+export const fetchUsers = async () => {
+  try {
+    console.log("Fetching users with:", {
+      databaseId,
+      userCollectionId,
+    });
+
+    if (!databaseId || !userCollectionId) {
+      throw new Error("Database or Collection ID not configured");
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      userCollectionId
+    );
+
+    console.log("Fetched users response:", response);
+    return response.documents;
+  } catch (error) {
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      response: error.response,
+    });
+    throw error;
+  }
+};
+
+// Fetch activity logs function
+export const fetchActivityLogs = async () => {
+  try {
+    if (!databaseId || !activityLogsCollectionId) {
+      throw new Error("Database or Collection ID not configured");
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      activityLogsCollectionId,
+      [Query.orderDesc("timestamp")]
+    );
+    return response.documents;
+  } catch (error) {
+    console.error("Error fetching activity logs:", error);
+    throw error;
+  }
+};

@@ -11,6 +11,7 @@ import {
   FileQuestion,
   UserPlus,
   BarChart2,
+  Shield,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,22 +21,15 @@ import DashboardOverview from "./dashboard/page";
 import EventsSection from "./events/page";
 import DemographicsSection from "./demographics/page";
 import SettingsSection from "./settings/page";
-import { UserManagement } from "./user-management/page";
+import UserManagement from "./user-management/page";
 import InactivityLock from "@/components/loading/InactivityLock";
 import DataImportAnalytics from "./data-import/page";
 import { SchoolsSection } from "./schools/page";
 import {
   getCurrentUser,
   getAccount,
-  fetchNotifications,
-  getEvents,
-  getStudents,
-  getAllEmployeeData,
-  fetchQuestions,
-  listResponses,
   databaseId,
   databases,
-  appwriteConfig,
   userCollectionId,
   eventCollectionId,
   participantCollectionId,
@@ -233,6 +227,15 @@ export default function AdminDashboard() {
               <LayoutDashboard className="mr-2 h-4 w-4" />
               Dashboard
             </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => router.push('/officer')}
+            >
+              <Shield className="mr-2 h-4 w-4" />
+              Officer Dashboard
+            </Button>
+
             <Button
               variant={activeSection === "users" ? "default" : "ghost"}
               className="w-full justify-start"
