@@ -32,6 +32,7 @@ import {
   checkDuplicateEvent,
   checkTimeConflict,
   createNotification,
+  notifyEventCreation,
 } from "@/lib/appwrite";
 import { schoolOptions } from "@/utils/participantUtils";
 import { getNonAcademicCategories } from "@/utils/eventUtils";
@@ -144,19 +145,27 @@ export default function CreateEvent({ onEventCreated, user }) {
       const createdEvent = await createEvent(newEvent, user.$id);
       onEventCreated(createdEvent);
 
-      /*  try {
-        await createNotification({
-          userId: "admin",
-          message: `New event "${eventName}" created by ${user.name}`,
-          type: "approval",
-          title: "New Event Approval Required",
-          status: "unread",
-          actionType: "event_approval",
-          approvalStatus: "pending",
-        });
-      } catch (notificationError) {
-        console.error("Failed to create notification:", notificationError);
-      }*/
+      await createNotification({
+        userId: "admin", // This will be shown to admin
+        type: "approval",
+        title: "New Event Pending Approval",
+        message: `${user.name} has created a new event "${eventName}" that requires approval.`,
+        eventId: createdEvent.$id,
+        actionType: "event_approval",
+        approvalStatus: "pending",
+      });
+  
+      // Create notification for the event creator
+      await createNotification({
+        userId: user.$id, // This will be shown to the event creator
+        type: "event",
+        title: "Event Created Successfully",
+        message: `Your event "${eventName}" has been created and is pending approval.`,
+        eventId: createdEvent.$id,
+      });
+
+      toast.success("Event created successfully and sent for approval!");
+
 
       // Reset form fields
       setEventName("");

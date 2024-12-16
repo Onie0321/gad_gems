@@ -99,6 +99,8 @@ export default function ParticipantManagement({
   const [newEntryInfo, setNewEntryInfo] = useState({});
   const [duplicateErrors, setDuplicateErrors] = useState({});
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [hasAddedParticipants, setHasAddedParticipants] = useState(false);
+
   //const router = useRouter();
   //const pathname = usePathname();
 
@@ -123,16 +125,14 @@ export default function ParticipantManagement({
   }, [participants, currentEventId]);
 
   const handleInputChange = async (field, value) => {
-    setParticipantData((prev) => ({ ...prev, [field]: value }));
+    try {
+      if (field === "studentId" || field === "name") {
+        if (field === "studentId" && !isStudentIdComplete(value)) {
+          setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
+          setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
+          return;
+        }
 
-    if (field === "studentId" || field === "name") {
-      if (field === "studentId" && !isStudentIdComplete(value)) {
-        setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
-        setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-        return;
-      }
-
-      try {
         const result = await debouncedCheckDuplicates(
           field,
           value,
@@ -151,10 +151,10 @@ export default function ParticipantManagement({
             setShowAutofillDialog(true);
           }
         }
-      } catch (error) {
-        console.error("Error checking duplicates:", error);
-        toast.error("An error occurred while checking for duplicates.");
       }
+    } catch (error) {
+      console.error("Error in handleInputChange:", error);
+      toast.error("An error occurred while processing your input.");
     }
   };
 
@@ -181,6 +181,7 @@ export default function ParticipantManagement({
     setShowAutofillDialog(false);
   };
 
+  // In your handleAddParticipant function
   const handleAddParticipant = async (e) => {
     e.preventDefault();
 
@@ -196,44 +197,38 @@ export default function ParticipantManagement({
       return;
     }
 
-    if (duplicateErrors.studentId || duplicateErrors.name) {
-      toast.error(
-        "Please resolve duplicate entries before adding the participant."
-      );
-      return;
-    }
-
     setLoading(true);
     try {
       const newParticipant = {
         ...participantData,
         age: parseInt(participantData.age),
         eventId: currentEventId,
-        createdBy: user.$id,
-        createdByName: user.name, // Add the user's name
-        createdAt: new Date().toISOString(), // Add the creation timestamp
-        status: "pending", // Set the initial status to pending
+        createdBy: user.name,
       };
 
       const createdParticipant = await createParticipant(
         newParticipant,
         user.$id
       );
-      setParticipants((prev) => [...prev, createdParticipant]);
-      toast.success(`Participant added to ${currentEvent.eventName}`);
-      setParticipantData({
-        studentId: "",
-        name: "",
-        sex: "",
-        age: "",
-        school: "",
-        year: "",
-        section: "",
-        ethnicGroup: "",
-        otherEthnicGroup: "",
-      });
-      setDuplicateErrors({});
-      setNewEntryInfo({});
+
+      if (createdParticipant) {
+        setParticipants((prev) => [...prev, createdParticipant]);
+        setHasAddedParticipants(true); // Set the flag when first participant is added
+        toast.success(`Participant added to ${currentEvent.eventName}`);
+        // Reset form
+        setParticipantData({
+          studentId: "",
+          name: "",
+          sex: "",
+          age: "",
+          homeAddress: "",
+          school: "",
+          year: "",
+          section: "",
+          ethnicGroup: "",
+          otherEthnicGroup: "",
+        });
+      }
     } catch (error) {
       console.error("Error details:", error);
       toast.error(`Error adding participant: ${error.message}`);
@@ -241,7 +236,6 @@ export default function ParticipantManagement({
       setLoading(false);
     }
   };
-
   const handleFinishAddingParticipants = () => {
     setParticipantData({
       studentId: "",
@@ -258,6 +252,8 @@ export default function ParticipantManagement({
 
     setParticipants([]);
     setCurrentEventId(null);
+    setHasAddedParticipants(false); // Reset the flag
+
 
     setTotalParticipants(0);
     setTotalMaleParticipants(0);
@@ -298,7 +294,7 @@ export default function ParticipantManagement({
         <CardDescription>
           {currentEvent
             ? `Add participants to ${currentEvent.eventName}`
-            : "No active event selected"}
+            : "No active event created"}
         </CardDescription>
         <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="bg-primary text-primary-foreground p-4 rounded-lg">
@@ -636,7 +632,10 @@ export default function ParticipantManagement({
           <Button
             type="button"
             variant="outline"
-            onClick={() => setCurrentEventId(null)}
+            onClick={() => {
+              setCurrentEventId(null);
+              setHasAddedParticipants(false); // Reset the flag when going back
+            }}
           >
             Back to Events
           </Button>
@@ -652,10 +651,15 @@ export default function ParticipantManagement({
               className="mr-2"
             >
               {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                "Add Participant"
-              )}
+               <>
+               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+               Please wait
+             </>
+           ) : hasAddedParticipants ? (
+             "Add Another Participant"
+           ) : (
+             "Add Participant"
+           )}
             </Button>
             <Button
               type="button"

@@ -8,10 +8,11 @@ import EventManagement from "./event-management/page";
 import DemographicAnalysis from "./demographic-analysis/page";
 import { Notifications } from "./notifications/page";
 import UserMenu from "./user-menu/page";
-import SettingsForm from "./settings/page";
+
 import { getCurrentUser } from "@/lib/appwrite";
 import { useRouter } from "next/navigation";
 import WelcomeModal from "@/components/modals/welcome";
+import SettingsSection from "./settings/page";
 
 export default function OfficerDashboard() {
   const [activeTab, setActiveTab] = useState("event-management");
@@ -31,8 +32,12 @@ export default function OfficerDashboard() {
           router.push("/sign-in");
         } else {
           setUser(currentUser);
-          setShowWelcomeModal(true);
-        }
+          if (currentUser.isFirstLogin === true) {
+            setShowWelcomeModal(true);
+            // Update the user's first login status
+            await updateUserFirstLogin(currentUser.$id);
+          }
+                }
       } catch (err) {
         console.error("Error checking user role:", err);
         setError(
@@ -148,7 +153,7 @@ export default function OfficerDashboard() {
         <div className="p-6">
           {activeTab === "event-management" && <EventManagement user={user} />}
           {activeTab === "demographic-analysis" && <DemographicAnalysis />}
-          {activeTab === "settings" && <SettingsForm />}
+          {activeTab === "settings" && <SettingsSection />}
         </div>
       </main>
       {showWelcomeModal && (

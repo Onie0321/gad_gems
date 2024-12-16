@@ -120,19 +120,33 @@ export default function EventParticipantLog() {
   const fetchData = async (userId) => {
     try {
       setLoading(true);
-      console.log("Fetching data for user ID:", userId);
       const fetchedEvents = await getEvents(userId);
       console.log("Fetched events:", fetchedEvents);
-      setEvents(fetchedEvents || []);
+
+      // Preserve existing data, just update the events array
+      setEvents((prevEvents) => {
+        return fetchedEvents.map((newEvent) => {
+          const existingEvent = prevEvents.find((e) => e.$id === newEvent.$id);
+          return existingEvent
+            ? { ...existingEvent, status: newEvent.status }
+            : newEvent;
+        });
+      });
 
       if (fetchedEvents.length > 0) {
+        // Keep existing participants data
         const allParticipants = await Promise.all(
           fetchedEvents.map((event) => getParticipants(event.$id, userId))
         );
-        console.log("Fetched participants:", allParticipants);
-        setParticipants(allParticipants.flat() || []);
-      } else {
-        setParticipants([]);
+        setParticipants((prevParticipants) => {
+          const newParticipants = allParticipants.flat();
+          return newParticipants.map((newParticipant) => {
+            const existingParticipant = prevParticipants.find(
+              (p) => p.$id === newParticipant.$id
+            );
+            return existingParticipant || newParticipant;
+          });
+        });
       }
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -311,14 +325,11 @@ export default function EventParticipantLog() {
   };
 
   const getStatusStyles = (status) => {
-    if (!status || status.trim() === "") status = "Pending";
-    switch (status) {
-      case "Pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "Ongoing":
+    switch (status?.toLowerCase()) {
+      case "approved":
         return "bg-green-100 text-green-800";
-      case "Completed":
-        return "bg-blue-100 text-blue-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
