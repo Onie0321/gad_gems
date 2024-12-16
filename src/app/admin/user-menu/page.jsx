@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getCurrentUser, signOut, account } from "@/lib/appwrite";
+import { getCurrentUser, signOut, account, logSignOutActivity } from "@/lib/appwrite";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,8 +58,18 @@ export default function UserMenu() {
 
   const handleLogOut = async () => {
     try {
+      const currentUser = await getCurrentUser();
+      if (currentUser) {
+        // Log the sign out activity before actually signing out
+        await logSignOutActivity(
+          currentUser.$id,
+          currentUser.role // 'admin' or 'officer'
+        );
+      }
+      
       await signOut(); // Call the signOut function
       router.push("/"); // Redirect to the home page
+      
       toast({
         title: "Signed Out",
         description: "You have been successfully signed out.",

@@ -78,13 +78,13 @@ export default function FeedbackSection() {
           <div>
             <div className="mb-8">
               <h3 className="text-xl font-semibold mb-4">Our Office</h3>
-              <p>123 Gender Equality Street</p>
-              <p>Inclusivity City, IC 12345</p>
-              <p>Phone: (123) 456-7890</p>
+              <p>Brgy. Zabali, Baler, Aurora</p>
+              <p>Gen Ed, Second Floor</p>
+              <p>Phone: +63 9123456789</p>
               <p>
                 Email:{" "}
-                <a href="mailto:info@gadoffice.gov" className="hover:underline">
-                  info@gadoffice.gov
+                <a href="gad@ascot.edu.ph" className="hover:underline">
+                gad@ascot.edu.ph
                 </a>
               </p>
             </div>

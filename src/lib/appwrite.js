@@ -10,6 +10,7 @@ import {
   Permission,
   Role,
   Teams,
+  RealtimeResponseEvent,
 } from "appwrite";
 
 export const client = new Client()
@@ -38,6 +39,8 @@ export const employeesSurveyCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_EMPLOYEESURVEY_COLLECTION_ID;
 export const notificationsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID;
+export const activityLogsCollectionId =
+  process.env.NEXT_PUBLIC_APPWRITE_ACTIVITYLOGS_COLLECTION_ID;
 
 export const account = new Account(client);
 //const avatars = new Avatars(client);
@@ -65,6 +68,35 @@ export async function createGoogleUser(userId, email, name) {
     throw new Error("Error creating Google user");
   }
 }
+// src/lib/appwrite.js
+
+// ... other imports and configurations ...
+
+export const updateUserFirstLogin = async (userId) => {
+  try {
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID,
+      userId,
+      {
+        isFirstLogin: false,
+      }
+    );
+  } catch (error) {
+    console.error("Error updating user first login status:", error);
+  }
+};
+
+export const subscribe = (collectionId, callback) => {
+  const unsubscribe = client.subscribe(
+    `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${collectionId}.documents`,
+    (response) => {
+      callback(response.payload);
+    }
+  );
+
+  return unsubscribe;
+};
 
 export async function createUser(email, password, name, role = "user") {
   try {
@@ -79,6 +111,7 @@ export async function createUser(email, password, name, role = "user") {
       ID.unique(),
       {
         accountId: newAccount.$id,
+        isFirstLogin: true,
         email: email,
         name: name,
         role: role, // Set role to 'admin' or 'user' as needed
@@ -554,15 +587,54 @@ const updateEventParticipants = async (eventId, participantId) => {
   }
 };
 
-export const deleteParticipant = async (participantId) => {
+export const updateEvent = async (eventId, updateData) => {
   try {
-    await databases.deleteDocument(
-      databaseId,
-      participantCollectionId,
+    const updatedEvent = await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID,
+      eventId,
+      updateData
+    );
+    return updatedEvent;
+  } catch (error) {
+    console.error("Error updating event:", error);
+    throw error;
+  }
+};
+
+export const deleteParticipant = async (participantId, userId) => {
+  try {
+    // Verify user session first
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error("No authenticated user found");
+    }
+
+    // Fetch the participant to check ownership
+    const participant = await databases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID,
       participantId
     );
+
+    // Check if the user is the creator or has admin rights
+    if (
+      participant.createdBy !== currentUser.$id &&
+      currentUser.role !== "admin"
+    ) {
+      throw new Error("You don't have permission to delete this participant");
+    }
+
+    // Proceed with deletion
+    await databases.deleteDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID,
+      participantId
+    );
+
+    return true;
   } catch (error) {
-    console.error("Error deleting participant:", error);
+    console.error("Error in deleteParticipant:", error);
     throw error;
   }
 };
@@ -1247,20 +1319,66 @@ export async function getEmployeeData(employeeId) {
   }
 }
 
-export async function createNotification(notificationData) {
+// src/lib/appwrite.js
+
+// Add these functions to your existing appwrite.js
+export const createNotification = async (data) => {
   try {
-    const response = await databases.createDocument(
+    return await databases.createDocument(
       databaseId,
-      notificationsCollectionId, // Make sure this collection exists in your Appwrite database
+      notificationsCollectionId,
       ID.unique(),
-      notificationData
+      {
+        userId: data.userId,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        read: false,
+        ...data,
+      }
     );
-    return response;
   } catch (error) {
     console.error("Error creating notification:", error);
     throw error;
   }
-}
+};
+
+// Helper functions for specific notification types
+export const notifyAccountCreation = async (userId, userName) => {
+  await createNotification({
+    type: "account",
+    title: "New Account Created",
+    message: `New user ${userName} has registered.`,
+    userId: userId,
+  });
+};
+
+export const notifyAccountUpdate = async (userId, userName) => {
+  await createNotification({
+    type: "account",
+    title: "Account Updated",
+    message: `User ${userName} has updated their profile.`,
+    userId: userId,
+  });
+};
+
+export const notifyEventCreation = async (userId, eventName) => {
+  await createNotification({
+    type: "event",
+    title: "New Event Created",
+    message: `New event "${eventName}" has been created and is pending approval.`,
+    userId: userId,
+  });
+};
+
+export const notifyEventStatusChange = async (userId, eventName, status) => {
+  await createNotification({
+    type: "approval",
+    title: "Event Status Updated",
+    message: `Event "${eventName}" has been ${status}.`,
+    userId: userId,
+  });
+};
 
 export async function fetchNotifications(filters = []) {
   try {
@@ -1275,3 +1393,245 @@ export async function fetchNotifications(filters = []) {
     throw error;
   }
 }
+
+export async function fetchTotals() {
+  try {
+    // Fetch events
+    const eventsResponse = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [Query.orderDesc("eventDate")] // Order by date descending
+    );
+    const totalEvents = eventsResponse.total;
+    const events = eventsResponse.documents;
+
+    // Count events by type
+    const academicEvents = events.filter(
+      (event) => event.eventType === "Academic"
+    ).length;
+    const nonAcademicEvents = events.filter(
+      (event) => event.eventType === "Non-Academic"
+    ).length;
+
+    // Fetch participants for each event
+    const participantsResponse = await databases.listDocuments(
+      databaseId,
+      participantCollectionId,
+      [Query.limit(1000)]
+    );
+
+    // Count participants per event
+    const participantCountByEvent = participantsResponse.documents.reduce(
+      (acc, participant) => {
+        const eventId = participant.eventId;
+        acc[eventId] = (acc[eventId] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    // Add participant count to each event
+    const eventsWithParticipants = events.map((event) => ({
+      ...event,
+      participantCount: participantCountByEvent[event.$id] || 0,
+    }));
+    const totalParticipants = participantsResponse.total;
+
+    // Calculate sex distribution
+    const sexCounts = participantsResponse.documents.reduce(
+      (acc, participant) => {
+        const sex = participant.sex?.toLowerCase() || "unknown";
+        acc[sex] = (acc[sex] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+    const sexDistribution = [
+      { name: "Male", value: sexCounts["male"] || 0 },
+      { name: "Female", value: sexCounts["female"] || 0 },
+      { name: "Intersex", value: sexCounts["intersex"] || 0 },
+    ];
+
+    // Calculate age distribution
+    const ageDistribution = participantsResponse.documents.reduce(
+      (acc, participant) => {
+        const age = participant.age;
+        if (age === undefined) return acc;
+
+        const ageRange = getAgeRange(age);
+        const existingRange = acc.find((item) => item.age === ageRange);
+        if (existingRange) {
+          existingRange.count += 1;
+        } else {
+          acc.push({ age: ageRange, count: 1 });
+        }
+        return acc;
+      },
+      []
+    );
+
+    // Calculate location distribution
+    const locationCounts = eventsResponse.documents.reduce((acc, event) => {
+      const venue = event.eventVenue || "Unknown";
+      acc[venue] = (acc[venue] || 0) + 1;
+      return acc;
+    }, {});
+
+    const locationDistribution = Object.entries(locationCounts).map(
+      ([name, value]) => ({
+        name,
+        value,
+      })
+    );
+
+    return {
+      events: eventsWithParticipants,
+      totalEvents,
+      academicEvents,
+      nonAcademicEvents,
+      totalParticipants,
+      sexDistribution,
+      ageDistribution,
+      locationDistribution,
+    };
+  } catch (error) {
+    console.error("Error fetching totals:", error);
+    throw error;
+  }
+}
+
+// Helper function to get age range
+function getAgeRange(age) {
+  if (age < 18) return "0-17";
+  if (age < 25) return "18-24";
+  if (age < 35) return "25-34";
+  if (age < 45) return "35-44";
+  if (age < 55) return "45-54";
+  if (age < 65) return "55-64";
+  return "65+";
+}
+
+export const logActivity = async (userId, activityType) => {
+  try {
+    await databases.createDocument(
+      databaseId,
+      activityLogsCollectionId,
+      ID.unique(),
+      {
+        userId,
+        activityType,
+        timestamp: new Date().toISOString(),
+      }
+    );
+  } catch (error) {
+    console.error("Error logging activity:", error);
+  }
+};
+
+// Function to log sign out
+export const logSignOut = async (userId) => {
+  await logActivity(userId, "Sign Out");
+};
+
+// Function to log event creation
+export const logEventCreation = async (userId, eventName) => {
+  await logActivity(userId, `Created Event: ${eventName}`);
+};
+
+// Function to log participant addition
+export const logParticipantAdded = async (
+  userId,
+  eventName,
+  participantName
+) => {
+  await logActivity(
+    userId,
+    `Added Participant: ${participantName} to ${eventName}`
+  );
+};
+
+export const logSignOutActivity = async (userId, userRole) => {
+  try {
+    await databases.createDocument(
+      databaseId,
+      activityLogsCollectionId, // make sure this matches your collection ID
+      ID.unique(),
+      {
+        userId,
+        activityType: `${userRole} Sign Out`,
+        timestamp: new Date().toISOString(),
+      }
+    );
+  } catch (error) {
+    console.error("Error logging sign out activity:", error);
+  }
+};
+
+export const updateUserStatus = async (userId, newStatus) => {
+  try {
+    if (!databaseId || !userCollectionId) {
+      throw new Error("Database or Collection ID not configured");
+    }
+
+    const response = await databases.updateDocument(
+      databaseId,
+      userCollectionId,
+      userId,
+      {
+        approvalStatus: newStatus,
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error("Error updating user status:", error);
+    throw error;
+  }
+};
+
+export const fetchUsers = async () => {
+  try {
+    console.log("Fetching users with:", {
+      databaseId,
+      userCollectionId,
+    });
+
+    if (!databaseId || !userCollectionId) {
+      throw new Error("Database or Collection ID not configured");
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      userCollectionId
+    );
+
+    console.log("Fetched users response:", response);
+    return response.documents;
+  } catch (error) {
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      response: error.response,
+    });
+    throw error;
+  }
+};
+
+// Fetch activity logs function
+export const fetchActivityLogs = async () => {
+  try {
+    if (!databaseId || !activityLogsCollectionId) {
+      throw new Error("Database or Collection ID not configured");
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      activityLogsCollectionId,
+      [Query.orderDesc("timestamp")]
+    );
+    return response.documents;
+  } catch (error) {
+    console.error("Error fetching activity logs:", error);
+    throw error;
+  }
+};

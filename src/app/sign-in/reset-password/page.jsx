@@ -1,151 +1,150 @@
-'use client'
+// src/app/reset-password/page.jsx
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { useToast } from '@/hooks/use-toast'
-import { useAppwrite } from '@/hooks/useAppwrite'
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Lock, Eye, EyeOff } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { account } from "@/lib/appwrite";
 
-const formSchema = z.object({
-  password: z.string().min(8, {
-    message: "Password must be at least 8 characters.",
-  }),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-})
+export default function ResetPassword() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-export default function ResetPasswordPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [isTokenValid, setIsTokenValid] = useState(false)
-  const searchParams = useSearchParams()
-  const { toast } = useToast()
-  const { validateResetToken, resetPassword } = useAppwrite()
-
-  const userId = searchParams.get('userId')
-  const token = searchParams.get('token')
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      password: "",
-      confirmPassword: "",
-    },
-  })
+  const userId = searchParams.get("userId");
+  const secret = searchParams.get("secret");
 
   useEffect(() => {
-    const checkToken = async () => {
-      if (userId && token) {
-        try {
-          const isValid = await validateResetToken(userId, token)
-          setIsTokenValid(isValid)
-          if (!isValid) {
-            toast({
-              title: "Invalid or expired token",
-              description: "Please request a new password reset link.",
-              variant: "destructive",
-            })
-          }
-        } catch (error) {
-          console.error('Error validating token:', error)
-          toast({
-            title: "Error",
-            description: "An error occurred while validating your reset token.",
-            variant: "destructive",
-          })
-        }
-      } else {
-        setIsTokenValid(false)
-        toast({
-          title: "Missing information",
-          description: "The password reset link is invalid.",
-          variant: "destructive",
-        })
-      }
-    }
-
-    checkToken()
-  }, [userId, token, toast, validateResetToken])
-
-  async function onSubmit(values) {
-    if (!userId || !token) return
-
-    setIsLoading(true)
-    try {
-      await resetPassword(userId, token, values.password)
+    if (!userId || !secret) {
       toast({
-        title: "Password reset successful",
-        description: "You can now log in with your new password.",
-      })
-      // Redirect to login page or show a success message
+        title: "Invalid Reset Link",
+        description: "The password reset link is invalid or has expired.",
+        variant: "destructive",
+      });
+      router.push("/sign-in");
+    }
+  }, [userId, secret, router]);
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      toast({
+        title: "Passwords Don't Match",
+        description: "Please make sure your passwords match.",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    setIsLoading(true);
+  
+    try {
+      await account.updateRecovery(userId, secret, password, password);
+      
+      // Log the password reset completion
+      await logActivity(userId, "password_reset_completed");
+      
+      toast({
+        title: "Password Reset Successful",
+        description: "Your password has been reset. Please sign in with your new password.",
+        variant: "success",
+      });
+      
+      router.push("/sign-in");
     } catch (error) {
-      console.error('Error resetting password:', error)
+      console.error("Password reset error:", error);
       toast({
         title: "Error",
-        description: "An error occurred while resetting your password. Please try again.",
+        description: "Failed to reset password. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
-
-  if (!isTokenValid) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="p-8 bg-white rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold mb-4">Invalid Reset Link</h1>
-          <p>The password reset link is invalid or has expired. Please request a new one.</p>
-        </div>
-      </div>
-    )
-  }
+  };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold mb-6">Reset Your Password</h1>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm New Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isLoading}>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F5F5F5] p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center text-[#37474F]">
+            Reset Password
+          </CardTitle>
+          <CardDescription className="text-center">
+            Enter your new password below.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter new password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="pl-10 pr-10"
+                />
+                <Lock
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  size={18}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="pl-10"
+                />
+                <Lock
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  size={18}
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-[#2D89EF] hover:bg-[#2679D5] text-white"
+              disabled={isLoading}
+            >
               {isLoading ? "Resetting..." : "Reset Password"}
             </Button>
           </form>
-        </Form>
-      </div>
+        </CardContent>
+      </Card>
     </div>
-  )
+  );
 }
-

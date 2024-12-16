@@ -11,7 +11,7 @@ import Footer from "./homepage/footer/page";
 
 export default function EnhancedGadLandingPage() {
   return (
-    <div className="bg-[#F5F5F5]">
+    <div className="bg-background min-h-screen">
       <main className="flex-grow">
         <Header />
         <HeroSection />
