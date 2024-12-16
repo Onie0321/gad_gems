@@ -21,9 +21,11 @@ import {
   getCurrentUser,
   account,
   SignIn,
-  createGoogleUser,
+  createGoogleUser, logActivity
 } from "@/lib/appwrite";
 import dynamic from "next/dynamic";
+import { ActivityTypes } from "@/lib/constants";
+
 
 const MotionDiv = dynamic(
   () => import("framer-motion").then((mod) => mod.motion.div),
@@ -101,6 +103,12 @@ export default function SignInPage() {
         `${currentUrl}/auth-callback`,
         `${currentUrl}/sign-in`
       );
+      
+      // Note: For Google sign-in, you'll need to log the activity after the callback
+      const user = await getCurrentUser();
+      if (user) {
+        await logActivity(user.$id, "google_signin");
+      }
     } catch (error) {
       console.error("Google sign-in error:", error);
       toast({
@@ -110,16 +118,18 @@ export default function SignInPage() {
       });
     }
   };
-
+  
   const handleSignIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-
+  
     try {
       const session = await SignIn(email, password);
       if (session) {
         const user = await getCurrentUser();
         if (user) {
+          // Log the sign-in activity
+          await logActivity(user.$id, "user_signin");
           handleUserStatus(user);
         } else {
           throw new Error("Failed to fetch user data after sign-in.");
@@ -239,6 +249,15 @@ export default function SignInPage() {
                   </button>
                 </div>
               </div>
+              <p className="mt-4 text-center text-sm text-gray-600">
+                Forgot your password?{" "}
+                <Link
+                  href="sign-in/forgot-password"
+                  className="font-medium text-[#FF6F61] hover:text-[#E5635B]"
+                >
+                  Reset it here
+                </Link>
+              </p>
               <div className="flex items-center">
                 <Checkbox
                   id="remember"
