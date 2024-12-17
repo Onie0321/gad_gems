@@ -67,13 +67,14 @@ import { createParticipant, getCurrentUser } from "@/lib/appwrite";
 import EditParticipantDialog from "./edit-participant-dialog/page";
 import DeleteParticipantDialog from "./delete-participant-dialog/page";
 import { debounce } from "lodash";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function ParticipantManagement({
   events,
   currentEventId,
   setCurrentEventId,
   user,
+  setActiveTab,
 }) {
   const [participantData, setParticipantData] = useState({
     studentId: "",
@@ -100,9 +101,10 @@ export default function ParticipantManagement({
   const [duplicateErrors, setDuplicateErrors] = useState({});
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [hasAddedParticipants, setHasAddedParticipants] = useState(false);
-
-  //const router = useRouter();
-  //const pathname = usePathname();
+  const [foundParticipant, setFoundParticipant] = useState(null);
+  const [showAutoFillDialog, setShowAutoFillDialog] = useState(false);
+const router = useRouter();
+const pathname = usePathname();
 
   const currentEvent = events.find((e) => e.$id === currentEventId);
   const isEventSelected = !!currentEvent;
@@ -169,12 +171,23 @@ export default function ParticipantManagement({
   }, 500);
 
   const handleAutofillConfirm = () => {
-    setParticipantData((prev) => ({
-      ...prev,
-      ...autofillData,
-    }));
-    setShowAutofillDialog(false);
-    toast.info("Participant data from another event has been loaded.");
+    console.log("Auto-filling with data:", foundParticipant); // Debug log
+    if (foundParticipant) {
+      setParticipantData((prev) => ({
+        ...prev,
+        name: foundParticipant.name,
+        sex: foundParticipant.sex,
+        age: foundParticipant.age,
+        homeAddress: foundParticipant.homeAddress,
+        school: foundParticipant.school,
+        year: foundParticipant.year,
+        section: foundParticipant.section,
+        ethnicGroup: foundParticipant.ethnicGroup,
+        otherEthnicGroup: foundParticipant.otherEthnicGroup,
+      }));
+    }
+    setShowAutoFillDialog(false);
+    setFoundParticipant(null);
   };
 
   const handleAutofillCancel = () => {
@@ -252,8 +265,7 @@ export default function ParticipantManagement({
 
     setParticipants([]);
     setCurrentEventId(null);
-    setHasAddedParticipants(false); // Reset the flag
-
+    setHasAddedParticipants(false);
 
     setTotalParticipants(0);
     setTotalMaleParticipants(0);
@@ -262,6 +274,9 @@ export default function ParticipantManagement({
 
     setShowSuccessMessage(true);
     toast.success("Event created successfully. Waiting for admin approval.");
+
+    // Redirect to EventOverview
+    setActiveTab("overview");
   };
 
   const handleUpdateParticipant = (updatedParticipant) => {
@@ -287,12 +302,83 @@ export default function ParticipantManagement({
     }
   }, [showSuccessMessage]);
 
+  useEffect(() => {
+    // Load saved data when component mounts
+    const savedData = localStorage.getItem(`participantData_${currentEventId}`);
+    const savedParticipants = localStorage.getItem(
+      `participants_${currentEventId}`
+    );
+
+    if (savedData) {
+      setParticipantData(JSON.parse(savedData));
+    }
+    if (savedParticipants) {
+      setParticipants(JSON.parse(savedParticipants));
+    }
+  }, [currentEventId]);
+
+  // Save data whenever it changes
+  useEffect(() => {
+    if (currentEventId) {
+      localStorage.setItem(
+        `participantData_${currentEventId}`,
+        JSON.stringify(participantData)
+      );
+      localStorage.setItem(
+        `participants_${currentEventId}`,
+        JSON.stringify(participants)
+      );
+    }
+  }, [participantData, participants, currentEventId]);
+
+  const handleStudentIdChange = (e) => {
+    if (!e || !e.target) return; // Add error checking
+
+    const studentId = formatStudentId(e.target.value);
+    setParticipantData((prev) => ({ ...prev, studentId }));
+
+    if (isStudentIdComplete(studentId)) {
+      handleAutofill(studentId, currentEventId)
+        .then((participant) => {
+          if (participant) {
+            setFoundParticipant(participant);
+            setShowAutoFillDialog(true);
+          }
+        })
+        .catch((error) => {
+          console.error("Error finding participant:", error);
+          toast.error("Error finding participant data");
+        });
+    }
+  };
+
+  const handleAutoFillConfirm = () => {
+    console.log("Confirming autofill with data:", foundParticipant); // Debug log
+
+    if (foundParticipant) {
+      setParticipantData((prev) => ({
+        ...prev,
+        name: foundParticipant.name,
+        sex: foundParticipant.sex,
+        age: foundParticipant.age,
+        homeAddress: foundParticipant.homeAddress,
+        school: foundParticipant.school,
+        year: foundParticipant.year,
+        section: foundParticipant.section,
+        ethnicGroup: foundParticipant.ethnicGroup,
+        otherEthnicGroup: foundParticipant.otherEthnicGroup,
+      }));
+    }
+    setShowAutoFillDialog(false);
+    setFoundParticipant(null);
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Add Participant</CardTitle>
         <CardDescription>
-          {currentEvent
+          {currentEventId && currentEvent
             ? `Add participants to ${currentEvent.eventName}`
             : "No active event created"}
         </CardDescription>
@@ -651,15 +737,15 @@ export default function ParticipantManagement({
               className="mr-2"
             >
               {loading ? (
-               <>
-               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-               Please wait
-             </>
-           ) : hasAddedParticipants ? (
-             "Add Another Participant"
-           ) : (
-             "Add Participant"
-           )}
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Please wait
+                </>
+              ) : hasAddedParticipants ? (
+                "Add Another Participant"
+              ) : (
+                "Add Participant"
+              )}
             </Button>
             <Button
               type="button"
@@ -708,23 +794,44 @@ export default function ParticipantManagement({
         </TableBody>
       </Table>
       <AlertDialog
-        open={showAutofillDialog}
-        onOpenChange={setShowAutofillDialog}
+        open={showAutoFillDialog}
+        onOpenChange={setShowAutoFillDialog}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Autofill Participant Data</AlertDialogTitle>
+            <AlertDialogTitle>Participant Found</AlertDialogTitle>
             <AlertDialogDescription>
-              Participant data from another event has been found. Would you like
-              to autofill the form with this data?
+              A participant with this student ID was found. Would you like to
+              auto-fill their information?
+              {foundParticipant && (
+                <div className="mt-4 p-4 bg-muted rounded-lg">
+                  <p>
+                    <strong>Name:</strong> {foundParticipant.name}
+                  </p>
+                  <p>
+                    <strong>School:</strong> {foundParticipant.school}
+                  </p>
+                  <p>
+                    <strong>Year:</strong> {foundParticipant.year}
+                  </p>
+                  <p>
+                    <strong>Section:</strong> {foundParticipant.section}
+                  </p>
+                </div>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleAutofillCancel}>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowAutoFillDialog(false);
+                setFoundParticipant(null);
+              }}
+            >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleAutofillConfirm}>
-              Yes, Autofill
+            <AlertDialogAction onClick={handleAutoFillConfirm}>
+              Auto-fill Information
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

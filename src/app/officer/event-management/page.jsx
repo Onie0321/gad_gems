@@ -13,6 +13,8 @@ import {
   subscribeToRealTimeUpdates,
   getCurrentUser,
 } from "@/lib/appwrite";
+import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
+
 
 function EventsPage() {
   const [user, setUser] = useState(null);
@@ -93,7 +95,7 @@ function EventsPage() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <GADConnectSimpleLoader />;
   }
 
   if (!user) {
@@ -127,6 +129,7 @@ function EventsPage() {
             currentEventId={currentEventId}
             setCurrentEventId={setCurrentEventId}
             user={user}
+            setActiveTab={setActiveTab} 
           />
         </TabsContent>
         <TabsContent value="log">

@@ -49,6 +49,7 @@ export default function CreateEvent({ onEventCreated, user }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [isTimeValid, setIsTimeValid] = useState(true);
+
   const nonAcademicCategories = getNonAcademicCategories();
 
   useEffect(() => {
@@ -146,7 +147,7 @@ export default function CreateEvent({ onEventCreated, user }) {
       onEventCreated(createdEvent);
 
       await createNotification({
-        userId: "admin", // This will be shown to admin
+        userId: "admin", // This is hardcoded
         type: "approval",
         title: "New Event Pending Approval",
         message: `${user.name} has created a new event "${eventName}" that requires approval.`,
@@ -154,7 +155,7 @@ export default function CreateEvent({ onEventCreated, user }) {
         actionType: "event_approval",
         approvalStatus: "pending",
       });
-  
+
       // Create notification for the event creator
       await createNotification({
         userId: user.$id, // This will be shown to the event creator
@@ -165,7 +166,6 @@ export default function CreateEvent({ onEventCreated, user }) {
       });
 
       toast.success("Event created successfully and sent for approval!");
-
 
       // Reset form fields
       setEventName("");

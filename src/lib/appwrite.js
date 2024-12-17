@@ -383,6 +383,10 @@ export async function setAdminApproval(userId, approved) {
 
 export const createEvent = async (eventData, userId) => {
   try {
+    if (!eventData || !userId) {
+      throw new Error("Missing required data for event creation");
+    }
+
     const response = await databases.createDocument(
       databaseId,
       eventCollectionId,
@@ -409,24 +413,22 @@ export const createEvent = async (eventData, userId) => {
   }
 };
 
-export const getEvents = async (userId) => {
+export async function getEvents(userId) {
   try {
-    if (!userId) {
-      console.error("UserId is missing or invalid");
-      return [];
-    }
-
     const response = await databases.listDocuments(
       databaseId,
       eventCollectionId,
-      [Query.equal("createdBy", userId)]
+      [Query.equal("createdBy", userId), Query.orderDesc("eventDate")]
     );
-    return response.documents;
+    return response.documents.map((event) => ({
+      ...event,
+      approvalStatus: event.approvalStatus || null,
+    }));
   } catch (error) {
     console.error("Error fetching events:", error);
     throw error;
   }
-};
+}
 
 export const checkDuplicateEvent = async (eventName, eventDate, eventVenue) => {
   try {
@@ -530,25 +532,46 @@ export const createParticipant = async (participantData, createdById) => {
   }
 };
 
-export const getParticipants = async (eventId, createdById) => {
+export async function getParticipants(eventId, userId) {
   try {
-    // Ensure eventId is defined
-    if (!eventId) {
-      throw new Error("eventId is missing.");
-    }
-
     const response = await databases.listDocuments(
       databaseId,
       participantCollectionId,
-      [Query.equal("eventId", eventId), Query.equal("createdBy", createdById)]
+      [Query.equal("eventId", eventId)]
     );
-
     return response.documents;
   } catch (error) {
     console.error("Error fetching participants:", error);
     throw error;
   }
-};
+}
+
+// Add to appwrite.js
+
+export async function getAllEventsAndParticipants() {
+  try {
+    // First fetch all events
+    const eventsResponse = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [Query.orderDesc("eventDate")]
+    );
+
+    // Then fetch all participants
+    const participantsResponse = await databases.listDocuments(
+      databaseId,
+      participantCollectionId
+    );
+
+    return {
+      events: eventsResponse.documents,
+      participants: participantsResponse.documents,
+    };
+  } catch (error) {
+    console.error("Error fetching events and participants:", error);
+    throw error;
+  }
+}
 
 export const updateParticipant = async (participantId, updatedData) => {
   try {
@@ -734,7 +757,7 @@ export function subscribeToRealTimeUpdates(collectionId, callback) {
   }
 
   const unsubscribe = client.subscribe(
-    `databases.${databaseId}.collections.${collectionId}.documents`,
+    `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${collectionId}.documents`,
     (response) => {
       console.log("Real-time update received:", response);
       if (response.events.includes("databases.*.collections.*.documents.*")) {
@@ -743,8 +766,23 @@ export function subscribeToRealTimeUpdates(collectionId, callback) {
     }
   );
 
-  return unsubscribe; // Return the unsubscribe function for cleanup
+  return () => {
+    unsubscribe();
+  };
 }
+
+export const subscribeToEventUpdates = (callback) => {
+  return client.subscribe(
+    `databases.${databaseId}.collections.${eventCollectionId}.documents`,
+    (response) => {
+      if (
+        response.events.includes("databases.*.collections.*.documents.*.update")
+      ) {
+        callback(response.payload);
+      }
+    }
+  );
+};
 
 export async function changePassword(currentPassword, newPassword) {
   try {
@@ -1322,23 +1360,83 @@ export async function getEmployeeData(employeeId) {
 // src/lib/appwrite.js
 
 // Add these functions to your existing appwrite.js
-export const createNotification = async (data) => {
+// In src/lib/appwrite.js
+
+export const createNotification = async ({
+  userId,
+  type,
+  title,
+  message,
+  actionType = null,
+  approvalStatus = null,
+  status = "pending",
+  read = false,
+}) => {
   try {
-    return await databases.createDocument(
+    const response = await databases.createDocument(
       databaseId,
       notificationsCollectionId,
       ID.unique(),
       {
-        userId: data.userId,
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        read: false,
-        ...data,
+        userId,
+        type,
+        title,
+        message,
+        actionType,
+        approvalStatus,
+        status,
+        read,
+        timestamp: new Date().toISOString(),
       }
     );
+    return response;
   } catch (error) {
     console.error("Error creating notification:", error);
+    throw error;
+  }
+};
+
+export const markNotificationAsRead = async (notificationId) => {
+  try {
+    const response = await databases.updateDocument(
+      databaseId,
+      notificationsCollectionId,
+      notificationId,
+      {
+        read: true,
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    throw error;
+  }
+};
+
+export const getNotifications = async (userId, role) => {
+  try {
+    let queries = [Query.orderDesc("$createdAt")];
+
+    if (role === "admin") {
+      queries.push(
+        Query.or(
+          Query.equal("type", "approval"),
+          Query.equal("type", "account"),
+          Query.equal("type", "info")
+        )
+      );
+    } else {
+      queries.push(Query.equal("userId", userId));
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      notificationsCollectionId,
+      queries
+    );
+    return response.documents;
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
     throw error;
   }
 };
@@ -1633,5 +1731,16 @@ export const fetchActivityLogs = async () => {
   } catch (error) {
     console.error("Error fetching activity logs:", error);
     throw error;
+  }
+};
+
+ export const checkConnection = async () => {
+  try {
+    await client.health.get();
+    console.log('Appwrite connection successful');
+    return true;
+  } catch (error) {
+    console.error('Appwrite connection failed:', error);
+    return false;
   }
 };

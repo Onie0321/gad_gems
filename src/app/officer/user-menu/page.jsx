@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getCurrentUser, signOut, account } from "@/lib/appwrite";
+import { getCurrentUser, signOut, account, logSignOutActivity } from "@/lib/appwrite";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,8 +58,18 @@ export default function UserMenu() {
 
   const handleLogOut = async () => {
     try {
+      const currentUser = await getCurrentUser();
+      if (currentUser) {
+        // Log the sign out activity before actually signing out
+        await logSignOutActivity(
+          currentUser.$id,
+          currentUser.role // 'admin' or 'officer'
+        );
+      }
+      
       await signOut(); // Call the signOut function
       router.push("/"); // Redirect to the home page
+      
       toast({
         title: "Signed Out",
         description: "You have been successfully signed out.",
@@ -108,13 +118,13 @@ export default function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onClick={() => router.push("/admin/user-menu/profile")}
+          onClick={() => router.push("/officer/user-menu/profile")}
         >
           <Users className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => router.push("/admin/user-menu/settings")}
+          onClick={() => router.push("/officer/user-menu/settings")}
         >
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>

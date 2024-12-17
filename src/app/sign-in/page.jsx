@@ -21,11 +21,12 @@ import {
   getCurrentUser,
   account,
   SignIn,
-  createGoogleUser, logActivity
+  createGoogleUser,
+  logActivity,
+  createNotification, // Add this import
 } from "@/lib/appwrite";
 import dynamic from "next/dynamic";
 import { ActivityTypes } from "@/lib/constants";
-
 
 const MotionDiv = dynamic(
   () => import("framer-motion").then((mod) => mod.motion.div),
@@ -103,7 +104,7 @@ export default function SignInPage() {
         `${currentUrl}/auth-callback`,
         `${currentUrl}/sign-in`
       );
-      
+
       // Note: For Google sign-in, you'll need to log the activity after the callback
       const user = await getCurrentUser();
       if (user) {
@@ -118,7 +119,7 @@ export default function SignInPage() {
       });
     }
   };
-  
+
   const handleSignIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -130,10 +131,24 @@ export default function SignInPage() {
         if (user) {
           // Log the sign-in activity
           await logActivity(user.$id, "user_signin");
+  
+          // Create notification for admin
+          await createNotification({
+            userId: "admin",
+            type: "account",
+            title: "User Sign In",
+            message: `${user.name} has signed in to the system.`,
+            actionType: "user_signin",
+            status: "new",
+            approvalStatus: "none",
+            read: false
+          });
+  
           handleUserStatus(user);
         } else {
           throw new Error("Failed to fetch user data after sign-in.");
         }
+  
         setEmail("");
         setPassword("");
       }
@@ -234,7 +249,6 @@ export default function SignInPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-10"
-                    autocomplete="new-password"
                   />
                   <Lock
                     className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"

@@ -59,37 +59,39 @@ export default function SignUpPage() {
   const handleGoogleSignUp = async () => {
     try {
       const currentUrl = window.location.origin;
-      await account.createOAuth2Session(
+      const session = await account.createOAuth2Session(
         "google",
         `${currentUrl}/auth-callback`,
         `${currentUrl}/signup`
       );
 
-       // If successful, create notifications
-    if (session) {
-      const userDetails = await account.get();
-      
-      // Create notification for admin
-      await createNotification({
-        userId: "admin",
-        type: "account",
-        title: "New Google Account Registration",
-        message: `New user ${userDetails.name} has registered via Google.`,
-        actionType: "user_registration",
-        read: false,
-        timestamp: new Date().toISOString()
-      });
+      // If successful, create notifications
+      if (session) {
+        const userDetails = await account.get();
+        
+        // Create notification for admin
+        await createNotification({
+          userId: "admin",
+          type: "account",
+          title: "New Google Account Registration",
+          message: `New user ${userDetails.name} has registered via Google.`,
+          actionType: "user_registration",
+          status: "pending",
+          approvalStatus: "pending",
+          read: false
+        });
 
-      // Create welcome notification for the new user
-      await createNotification({
-        userId: userDetails.$id,
-        type: "info",
-        title: "Welcome to GAD Nexus",
-        message: `Welcome ${userDetails.name}! Your Google account has been connected successfully.`,
-        read: false,
-        timestamp: new Date().toISOString()
-      });
-    }
+        // Create welcome notification for the new user
+        await createNotification({
+          userId: userDetails.$id,
+          type: "info",
+          title: "Welcome to GAD Nexus",
+          message: `Welcome ${userDetails.name}! Your Google account has been connected successfully.`,
+          status: "new",
+          approvalStatus: "none",
+          read: false
+        });
+      }
     } catch (error) {
       console.error("Google signup error:", error);
       toast({
@@ -120,25 +122,27 @@ export default function SignUpPage() {
       const newUser = await createUser(email, password, name);
 
       if (newUser) {
-         // Create notification for admin
-      await createNotification({
-        userId: "admin",
-        type: "account",
-        title: "New User Registration",
-        message: `New user ${name} (${email}) has registered and requires approval.`,
-        actionType: "user_registration",
-        read: false,
-        timestamp: new Date().toISOString()
-      });
-      // Create welcome notification for the new user
-      await createNotification({
-        userId: newUser.$id,
-        type: "info",
-        title: "Welcome to GAD Nexus",
-        message: `Welcome ${name}! Your account has been created successfully.`,
-        read: false,
-        timestamp: new Date().toISOString()
-      });
+        // Create notification for admin
+        await createNotification({
+          userId: "admin",
+          type: "account",
+          title: "New User Registration",
+          message: `New user ${name} (${email}) has registered and requires approval.`,
+          actionType: "user_registration",
+          read: false
+        });
+
+        // Create welcome notification for the new user
+        await createNotification({
+          userId: newUser.$id,
+          type: "info",
+          title: "Welcome to GAD Nexus",
+          message: `Welcome ${name}! Your account has been created successfully.`,
+          status: "new",
+          approvalStatus: "none",
+          read: false
+        });
+
         toast({
           title: "Success",
           description: "Account created successfully!",
