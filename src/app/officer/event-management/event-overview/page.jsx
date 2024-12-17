@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,8 +40,10 @@ import {
   Query,
   getEvents,
 } from "@/lib/appwrite";
+import { client } from "@/lib/appwrite";
+import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
 
-export default function EventOverView({ setActiveSection }) {
+export default function EventOverView() {
   const [events, setEvents] = useState([]);
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +92,36 @@ export default function EventOverView({ setActiveSection }) {
     };
 
     fetchUserAndData();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = client.subscribe(
+      `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID}.documents`,
+      (response) => {
+        if (
+          response.events.includes(
+            "databases.*.collections.*.documents.*.update"
+          ) ||
+          response.events.includes(
+            "databases.*.collections.*.documents.*.create"
+          )
+        ) {
+          // Update the specific event in the local state
+          const updatedEvent = response.payload;
+          setEvents((prevEvents) =>
+            prevEvents.map((event) =>
+              event.$id === updatedEvent.$id
+                ? { ...event, ...updatedEvent }
+                : event
+            )
+          );
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const fetchData = async (userId) => {
@@ -222,11 +256,7 @@ export default function EventOverView({ setActiveSection }) {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <GADConnectSimpleLoader />;
   }
 
   if (error) {
@@ -247,7 +277,7 @@ export default function EventOverView({ setActiveSection }) {
     <div className="space-y-4">
       <div className="flex justify-between">
         <h2 className="text-2xl font-bold">Recent Events</h2>
-        <Button onClick={() => setActiveSection("create")}>
+        <Button onClick={() => {}}>
           <Plus className="mr-2 h-4 w-4" /> Add Event
         </Button>
       </div>
@@ -329,8 +359,7 @@ export default function EventOverView({ setActiveSection }) {
               </Button>
             </TableHead>
             <TableHead>Location</TableHead>
-            <TableHead>Status</TableHead> {/* Add status column */}
-
+            <TableHead>Status</TableHead>
             <TableHead className="text-right">
               <Button
                 variant="ghost"
@@ -356,12 +385,14 @@ export default function EventOverView({ setActiveSection }) {
                 <TableCell>
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      event.status === "approved"
+                      event.approvalStatus === "approved"
                         ? "bg-green-100 text-green-800"
+                        : event.approvalStatus === "rejected"
+                        ? "bg-red-100 text-red-800"
                         : "bg-yellow-100 text-yellow-800"
                     }`}
                   >
-                    {event.status || "Pending"}
+                    {event.approvalStatus || "Pending"}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">

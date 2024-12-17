@@ -11,7 +11,6 @@ import {
   FileQuestion,
   UserPlus,
   BarChart2,
-  Shield,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -19,12 +18,11 @@ import UserMenu from "./user-menu/page";
 import NotificationButton from "./notifications/page";
 import DashboardOverview from "./dashboard/page";
 import EventsSection from "./events/page";
-import DemographicsSection from "./demographics/page";
+import DemographicAnalysis from "./demographics/page";
 import SettingsSection from "./settings/page";
 import UserManagement from "./user-management/page";
 import InactivityLock from "@/components/loading/InactivityLock";
 import DataImportAnalytics from "./data-import/page";
-import { SchoolsSection } from "./schools/page";
 import {
   getCurrentUser,
   getAccount,
@@ -163,12 +161,12 @@ export default function AdminDashboard() {
         return <UserManagement {...props} />;
       case "events":
         return <EventsSection {...props} />;
-      case "schools":
-        return <SchoolsSection {...props} />;
       case "settings":
         return <SettingsSection {...props} />;
       case "data-import":
         return <DataImportAnalytics {...props} />;
+      case "demographics":
+        return <DemographicAnalysis />;
       default:
         return <DashboardOverview {...props} />;
     }
@@ -228,15 +226,6 @@ export default function AdminDashboard() {
               Dashboard
             </Button>
             <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => router.push('/officer')}
-            >
-              <Shield className="mr-2 h-4 w-4" />
-              Officer Dashboard
-            </Button>
-
-            <Button
               variant={activeSection === "users" ? "default" : "ghost"}
               className="w-full justify-start"
               onClick={() => setActiveSection("users")}
@@ -253,6 +242,14 @@ export default function AdminDashboard() {
               Event Management
             </Button>
             <Button
+              variant={activeSection === "demographics" ? "default" : "ghost"}
+              className="w-full justify-start mb-2"
+              onClick={() => setActiveSection("demographics")}
+            >
+              <Users className="mr-2 h-4 w-4" />
+              Demographics
+            </Button>
+            <Button
               variant={activeSection === "data-import" ? "default" : "ghost"}
               className="w-full justify-start"
               onClick={() => setActiveSection("data-import")}
@@ -260,14 +257,7 @@ export default function AdminDashboard() {
               <BarChart2 className="mr-2 h-4 w-4" />
               Data Import & Analytics
             </Button>
-            <Button
-              variant={activeSection === "schools" ? "default" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => setActiveSection("schools")}
-            >
-              <BarChart2 className="mr-2 h-4 w-4" />
-              Schools
-            </Button>
+          
             <Button
               variant={activeSection === "settings" ? "default" : "ghost"}
               className="w-full justify-start"

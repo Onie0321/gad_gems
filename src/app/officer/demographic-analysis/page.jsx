@@ -20,13 +20,10 @@ import { getEvents, getParticipants, getCurrentUser } from "@/lib/appwrite";
 import GenderBreakdown from "./gender-breakdown/page";
 import AgeDistribution from "./age-distribution/page";
 import EducationLevel from "./educational-level/page";
-import EthnicGroupAnalysis from "./ethnic-group-analysis/page";
+import EthnicGroupAnalysis from "../../admin/demographics/ethnic-group-analysis/page";
 import SchoolDistribution from "./school-distribution/page";
 import SectionDistribution from "./section-distribution/page";
-import AdvancedSearch from "./search/page";
-import { Trends } from "./trends/page";
-import { Reports } from "./reports/page";
-import { LoadingAnimation } from "@/components/loading/loading-animation";
+import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
 
 export default function DemographicAnalysis() {
   const [events, setEvents] = useState([]);
@@ -48,45 +45,33 @@ export default function DemographicAnalysis() {
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    const initializeUser = async () => {
+    const initializeData = async () => {
       try {
+        setIsLoading(true);
         const user = await getCurrentUser();
-        setCurrentUser(user);
-        if (user) {
-          fetchEvents(user.id);
-        } else {
+        if (!user) {
           setIsLoading(false);
-          setLoadingMessage("Please sign in to view demographic analysis.");
+          return;
         }
-      } catch (error) {
-        console.error("Error fetching current user:", error);
+
+        setCurrentUser(user);
+        const fetchedEvents = await getEvents(user.$id);
+        setEvents(fetchedEvents);
         setIsLoading(false);
-        setLoadingMessage("Error fetching user information. Please try again.");
+      } catch (error) {
+        console.error("Error initializing data:", error);
+        setIsLoading(false);
+        setLoadingMessage("Error loading data. Please try again.");
       }
     };
 
-    initializeUser();
+    initializeData();
   }, []);
-
   useEffect(() => {
     if (events.length > 0 && currentUser) {
       fetchDemographicData(selectedEvent);
     }
   }, [selectedEvent, events, currentUser]);
-
-  const fetchEvents = async (userId) => {
-    try {
-      setIsLoading(true);
-      setLoadingMessage("Fetching events...");
-      const fetchedEvents = await getEvents(userId);
-      setEvents(fetchedEvents);
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Error fetching events:", error);
-      setIsLoading(false);
-      setLoadingMessage("Error fetching events. Please try again.");
-    }
-  };
 
   const fetchDemographicData = async (eventId) => {
     if (!currentUser) return;
@@ -94,21 +79,25 @@ export default function DemographicAnalysis() {
     try {
       setIsLoading(true);
       setLoadingMessage("Fetching demographic data...");
+
       let participants;
       if (eventId === "all") {
-        participants = await Promise.all(
-          events.map((event) => getParticipants(event.$id, currentUser.id))
+        // Fetch participants for all events
+        const allParticipants = await Promise.all(
+          events.map((event) => getParticipants(event.$id, currentUser.$id))
         );
-        participants = participants.flat();
+        participants = allParticipants.flat();
         setSelectedEventName("All Events");
       } else {
-        participants = await getParticipants(eventId, currentUser.id);
+        // Fetch participants for selected event
+        participants = await getParticipants(eventId, currentUser.$id);
         const selectedEventObj = events.find((event) => event.$id === eventId);
         setSelectedEventName(
           selectedEventObj ? selectedEventObj.eventName : "Unknown Event"
         );
       }
 
+      // Process demographic data
       setDemographicData({
         genderData: processGenderData(participants),
         ageData: processAgeData(participants),
@@ -268,38 +257,46 @@ export default function DemographicAnalysis() {
     setDemographicData(processedData);
   };
 
-  const handleLoadingTimeout = () => {
-    setIsLoading(false);
-    setLoadingMessage("Operation timed out. Please try again.");
+  const colors = {
+    background: "#F5F5F5",
+    primary: "#2D89EF",
+    secondary: "#4DB6AC",
+    heading: "#37474F",
+    link: "#FF6F61",
+    cta: "#F9A825",
+    success: "#A7FFEB",
+    chartColors: ["#2D89EF", "#4DB6AC", "#FF6F61", "#9C27B0"], // Blue, Teal, Coral, Violet
   };
 
   if (!currentUser) {
     return (
-      <div className="p-4">Please sign in to view demographic analysis.</div>
+      <div className="p-4 text-center">
+        <p className="text-red-500">
+          Please sign in to view demographic analysis.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4 p-4">
-      {isLoading && (
-        <LoadingAnimation
-          message={loadingMessage}
-          timeout={30000}
-          onTimeout={handleLoadingTimeout}
-        />
-      )}
+    <div className="space-y-4 p-4 bg-[#F5F5F5]">
+      {isLoading && <GADConnectSimpleLoader />}
       <Tabs value={activeSection} onValueChange={setActiveSection}>
-        <TabsList>
-          <TabsTrigger value="demographic">Demographic Overview</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="advanced">Advanced Search</TabsTrigger>
+        <TabsList className="bg-white">
+          <TabsTrigger
+            value="demographic"
+            className="data-[state=active]:bg-[#2D89EF] data-[state=active]:text-white"
+          >
+            Demographic Overview
+          </TabsTrigger>{" "}
         </TabsList>
         <TabsContent value="demographic">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">{selectedEventName}</h2>
+            <h2 className="text-2xl font-bold text-[#37474F]">
+              {selectedEventName}
+            </h2>
             <Select onValueChange={setSelectedEvent} value={selectedEvent}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[200px] bg-white border-[#4DB6AC]">
                 <SelectValue placeholder="Select event" />
               </SelectTrigger>
               <SelectContent>
@@ -313,25 +310,31 @@ export default function DemographicAnalysis() {
             </Select>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <GenderBreakdown data={demographicData.genderData} />
-            <AgeDistribution data={demographicData.ageData} />
-            <EducationLevel data={demographicData.educationData} />
-            <EthnicGroupAnalysis data={demographicData.ethnicData} />
-            <SchoolDistribution data={demographicData.schoolData} />
-            <SectionDistribution data={demographicData.sectionData} />
+            <GenderBreakdown
+              data={demographicData.genderData}
+              colors={colors.chartColors}
+            />
+            <AgeDistribution
+              data={demographicData.ageData}
+              colors={colors.chartColors}
+            />
+            <EducationLevel
+              data={demographicData.educationData}
+              colors={colors.chartColors}
+            />
+            <EthnicGroupAnalysis
+              data={demographicData.ethnicData}
+              colors={colors.chartColors}
+            />
+            <SchoolDistribution
+              data={demographicData.schoolData}
+              colors={colors.chartColors}
+            />
+            <SectionDistribution
+              data={demographicData.sectionData}
+              colors={colors.chartColors}
+            />
           </div>
-        </TabsContent>
-        <TabsContent value="trends">
-          <Trends currentUser={currentUser} />
-        </TabsContent>
-        <TabsContent value="reports">
-          <Reports currentUser={currentUser} />
-        </TabsContent>
-        <TabsContent value="advanced">
-          <AdvancedSearch
-            onFilterChange={handleFilterChange}
-            currentUser={currentUser}
-          />
         </TabsContent>
       </Tabs>
     </div>

@@ -7,7 +7,7 @@ import Script from 'next/script';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'GAD',
+  title: 'GAD - Gender and Development ',
   description: 'Gender and Development',
 };
 

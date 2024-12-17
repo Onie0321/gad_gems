@@ -155,6 +155,7 @@ const ViewParticipants = ({
             </TableBody>
           </Table>
         </div>
+      
       </DialogContent>
     </Dialog>
   );

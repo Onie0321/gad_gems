@@ -48,6 +48,7 @@ import {
   updateParticipant,
   deleteParticipant,
   getCurrentUser,
+  subscribeToEventUpdates,
 } from "@/lib/appwrite";
 
 import AddParticipant from "./add-participant-dialog/page";
@@ -56,6 +57,7 @@ import DeleteEvent from "./delete-event-dialog/page";
 import ViewParticipants from "./view-participant-dialog/page";
 import ExportEventsButton from "./export-event/page";
 import GenerateReportButton from "./import-event/page";
+import SimpleLoading from "@/components/loading/simpleLoading";
 
 export default function EventParticipantLog() {
   const [events, setEvents] = useState([]);
@@ -88,14 +90,13 @@ export default function EventParticipantLog() {
     const fetchUserAndData = async () => {
       try {
         const user = await getCurrentUser();
-        console.log("Current user:", user);
         setCurrentUser(user);
         if (user) {
           fetchData(user.$id);
 
-          const unsubscribeEvents = subscribeToRealTimeUpdates(
-            eventCollectionId,
-            () => fetchData(user.$id)
+          // Subscribe to both event and participant updates
+          const unsubscribeEvents = subscribeToEventUpdates(() =>
+            fetchData(user.$id)
           );
           const unsubscribeParticipants = subscribeToRealTimeUpdates(
             participantCollectionId,
@@ -124,11 +125,21 @@ export default function EventParticipantLog() {
       console.log("Fetched events:", fetchedEvents);
 
       // Preserve existing data, just update the events array
+      const eventsWithStatus = fetchedEvents.map((event) => ({
+        ...event,
+        status: event.status || "pending",
+        approvalStatus: event.approvalStatus || null,
+      }));
+
       setEvents((prevEvents) => {
-        return fetchedEvents.map((newEvent) => {
+        return eventsWithStatus.map((newEvent) => {
           const existingEvent = prevEvents.find((e) => e.$id === newEvent.$id);
           return existingEvent
-            ? { ...existingEvent, status: newEvent.status }
+            ? {
+                ...existingEvent,
+                status: newEvent.status,
+                approvalStatus: newEvent.approvalStatus,
+              }
             : newEvent;
         });
       });
@@ -167,7 +178,9 @@ export default function EventParticipantLog() {
       eventName.includes(searchTerm.toLowerCase()) ||
       eventVenue.includes(searchTerm.toLowerCase());
     const matchesStatus =
-      statusFilter === "All" || event.status === statusFilter;
+      statusFilter === "All" ||
+      event.approvalStatus?.toLowerCase() === statusFilter.toLowerCase() ||
+      event.status?.toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
 
@@ -324,7 +337,20 @@ export default function EventParticipantLog() {
     };
   };
 
-  const getStatusStyles = (status) => {
+  const getStatusStyles = (status, approvalStatus) => {
+    // First check approval status
+    if (approvalStatus) {
+      switch (approvalStatus.toLowerCase()) {
+        case "approved":
+          return "bg-green-100 text-green-800";
+        case "rejected":
+          return "bg-red-100 text-red-800";
+        case "pending":
+          return "bg-yellow-100 text-yellow-800";
+      }
+    }
+
+    // If no approval status, fall back to event status
     switch (status?.toLowerCase()) {
       case "approved":
         return "bg-green-100 text-green-800";
@@ -347,7 +373,7 @@ export default function EventParticipantLog() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <SimpleLoading />
       </div>
     );
   }
@@ -467,13 +493,21 @@ export default function EventParticipantLog() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusStyles(
-                          event.status
-                        )}`}
-                      >
-                        {event.status || "Pending"}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span
+                          className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusStyles(
+                            event.status,
+                            event.approvalStatus
+                          )}`}
+                        >
+                          {event.approvalStatus || event.status || "Pending"}
+                        </span>
+                        {event.approvalStatus === "rejected" && (
+                          <span className="text-xs text-red-600">
+                            Rejected by Admin
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">

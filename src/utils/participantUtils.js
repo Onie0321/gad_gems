@@ -210,18 +210,22 @@ export const isStudentIdComplete = (studentId) => {
   if (!studentId) return false; // Handle null/undefined studentId
   return /^\d{2}-\d{2}-\d{4}$/.test(studentId);
 };
-
 export const handleAutofill = async (value, currentEventId) => {
-  // Add validation for required parameters
   if (!value || !currentEventId) {
     return null;
   }
 
   try {
     const data = await fetchParticipantData(value, currentEventId);
-    // Add null check before accessing data properties
+    console.log("Fetched participant data:", data); // Debug log
+    
+    // Return the data if found in another event
     if (data && data.eventId && data.eventId !== currentEventId) {
-      return data;
+      return {
+        ...data,
+        foundInEvent: true, // Add a flag to indicate it was found in another event
+        eventName: data.eventName // Make sure this is included in your fetched data
+      };
     }
     return null;
   } catch (error) {
