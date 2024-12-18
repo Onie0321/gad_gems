@@ -19,6 +19,7 @@ import {
 import {
   Bar,
   BarChart,
+  Cell,
   Line,
   LineChart,
   Pie,
@@ -33,7 +34,12 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { databases, databaseId, eventCollectionId } from "@/lib/appwrite";
+import {
+  databases,
+  databaseId,
+  eventCollectionId,
+  participantCollectionId,
+} from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { Loader2 } from "lucide-react";
 
@@ -55,29 +61,24 @@ export default function DemographicAnalysis() {
       setLoading(true);
       console.log("Fetching demographic data...");
 
-      // Fetch all events
-      const response = await databases.listDocuments(
+      // Fetch all events first
+      const eventsResponse = await databases.listDocuments(
         databaseId,
         eventCollectionId
       );
 
-      console.log("Events response:", response);
-
-      // Filter events with participants
-      const eventsWithParticipants = response.documents.filter(
-        event => event.participants && event.participants.length > 0
+      // Fetch all participants
+      const participantsResponse = await databases.listDocuments(
+        databaseId,
+        participantCollectionId
       );
 
-      // Process all participants from filtered events
-      const allParticipants = eventsWithParticipants.flatMap((event) => {
-        console.log("Event participants:", event.participants);
-        return event.participants || [];
-      });
+      console.log("Participants response:", participantsResponse);
 
-      console.log("All participants:", allParticipants);
+      const allParticipants = participantsResponse.documents;
 
       if (allParticipants.length === 0) {
-        console.log("No participants found in any events");
+        console.log("No participants found");
         setLoading(false);
         return;
       }
