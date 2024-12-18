@@ -384,9 +384,16 @@ export async function setAdminApproval(userId, approved) {
 export const createEvent = async (eventData) => {
   try {
     // Validate required fields
-    if (!eventData.eventName || !eventData.eventDate || !eventData.eventTimeFrom || 
-        !eventData.eventTimeTo || !eventData.eventVenue || !eventData.eventType || 
-        !eventData.eventCategory || !eventData.createdBy) {
+    if (
+      !eventData.eventName ||
+      !eventData.eventDate ||
+      !eventData.eventTimeFrom ||
+      !eventData.eventTimeTo ||
+      !eventData.eventVenue ||
+      !eventData.eventType ||
+      !eventData.eventCategory ||
+      !eventData.createdBy
+    ) {
       throw new Error("Missing required data for event creation");
     }
 
@@ -498,12 +505,15 @@ export const editEvent = async (eventId, eventData) => {
       eventVenue: eventData.eventVenue,
       eventType: eventData.eventType,
       eventCategory: eventData.eventCategory,
-      numberOfHours: String(eventData.numberOfHours)
+      numberOfHours: String(eventData.numberOfHours),
     };
 
     // Remove any undefined or null values
-    Object.keys(sanitizedEventData).forEach(key => {
-      if (sanitizedEventData[key] === undefined || sanitizedEventData[key] === null) {
+    Object.keys(sanitizedEventData).forEach((key) => {
+      if (
+        sanitizedEventData[key] === undefined ||
+        sanitizedEventData[key] === null
+      ) {
         delete sanitizedEventData[key];
       }
     });
@@ -705,18 +715,22 @@ export const deleteParticipant = async (participantId, userId) => {
   }
 };
 
-export const checkDuplicateParticipant = async (eventId, studentId = "", name = "") => {
+export const checkDuplicateParticipant = async (
+  eventId,
+  studentId = "",
+  name = ""
+) => {
   try {
-    let queries = [Query.equal('eventId', eventId)];
-    
+    let queries = [Query.equal("eventId", eventId)];
+
     // Add studentId check if provided
     if (studentId) {
-      queries.push(Query.equal('studentId', studentId));
+      queries.push(Query.equal("studentId", studentId));
     }
-    
+
     // Add name check if provided
     if (name) {
-      queries.push(Query.equal('name', name));
+      queries.push(Query.equal("name", name));
     }
 
     const response = await databases.listDocuments(
@@ -1410,7 +1424,7 @@ export const createNotification = async ({
   actionType = null,
   approvalStatus = "pending",
   status = "pending",
-  read = false
+  read = false,
 }) => {
   try {
     const response = await databases.createDocument(
@@ -1791,8 +1805,8 @@ export const listEvents = async () => {
       databaseId,
       eventCollectionId,
       [
-        Query.orderDesc('$createdAt'),
-        Query.limit(100) // Adjust limit as needed
+        Query.orderDesc("$createdAt"),
+        Query.limit(100), // Adjust limit as needed
       ]
     );
 
@@ -1804,19 +1818,22 @@ export const listEvents = async () => {
             databaseId,
             participantCollectionId,
             [
-              Query.equal('eventId', event.$id),
-              Query.limit(100) // Adjust limit as needed
+              Query.equal("eventId", event.$id),
+              Query.limit(100), // Adjust limit as needed
             ]
           );
           return {
             ...event,
-            participants: participants.documents
+            participants: participants.documents,
           };
         } catch (error) {
-          console.error(`Error fetching participants for event ${event.$id}:`, error);
+          console.error(
+            `Error fetching participants for event ${event.$id}:`,
+            error
+          );
           return {
             ...event,
-            participants: []
+            participants: [],
           };
         }
       })

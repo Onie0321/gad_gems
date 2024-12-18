@@ -379,7 +379,7 @@ const validateParticipants = (participants) => {
         `Participant at row ${index + 1} is missing a Student ID.`
       );
     }
-    if (!["Male", "Female"].includes(participant.sex)) {
+    if (!["Male", "Female", "Intersex"].includes(participant.sex)) {
       throw new Error(
         `Participant at row ${index + 1} has an invalid Sex value.`
       );
