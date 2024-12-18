@@ -381,54 +381,93 @@ export async function setAdminApproval(userId, approved) {
   }
 }
 
-export const createEvent = async (eventData, userId) => {
+export const createEvent = async (eventData) => {
   try {
-    if (!eventData || !userId) {
+    // Validate required fields
+    if (!eventData.eventName || !eventData.eventDate || !eventData.eventTimeFrom || 
+        !eventData.eventTimeTo || !eventData.eventVenue || !eventData.eventType || 
+        !eventData.eventCategory || !eventData.createdBy) {
       throw new Error("Missing required data for event creation");
     }
+
+    // Ensure participants array exists
+    const eventWithDefaults = {
+      ...eventData,
+      participants: eventData.participants || [],
+      numberOfHours: eventData.numberOfHours || "0",
+    };
 
     const response = await databases.createDocument(
       databaseId,
       eventCollectionId,
       ID.unique(),
-      {
-        eventName: eventData.eventName,
-        eventDate: eventData.eventDate,
-        eventTimeFrom: eventData.eventTimeFrom,
-        eventTimeTo: eventData.eventTimeTo,
-        eventVenue: eventData.eventVenue,
-        eventType: eventData.eventType,
-        eventCategory: eventData.eventCategory,
-        numberOfHours: eventData.numberOfHours,
-        approvalStatus: "pending",
-        createdBy: userId,
-      }
+      eventWithDefaults
     );
 
-    console.log("Event created successfully:", response);
+    if (!response) {
+      throw new Error("Failed to create event. Please try again.");
+    }
+
     return response;
   } catch (error) {
     console.error("Error creating event:", error);
-    throw new Error("Failed to create event. Please try again.");
+    throw error;
   }
 };
 
-export async function getEvents(userId) {
+export const getEvents = async () => {
   try {
     const response = await databases.listDocuments(
       databaseId,
       eventCollectionId,
-      [Query.equal("createdBy", userId), Query.orderDesc("eventDate")]
+      [
+        Query.orderDesc("$createdAt"), // Order by creation date, newest first
+      ]
     );
-    return response.documents.map((event) => ({
-      ...event,
-      approvalStatus: event.approvalStatus || null,
-    }));
+    return response.documents;
   } catch (error) {
     console.error("Error fetching events:", error);
     throw error;
   }
-}
+};
+
+export const getParticipants = async (eventId) => {
+  try {
+    let query = [];
+
+    if (eventId && eventId !== "all") {
+      // If specific event, filter by eventId
+      query.push(Query.equal("eventId", eventId));
+    }
+
+    // Fetch participants directly from the participants collection
+    const response = await databases.listDocuments(
+      databaseId,
+      participantCollectionId,
+      query
+    );
+
+    return response.documents;
+  } catch (error) {
+    console.error("Error fetching participants:", error);
+    throw error;
+  }
+};
+
+// Add this helper function to get a single event
+export const getEvent = async (eventId) => {
+  try {
+    const event = await databases.getDocument(
+      databaseId,
+      eventCollectionId,
+      eventId
+    );
+    return event;
+  } catch (error) {
+    console.error("Error fetching event:", error);
+    throw error;
+  }
+};
 
 export const checkDuplicateEvent = async (eventName, eventDate, eventVenue) => {
   try {
@@ -450,14 +489,32 @@ export const checkDuplicateEvent = async (eventName, eventDate, eventVenue) => {
 
 export const editEvent = async (eventId, eventData) => {
   try {
-    // Perform the update on the specified event using its ID
+    // Remove any Appwrite internal fields and ensure numberOfHours is a string
+    const sanitizedEventData = {
+      eventName: eventData.eventName,
+      eventDate: eventData.eventDate,
+      eventTimeFrom: eventData.eventTimeFrom,
+      eventTimeTo: eventData.eventTimeTo,
+      eventVenue: eventData.eventVenue,
+      eventType: eventData.eventType,
+      eventCategory: eventData.eventCategory,
+      numberOfHours: String(eventData.numberOfHours)
+    };
+
+    // Remove any undefined or null values
+    Object.keys(sanitizedEventData).forEach(key => {
+      if (sanitizedEventData[key] === undefined || sanitizedEventData[key] === null) {
+        delete sanitizedEventData[key];
+      }
+    });
+
     const response = await databases.updateDocument(
-      databaseId, // Database ID
-      eventCollectionId, // Collection ID
-      eventId, // Document ID to update
-      eventData // Updated data
+      databaseId,
+      eventCollectionId,
+      eventId,
+      sanitizedEventData
     );
-    return response; // Return the updated event
+    return response;
   } catch (error) {
     console.error("Error editing event:", error);
     throw new Error("Failed to edit event.");
@@ -531,20 +588,6 @@ export const createParticipant = async (participantData, createdById) => {
     return null;
   }
 };
-
-export async function getParticipants(eventId, userId) {
-  try {
-    const response = await databases.listDocuments(
-      databaseId,
-      participantCollectionId,
-      [Query.equal("eventId", eventId)]
-    );
-    return response.documents;
-  } catch (error) {
-    console.error("Error fetching participants:", error);
-    throw error;
-  }
-}
 
 // Add to appwrite.js
 
@@ -662,21 +705,18 @@ export const deleteParticipant = async (participantId, userId) => {
   }
 };
 
-export async function checkDuplicateParticipant(eventId, studentId, name) {
-  if (!eventId || (!studentId && !name)) {
-    console.error("Invalid input: eventId, studentId, or name is missing");
-    return false;
-  }
-
+export const checkDuplicateParticipant = async (eventId, studentId = "", name = "") => {
   try {
-    const queries = [Query.equal("eventId", eventId)];
-
+    let queries = [Query.equal('eventId', eventId)];
+    
+    // Add studentId check if provided
     if (studentId) {
-      queries.push(Query.equal("studentId", studentId));
+      queries.push(Query.equal('studentId', studentId));
     }
-
+    
+    // Add name check if provided
     if (name) {
-      queries.push(Query.equal("name", name));
+      queries.push(Query.equal('name', name));
     }
 
     const response = await databases.listDocuments(
@@ -685,12 +725,12 @@ export async function checkDuplicateParticipant(eventId, studentId, name) {
       queries
     );
 
-    return response.total > 0;
+    return response.documents.length > 0;
   } catch (error) {
-    console.error("Error checking for duplicate participant:", error);
+    console.error("Error checking duplicate participant:", error);
     throw error;
   }
-}
+};
 
 export async function getParticipantByStudentId(studentId) {
   try {
@@ -1368,9 +1408,9 @@ export const createNotification = async ({
   title,
   message,
   actionType = null,
-  approvalStatus = null,
+  approvalStatus = "pending",
   status = "pending",
-  read = false,
+  read = false
 }) => {
   try {
     const response = await databases.createDocument(
@@ -1734,13 +1774,57 @@ export const fetchActivityLogs = async () => {
   }
 };
 
- export const checkConnection = async () => {
+export const checkConnection = async () => {
   try {
     await client.health.get();
-    console.log('Appwrite connection successful');
+    console.log("Appwrite connection successful");
     return true;
   } catch (error) {
-    console.error('Appwrite connection failed:', error);
+    console.error("Appwrite connection failed:", error);
     return false;
+  }
+};
+
+export const listEvents = async () => {
+  try {
+    const response = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [
+        Query.orderDesc('$createdAt'),
+        Query.limit(100) // Adjust limit as needed
+      ]
+    );
+
+    // For each event, fetch its participants
+    const eventsWithParticipants = await Promise.all(
+      response.documents.map(async (event) => {
+        try {
+          const participants = await databases.listDocuments(
+            databaseId,
+            participantCollectionId,
+            [
+              Query.equal('eventId', event.$id),
+              Query.limit(100) // Adjust limit as needed
+            ]
+          );
+          return {
+            ...event,
+            participants: participants.documents
+          };
+        } catch (error) {
+          console.error(`Error fetching participants for event ${event.$id}:`, error);
+          return {
+            ...event,
+            participants: []
+          };
+        }
+      })
+    );
+
+    return eventsWithParticipants;
+  } catch (error) {
+    console.error("Error listing events:", error);
+    throw error;
   }
 };

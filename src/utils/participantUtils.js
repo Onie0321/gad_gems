@@ -210,26 +210,35 @@ export const isStudentIdComplete = (studentId) => {
   if (!studentId) return false; // Handle null/undefined studentId
   return /^\d{2}-\d{2}-\d{4}$/.test(studentId);
 };
-export const handleAutofill = async (value, currentEventId) => {
-  if (!value || !currentEventId) {
+export const handleAutofill = async (studentId, currentEventId) => {
+  if (!studentId || !currentEventId || !isStudentIdComplete(studentId)) {
     return null;
   }
 
   try {
-    const data = await fetchParticipantData(value, currentEventId);
-    console.log("Fetched participant data:", data); // Debug log
-    
-    // Return the data if found in another event
-    if (data && data.eventId && data.eventId !== currentEventId) {
+    const data = await fetchParticipantData(studentId, currentEventId);
+    console.log("Fetched participant data:", data);
+
+    // Return participant data if found in another event
+    if (data && data.studentId && data.eventId !== currentEventId) {
       return {
-        ...data,
-        foundInEvent: true, // Add a flag to indicate it was found in another event
-        eventName: data.eventName // Make sure this is included in your fetched data
+        studentId: data.studentId,
+        name: data.name,
+        sex: data.sex,
+        age: data.age,
+        homeAddress: data.homeAddress || "",
+        school: data.school,
+        year: data.year,
+        section: data.section,
+        ethnicGroup: data.ethnicGroup,
+        otherEthnicGroup: data.otherEthnicGroup || "",
+        foundInEvent: true,
+        eventName: data.eventName
       };
     }
     return null;
   } catch (error) {
-    console.error("Error fetching participant data:", error);
-    throw new Error("Error fetching participant data. Please try again.");
+    console.error("Error in handleAutofill:", error);
+    throw new Error("Error fetching participant data");
   }
 };

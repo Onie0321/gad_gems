@@ -5,13 +5,13 @@ import {
   databaseId,
   eventCollectionId,
   participantCollectionId,
+  getCurrentUser,
 } from "@/lib/appwrite";
 
 // Utility to format dates for database storage
 export const formatDateForDatabase = (dateString) => {
   if (!dateString) {
-    console.warn("Empty date value provided.");
-    return null;
+    throw new Error("Empty date value provided");
   }
 
   // First, try parsing as a regular date string
@@ -26,11 +26,11 @@ export const formatDateForDatabase = (dateString) => {
   }
 
   if (isNaN(date.getTime())) {
-    console.warn(`Invalid date value: "${dateString}"`);
-    return null;
+    throw new Error(`Invalid date value: "${dateString}"`);
   }
 
-  // Return ISO string
+  // Set time to midnight UTC to avoid timezone issues
+  date.setUTCHours(0, 0, 0, 0);
   return date.toISOString();
 };
 
@@ -46,93 +46,116 @@ export const formatDateForDisplay = (dateString) => {
 
 const formatDateForErrorMessage = (dateString) => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 };
 
 // Utility to calculate duration in hours
 export const calculateDuration = (timeFrom, timeTo) => {
-  const parseTime = (timeString) => {
-    const [time, period] = timeString.split(' ');
-    let [hours, minutes] = time.split(':').map(Number);
-    if (period === 'PM' && hours !== 12) hours += 12;
-    if (period === 'AM' && hours === 12) hours = 0;
-    return hours * 60 + minutes; // Convert to minutes
-  };
+  try {
+    const start = new Date(timeFrom);
+    const end = new Date(timeTo);
 
-  const fromMinutes = parseTime(timeFrom);
-  const toMinutes = parseTime(timeTo);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new Error("Invalid time format");
+    }
 
-  let durationMinutes = toMinutes - fromMinutes;
-  if (durationMinutes < 0) durationMinutes += 24 * 60; // Add a day if it goes past midnight
+    const durationMs = end - start;
+    if (durationMs < 0) {
+      throw new Error("End time must be after start time");
+    }
 
-  const hours = Math.floor(durationMinutes / 60);
-  const minutes = durationMinutes % 60;
+    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
 
-  return { hours, minutes };
+    return {
+      hours,
+      minutes,
+      toString: () =>
+        `${hours} hour${hours !== 1 ? "s" : ""} ${minutes} minute${
+          minutes !== 1 ? "s" : ""
+        }`,
+    };
+  } catch (error) {
+    console.error("Error calculating duration:", error);
+    throw new Error(
+      "Invalid duration. Please check the event start and end times."
+    );
+  }
 };
 
 export const formatDurationForDisplay = (duration) => {
   const { hours, minutes } = duration;
-  return `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  return `${hours} hour${hours !== 1 ? "s" : ""} ${minutes} minute${
+    minutes !== 1 ? "s" : ""
+  }`;
 };
 
-
 // Utility to format dates
-// const formatDate = (dateString) => {
-//   if (!dateString) {
-//     console.warn("Empty date value provided.");
-//     return null;
-//   }
+const formatDate = (dateString) => {
+  if (!dateString) {
+    console.warn("Empty date value provided.");
+    return null;
+  }
 
-//   // First, try parsing as a regular date string
-//   let date = new Date(dateString);
+  //   // First, try parsing as a regular date string
+  let date = new Date(dateString);
 
-//   // If that fails, try parsing as an Excel serial number
-//   if (isNaN(date.getTime())) {
-//     const excelDate = XLSX.SSF.parse_date_code(dateString);
-//     if (excelDate) {
-//       date = new Date(Date.UTC(excelDate.y, excelDate.m - 1, excelDate.d));
-//     }
-//   }
+  //   // If that fails, try parsing as an Excel serial number
+  if (isNaN(date.getTime())) {
+    const excelDate = XLSX.SSF.parse_date_code(dateString);
+    if (excelDate) {
+      date = new Date(Date.UTC(excelDate.y, excelDate.m - 1, excelDate.d));
+    }
+  }
 
-//   if (isNaN(date.getTime())) {
-//     console.warn(`Invalid date value: "${dateString}"`);
-//     return null;
-//   }
+  if (isNaN(date.getTime())) {
+    console.warn(`Invalid date value: "${dateString}"`);
+    return null;
+  }
 
-//   // Return ISO string with time set to 00:00:00
-//   return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
-// };
+  // Return ISO string with time set to 00:00:00
+  return new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+  ).toISOString();
+};
 
 export const importEventAndParticipants = async (file) => {
   try {
-    const data = await readFile(file);
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error("You must be logged in to import events");
+    }
 
-    // Extract event metadata from the structured rows
+    const data = await readFile(file);
     const eventMetadata = extractEventMetadata(data);
     console.log("Extracted Event Metadata:", eventMetadata);
     validateEventMetadata(eventMetadata);
 
-    // Extract participant details
     const participants = extractParticipants(data);
     console.log("Extracted Participants:", participants);
     validateParticipants(participants);
 
-    // Check for duplicate event
     const isDuplicate = await checkForDuplicateEvent(eventMetadata);
-    
+
     if (isDuplicate) {
       return {
         success: false,
-        message: `Event "${eventMetadata.eventName}" on ${formatDateForErrorMessage(eventMetadata.eventDate)} at ${eventMetadata.eventVenue} already exists in the database. Skipped import.`,
+        message: `Event "${
+          eventMetadata.eventName
+        }" on ${formatDateForErrorMessage(eventMetadata.eventDate)} at ${
+          eventMetadata.eventVenue
+        } already exists in the database. Skipped import.`,
       };
     }
 
-    // Save event and participants to the database
     const eventResponse = await saveEventToDatabase(eventMetadata);
     const participantResponses = await saveParticipantsToDatabase(
       participants,
-      eventResponse.$id // Link participants to the event
+      eventResponse.response.$id
     );
 
     return {
@@ -188,44 +211,129 @@ export const extractEventMetadata = (data) => {
     return value !== undefined ? String(value).trim() : null;
   };
 
-  const eventTimeFrom = getCellValue(2, 5).split("-")[0].trim();
-  const eventTimeTo = getCellValue(2, 5).split("-")[1].trim();
-  const calculatedDuration = calculateDuration(eventTimeFrom, eventTimeTo);
+  try {
+    // Get and validate the event date first
+    const rawEventDate = getCellValue(0, 5);
+    if (!rawEventDate) {
+      throw new Error("Event date is missing");
+    }
 
-  const metadata = {
-    eventName: getCellValue(0, 1),
-    eventDate: formatDateForDatabase(getCellValue(0, 5)),
-    eventVenue: getCellValue(1, 1),
-    eventType: getCellValue(1, 5),
-    eventCategory: getCellValue(2, 1),
-    eventTimeFrom: eventTimeFrom,
-    eventTimeTo: eventTimeTo,
-    numberOfHours: calculatedDuration.hours,
-    numberOfMinutes: calculatedDuration.minutes
-  };
+    // Parse the event date
+    const eventDate = formatDateForDatabase(rawEventDate);
+    if (!eventDate) {
+      throw new Error("Invalid event date format");
+    }
 
-  console.log("Extracted Event Metadata:", metadata);
-  return metadata;
+    // Get and validate the time range
+    const timeRange = getCellValue(2, 5);
+    if (!timeRange || !timeRange.includes("-")) {
+      throw new Error(
+        "Invalid time range format. Expected format: HH:MM AM/PM - HH:MM AM/PM"
+      );
+    }
+
+    const [eventTimeFrom, eventTimeTo] = timeRange
+      .split("-")
+      .map((t) => t.trim());
+
+    // Create date objects for the time values
+    const timeFromDate = new Date(eventDate);
+    const timeToDate = new Date(eventDate);
+
+    // Parse the start time
+    const parseTimeAndSetDate = (timeString, dateObj) => {
+      const [time, period] = timeString.split(" ");
+      if (!time || !period) {
+        throw new Error(
+          `Invalid time format: ${timeString}. Expected format: HH:MM AM/PM`
+        );
+      }
+
+      const [hours, minutes] = time.split(":").map(Number);
+      if (isNaN(hours) || isNaN(minutes)) {
+        throw new Error(`Invalid time values: ${timeString}`);
+      }
+
+      let adjustedHours = hours;
+      if (period === "PM" && hours !== 12) adjustedHours += 12;
+      if (period === "AM" && hours === 12) adjustedHours = 0;
+
+      dateObj.setHours(adjustedHours, minutes, 0, 0);
+      return dateObj;
+    };
+
+    // Set the times
+    const fromDateTime = parseTimeAndSetDate(eventTimeFrom, timeFromDate);
+    const toDateTime = parseTimeAndSetDate(eventTimeTo, timeToDate);
+
+    // Calculate duration and validate
+    const duration = calculateDuration(fromDateTime, toDateTime);
+    if (!duration || duration.hours < 0) {
+      throw new Error("Invalid duration calculated");
+    }
+
+    // Create metadata object matching exact schema
+    const metadata = {
+      eventName: getCellValue(0, 1),
+      eventDate: eventDate,
+      eventTimeFrom: fromDateTime.toISOString(),
+      eventTimeTo: toDateTime.toISOString(),
+      eventVenue: getCellValue(1, 1),
+      eventType: getCellValue(1, 5),
+      eventCategory: getCellValue(2, 1),
+      numberOfHours: String(duration.hours), // Convert to string
+      participants: [], // Initialize empty array
+      createdBy: "", // This will be set in saveEventToDatabase
+    };
+
+    return metadata;
+  } catch (error) {
+    console.error("Error extracting event metadata:", error);
+    throw new Error(`Failed to extract event data: ${error.message}`);
+  }
 };
 
 const validateEventMetadata = (eventMetadata) => {
-  console.log("Validating Event Metadata:", eventMetadata);
-
   if (!eventMetadata.eventName) {
-    throw new Error("Event Name is missing.");
+    throw new Error("Event name is required");
   }
   if (!eventMetadata.eventDate) {
-    throw new Error("Invalid or missing Event Date.");
+    throw new Error("Event date is required");
+  }
+  if (!eventMetadata.eventTimeFrom || !eventMetadata.eventTimeTo) {
+    throw new Error("Event start and end times are required");
   }
   if (!eventMetadata.eventVenue) {
-    throw new Error("Event Venue is missing.");
+    throw new Error("Event venue is required");
   }
-  if (typeof eventMetadata.numberOfHours !== 'number' || eventMetadata.numberOfHours < 0 ||
-      typeof eventMetadata.numberOfMinutes !== 'number' || eventMetadata.numberOfMinutes < 0 || eventMetadata.numberOfMinutes >= 60) {
-    throw new Error("Invalid duration. Please check the event start and end times.");
+  if (!eventMetadata.eventType) {
+    throw new Error("Event type is required");
   }
-};
+  if (!eventMetadata.eventCategory) {
+    throw new Error("Event category is required");
+  }
 
+  // Validate time range
+  const startTime = new Date(eventMetadata.eventTimeFrom);
+  const endTime = new Date(eventMetadata.eventTimeTo);
+
+  if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+    throw new Error("Invalid event time format");
+  }
+
+  if (endTime <= startTime) {
+    throw new Error("Event end time must be after start time");
+  }
+
+  // Calculate duration in hours
+  const durationMs = endTime - startTime;
+  const durationHours = durationMs / (1000 * 60 * 60);
+
+  // Convert duration to string and store in numberOfHours
+  eventMetadata.numberOfHours = String(Math.floor(durationHours));
+
+  return eventMetadata;
+};
 
 export const extractParticipants = (data) => {
   console.log("Searching for participant data...");
@@ -285,9 +393,9 @@ const checkForDuplicateEvent = async (eventMetadata) => {
       databaseId,
       eventCollectionId,
       [
-        Query.equal('eventName', eventMetadata.eventName),
-        Query.equal('eventDate', eventMetadata.eventDate),
-        Query.equal('eventVenue', eventMetadata.eventVenue)
+        Query.equal("eventName", eventMetadata.eventName),
+        Query.equal("eventDate", eventMetadata.eventDate),
+        Query.equal("eventVenue", eventMetadata.eventVenue),
       ]
     );
 
@@ -306,12 +414,23 @@ const saveEventToDatabase = async (eventMetadata) => {
       return { isDuplicate: true, eventMetadata };
     }
 
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error("No authenticated user found");
+    }
+
+    const eventData = {
+      ...eventMetadata,
+      createdBy: currentUser.$id,
+    };
+
     const response = await databases.createDocument(
       databaseId,
       eventCollectionId,
       ID.unique(),
-      eventMetadata
+      eventData
     );
+
     console.log("Event saved successfully:", response);
     return { isDuplicate: false, response };
   } catch (error) {
@@ -320,3 +439,44 @@ const saveEventToDatabase = async (eventMetadata) => {
   }
 };
 
+const saveParticipantsToDatabase = async (participants, eventId) => {
+  try {
+    const participantPromises = participants.map(async (participant) => {
+      const participantData = {
+        name: participant.name,
+        studentId: participant.studentId,
+        sex: participant.sex,
+        age: participant.age || "",
+        school: participant.school || "",
+        year: participant.year || "",
+        section: participant.section || "",
+        ethnicGroup: participant.ethnicGroup || "",
+        eventId: eventId,
+        createdBy: "", // Will be set by getCurrentUser
+      };
+
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        throw new Error("No authenticated user found");
+      }
+
+      participantData.createdBy = currentUser.$id;
+
+      return databases.createDocument(
+        databaseId,
+        participantCollectionId,
+        ID.unique(),
+        participantData
+      );
+    });
+
+    const responses = await Promise.all(participantPromises);
+    console.log("Participants saved successfully:", responses);
+    return responses;
+  } catch (error) {
+    console.error("Error saving participants to database:", error);
+    throw new Error(
+      "Failed to save participants to database: " + error.message
+    );
+  }
+};

@@ -27,8 +27,6 @@ import {
   Users,
   BarChart,
   Edit,
-  Trash2,
-  Plus,
   Eye,
   Loader2,
 } from "lucide-react";
@@ -43,27 +41,27 @@ import {
   subscribeToRealTimeUpdates,
   createEvent,
   updateEvent,
-  deleteEvent,
   createParticipant,
   updateParticipant,
   deleteParticipant,
   getCurrentUser,
   subscribeToEventUpdates,
+  databaseId
 } from "@/lib/appwrite";
+import { Query } from "appwrite";
+import { LoadingAnimation } from "@/components/loading/loading-animation";
 
 import AddParticipant from "./add-participant-dialog/page";
 import EditEvent from "./edit-event-dialog/page";
-import DeleteEvent from "./delete-event-dialog/page";
 import ViewParticipants from "./view-participant-dialog/page";
 import ExportEventsButton from "./export-event/page";
 import GenerateReportButton from "./import-event/page";
-import SimpleLoading from "@/components/loading/simpleLoading";
 
 export default function EventParticipantLog() {
+  const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
   const [participants, setParticipants] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortCriteria, setSortCriteria] = useState("eventDate");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -86,15 +84,56 @@ export default function EventParticipantLog() {
   const [showParticipants, setShowParticipants] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
+  const summaryStats = useMemo(
+    () => ({
+      total: events.length,
+      academic: events.filter((e) => e.eventType === "Academic").length,
+      nonAcademic: events.filter((e) => e.eventType === "Non-Academic").length,
+    }),
+    [events]
+  );
+
+  const fetchData = async (userId) => {
+    try {
+      setLoading(true);
+      const response = await databases.listDocuments(
+        databaseId,
+        eventCollectionId,
+        [Query.equal("createdBy", userId)]
+      );
+
+      if (response.documents.length > 0) {
+        setEvents(response.documents);
+
+        const participantsResponse = await databases.listDocuments(
+          databaseId,
+          participantCollectionId,
+          [
+            Query.equal("eventId", response.documents.map(event => event.$id))
+          ]
+        );
+
+        setParticipants(participantsResponse.documents);
+      } else {
+        setEvents([]);
+        setParticipants([]);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setError("Failed to fetch data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchUserAndData = async () => {
       try {
         const user = await getCurrentUser();
         setCurrentUser(user);
         if (user) {
-          fetchData(user.$id);
+          await fetchData(user.$id);
 
-          // Subscribe to both event and participant updates
           const unsubscribeEvents = subscribeToEventUpdates(() =>
             fetchData(user.$id)
           );
@@ -118,54 +157,27 @@ export default function EventParticipantLog() {
     fetchUserAndData();
   }, []);
 
-  const fetchData = async (userId) => {
-    try {
-      setLoading(true);
-      const fetchedEvents = await getEvents(userId);
-      console.log("Fetched events:", fetchedEvents);
+  if (loading) {
+    return <LoadingAnimation message="Loading participant logs..." />;
+  }
 
-      // Preserve existing data, just update the events array
-      const eventsWithStatus = fetchedEvents.map((event) => ({
-        ...event,
-        status: event.status || "pending",
-        approvalStatus: event.approvalStatus || null,
-      }));
+  if (error) {
+    return (
+      <div className="text-center text-red-500">
+        <p>{error}</p>
+        <Button
+          onClick={() => getCurrentUser().then((user) => fetchData(user.id))}
+          className="mt-4"
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
-      setEvents((prevEvents) => {
-        return eventsWithStatus.map((newEvent) => {
-          const existingEvent = prevEvents.find((e) => e.$id === newEvent.$id);
-          return existingEvent
-            ? {
-                ...existingEvent,
-                status: newEvent.status,
-                approvalStatus: newEvent.approvalStatus,
-              }
-            : newEvent;
-        });
-      });
-
-      if (fetchedEvents.length > 0) {
-        // Keep existing participants data
-        const allParticipants = await Promise.all(
-          fetchedEvents.map((event) => getParticipants(event.$id, userId))
-        );
-        setParticipants((prevParticipants) => {
-          const newParticipants = allParticipants.flat();
-          return newParticipants.map((newParticipant) => {
-            const existingParticipant = prevParticipants.find(
-              (p) => p.$id === newParticipant.$id
-            );
-            return existingParticipant || newParticipant;
-          });
-        });
-      }
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      setError("Failed to fetch data.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!currentUser) {
+    return <div>Please log in to view the Event Participant Log.</div>;
+  }
 
   const getParticipantCount = (eventId) => {
     return participants.filter((p) => p.eventId === eventId).length;
@@ -211,26 +223,6 @@ export default function EventParticipantLog() {
     } catch (error) {
       console.error("Error updating event:", error);
       toast.error("Failed to update event.");
-    }
-  };
-
-  const handleDeleteEvent = async (eventId) => {
-    if (!currentUser) return;
-    if (
-      window.confirm(
-        "Are you sure you want to delete this event? This action cannot be undone."
-      )
-    ) {
-      try {
-        await deleteEvent(eventId, currentUser.id);
-        setEvents((prevEvents) =>
-          prevEvents.filter((event) => event.$id !== eventId)
-        );
-        toast.success("Event deleted successfully.");
-      } catch (error) {
-        console.error("Error deleting event:", error);
-        toast.error("Failed to delete event.");
-      }
     }
   };
 
@@ -338,7 +330,6 @@ export default function EventParticipantLog() {
   };
 
   const getStatusStyles = (status, approvalStatus) => {
-    // First check approval status
     if (approvalStatus) {
       switch (approvalStatus.toLowerCase()) {
         case "approved":
@@ -350,7 +341,6 @@ export default function EventParticipantLog() {
       }
     }
 
-    // If no approval status, fall back to event status
     switch (status?.toLowerCase()) {
       case "approved":
         return "bg-green-100 text-green-800";
@@ -360,41 +350,6 @@ export default function EventParticipantLog() {
         return "bg-gray-100 text-gray-800";
     }
   };
-
-  const summaryStats = useMemo(
-    () => ({
-      total: events.length,
-      academic: events.filter((e) => e.eventType === "Academic").length,
-      nonAcademic: events.filter((e) => e.eventType === "Non-Academic").length,
-    }),
-    [events]
-  );
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <SimpleLoading />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center text-red-500">
-        <p>{error}</p>
-        <Button
-          onClick={() => getCurrentUser().then((user) => fetchData(user.id))}
-          className="mt-4"
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    return <div>Please log in to view the Event Participant Log.</div>;
-  }
 
   return (
     <Card>
@@ -465,7 +420,6 @@ export default function EventParticipantLog() {
                 <TableHead>Event Date</TableHead>
                 <TableHead className="text-center">Venue</TableHead>
                 <TableHead className="text-center">Participant</TableHead>
-                <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -487,26 +441,7 @@ export default function EventParticipantLog() {
                     <TableCell className="text-center">
                       <div>Total: {participantCounts.total}</div>
                       <div className="text-sm text-muted-foreground">
-                        (M: {participantCounts.male} | F:{" "}
-                        {participantCounts.female} | I:{" "}
-                        {participantCounts.intersex})
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col items-center gap-1">
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusStyles(
-                            event.status,
-                            event.approvalStatus
-                          )}`}
-                        >
-                          {event.approvalStatus || event.status || "Pending"}
-                        </span>
-                        {event.approvalStatus === "rejected" && (
-                          <span className="text-xs text-red-600">
-                            Rejected by Admin
-                          </span>
-                        )}
+                        (M: {participantCounts.male} | F: {participantCounts.female} | I: {participantCounts.intersex})
                       </div>
                     </TableCell>
                     <TableCell>
@@ -517,13 +452,6 @@ export default function EventParticipantLog() {
                             onUpdateEvent={handleUpdateEvent}
                           />
                           <span className="text-xs mt-1">Edit</span>
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <DeleteEvent
-                            eventId={event.$id}
-                            onDeleteEvent={handleDeleteEvent}
-                          />
-                          <span className="text-xs mt-1">Delete</span>
                         </div>
                         <div className="flex flex-col items-center">
                           <Button
@@ -616,7 +544,7 @@ export default function EventParticipantLog() {
                             handleDeleteParticipant(participant.$id)
                           }
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

@@ -11,6 +11,7 @@ import {
   FileQuestion,
   UserPlus,
   BarChart2,
+  Loader2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,6 @@ import NotificationButton from "./notifications/page";
 import DashboardOverview from "./dashboard/page";
 import EventsSection from "./events/page";
 import DemographicAnalysis from "./demographics/page";
-import SettingsSection from "./settings/page";
 import UserManagement from "./user-management/page";
 import InactivityLock from "@/components/loading/InactivityLock";
 import DataImportAnalytics from "./data-import/page";
@@ -33,8 +33,17 @@ import {
   participantCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
-import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
@@ -161,10 +170,7 @@ export default function AdminDashboard() {
         return <UserManagement {...props} />;
       case "events":
         return <EventsSection {...props} />;
-      case "settings":
-        return <SettingsSection {...props} />;
-      case "data-import":
-        return <DataImportAnalytics {...props} />;
+
       case "demographics":
         return <DemographicAnalysis />;
       default:
@@ -192,10 +198,7 @@ export default function AdminDashboard() {
   if (!currentUser) {
     return (
       <div className="flex h-screen flex-col items-center justify-center">
-        <h1 className="text-2xl font-bold text-gray-800">Access Denied</h1>
-        <p className="mt-2 text-gray-600">
-          Please log in to access the admin dashboard.
-        </p>
+       <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -248,23 +251,6 @@ export default function AdminDashboard() {
             >
               <Users className="mr-2 h-4 w-4" />
               Demographics
-            </Button>
-            <Button
-              variant={activeSection === "data-import" ? "default" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => setActiveSection("data-import")}
-            >
-              <BarChart2 className="mr-2 h-4 w-4" />
-              Data Import & Analytics
-            </Button>
-          
-            <Button
-              variant={activeSection === "settings" ? "default" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => setActiveSection("settings")}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
             </Button>
           </nav>
         </div>

@@ -8,7 +8,7 @@ const COLORS = {
   female: "#ED64A6", // Pink for Female
 };
 
-export default function SectionDistribution({ data }) {
+export default function SectionDistribution({ data, colors }) {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const male = payload.find(p => p.dataKey === "male")?.value || 0;
@@ -77,6 +77,9 @@ export default function SectionDistribution({ data }) {
             </Bar>
             <Bar dataKey="female" fill={COLORS.female} minPointSize={10}>
               <LabelList dataKey="female" content={renderCustomizedLabel} />
+            </Bar>
+            <Bar dataKey="intersex" fill={colors[2]} minPointSize={10}>
+              <LabelList dataKey="intersex" content={renderCustomizedLabel} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

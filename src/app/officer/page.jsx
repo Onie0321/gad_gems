@@ -11,7 +11,6 @@ import UserMenu from "./user-menu/page";
 import { getCurrentUser } from "@/lib/appwrite";
 import { useRouter } from "next/navigation";
 import WelcomeModal from "@/components/modals/welcome";
-import SettingsSection from "./settings/page";
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
 
 // Note: Update chart colors in respective components to use a mix of Blue (#2D89EF), Teal (#4DB6AC), Coral (#FF6F61), and Violet for visual clarity.
@@ -35,7 +34,8 @@ export default function OfficerDashboard() {
     const checkUserRole = async () => {
       try {
         const currentUser = await getCurrentUser();
-        const isAdminViewing = sessionStorage.getItem('adminViewingOfficer') === 'true';
+        const isAdminViewing =
+          sessionStorage.getItem("adminViewingOfficer") === "true";
 
         if (!currentUser) {
           router.replace("/sign-in");
@@ -43,9 +43,15 @@ export default function OfficerDashboard() {
         }
 
         // Check if user is admin viewing officer dashboard or is a regular user
-        if ((currentUser.role === "admin" && isAdminViewing) || currentUser.role === "user") {
+        if (
+          (currentUser.role === "admin" && isAdminViewing) ||
+          currentUser.role === "user"
+        ) {
           setUser(currentUser);
-          if (currentUser.role === "user" && currentUser.isFirstLogin === true) {
+          if (
+            currentUser.role === "user" &&
+            currentUser.isFirstLogin === true
+          ) {
             setShowWelcomeModal(true);
             await updateUserFirstLogin(currentUser.$id);
           }
@@ -54,7 +60,9 @@ export default function OfficerDashboard() {
         }
       } catch (err) {
         console.error("Error checking user role:", err);
-        setError("An error occurred while checking your access. Please try again.");
+        setError(
+          "An error occurred while checking your access. Please try again."
+        );
       } finally {
         setLoading(false);
       }
@@ -65,7 +73,7 @@ export default function OfficerDashboard() {
 
     // Cleanup function
     return () => {
-      sessionStorage.removeItem('adminViewingOfficer');
+      sessionStorage.removeItem("adminViewingOfficer");
     };
   }, []);
 
@@ -78,7 +86,6 @@ export default function OfficerDashboard() {
       label: "Demographic Analysis",
       icon: PieChart,
     },
-    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   // Add a back to admin dashboard button if user is admin
@@ -89,8 +96,8 @@ export default function OfficerDashboard() {
           variant="ghost"
           className="ml-auto"
           onClick={() => {
-            sessionStorage.removeItem('adminViewingOfficer');
-            router.replace('/admin');
+            sessionStorage.removeItem("adminViewingOfficer");
+            router.replace("/admin");
           }}
         >
           Back to Admin Dashboard
@@ -101,9 +108,7 @@ export default function OfficerDashboard() {
   };
 
   if (loading) {
-    return (
-      <GADConnectSimpleLoader />
-    );
+    return <GADConnectSimpleLoader />;
   }
 
   if (error) {
@@ -196,7 +201,6 @@ export default function OfficerDashboard() {
         <div className="p-6">
           {activeTab === "event-management" && <EventsPage user={user} />}
           {activeTab === "demographic-analysis" && <DemographicAnalysis />}
-          {activeTab === "settings" && <SettingsSection />}
         </div>
       </main>
       {showWelcomeModal && (

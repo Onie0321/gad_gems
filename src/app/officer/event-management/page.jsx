@@ -14,9 +14,9 @@ import {
   getCurrentUser,
 } from "@/lib/appwrite";
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
+import { useTabContext, TabProvider } from "@/context/TabContext";
 
-
-function EventsPage() {
+function EventsManagement() {
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,12 +103,12 @@ function EventsPage() {
   }
 
   return (
-    <>
+    <TabProvider value={{ activeTab, setActiveTab }}>
       <ToastContainer />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="create">Create Event</TabsTrigger>
+          <TabsTrigger value="createEvent">Create Event</TabsTrigger>
           <TabsTrigger value="participants">Participant Management</TabsTrigger>
           <TabsTrigger value="log">Participant Log</TabsTrigger>
         </TabsList>
@@ -120,7 +120,7 @@ function EventsPage() {
             user={user}
           />
         </TabsContent>
-        <TabsContent value="create">
+        <TabsContent value="createEvent">
           <CreateEvent onEventCreated={handleEventCreated} user={user} />
         </TabsContent>
         <TabsContent value="participants">
@@ -140,8 +140,8 @@ function EventsPage() {
           />
         </TabsContent>
       </Tabs>
-    </>
+    </TabProvider>
   );
 }
 
-export default EventsPage;
+export default EventsManagement;
