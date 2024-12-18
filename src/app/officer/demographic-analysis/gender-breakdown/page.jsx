@@ -55,7 +55,7 @@ const renderActiveShape = (props) => {
   );
 };
 
-export default function GenderBreakdown({ data }) {
+export default function GenderBreakdown({ data, colors }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const onPieEnter = (_, index) => {
@@ -95,7 +95,7 @@ export default function GenderBreakdown({ data }) {
               onMouseEnter={onPieEnter}
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[entry.name.toLowerCase()]} />
+                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
             </Pie>
             <Tooltip />

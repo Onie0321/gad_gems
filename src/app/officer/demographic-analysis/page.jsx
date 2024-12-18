@@ -55,8 +55,13 @@ export default function DemographicAnalysis() {
         }
 
         setCurrentUser(user);
-        const fetchedEvents = await getEvents(user.$id);
+        const fetchedEvents = await getEvents();
         setEvents(fetchedEvents);
+        
+        // Set initial event selection
+        setSelectedEvent("all");
+        setSelectedEventName("All Events");
+        
         setIsLoading(false);
       } catch (error) {
         console.error("Error initializing data:", error);
@@ -67,11 +72,12 @@ export default function DemographicAnalysis() {
 
     initializeData();
   }, []);
+
   useEffect(() => {
-    if (events.length > 0 && currentUser) {
+    if (currentUser) {
       fetchDemographicData(selectedEvent);
     }
-  }, [selectedEvent, events, currentUser]);
+  }, [selectedEvent, currentUser]);
 
   const fetchDemographicData = async (eventId) => {
     if (!currentUser) return;
@@ -80,32 +86,42 @@ export default function DemographicAnalysis() {
       setIsLoading(true);
       setLoadingMessage("Fetching demographic data...");
 
-      let participants;
-      if (eventId === "all") {
-        // Fetch participants for all events
-        const allParticipants = await Promise.all(
-          events.map((event) => getParticipants(event.$id, currentUser.$id))
-        );
-        participants = allParticipants.flat();
-        setSelectedEventName("All Events");
-      } else {
-        // Fetch participants for selected event
-        participants = await getParticipants(eventId, currentUser.$id);
+      // Update selected event name
+      if (eventId !== "all") {
         const selectedEventObj = events.find((event) => event.$id === eventId);
-        setSelectedEventName(
-          selectedEventObj ? selectedEventObj.eventName : "Unknown Event"
-        );
+        setSelectedEventName(selectedEventObj?.eventName || "Unknown Event");
+      } else {
+        setSelectedEventName("All Events");
       }
 
-      // Process demographic data
-      setDemographicData({
-        genderData: processGenderData(participants),
-        ageData: processAgeData(participants),
-        educationData: processEducationData(participants),
-        ethnicData: processEthnicData(participants),
-        schoolData: processSchoolData(participants),
-        sectionData: processSectionData(participants),
-      });
+      // Fetch participants
+      const participants = await getParticipants(eventId);
+      console.log('Fetched participants:', participants);
+
+      if (participants && participants.length > 0) {
+        const processedData = {
+          genderData: processGenderData(participants),
+          ageData: processAgeData(participants),
+          educationData: processEducationData(participants),
+          ethnicData: processEthnicData(participants),
+          schoolData: processSchoolData(participants),
+          sectionData: processSectionData(participants),
+        };
+
+        console.log('Processed demographic data:', processedData);
+        setDemographicData(processedData);
+      } else {
+        // Reset data if no participants
+        setDemographicData({
+          genderData: [],
+          ageData: [],
+          educationData: [],
+          ethnicData: [],
+          schoolData: [],
+          sectionData: [],
+        });
+      }
+
       setIsLoading(false);
     } catch (error) {
       console.error("Error fetching demographic data:", error);
@@ -115,12 +131,19 @@ export default function DemographicAnalysis() {
   };
 
   const processGenderData = (participants) => {
+    if (!participants || !Array.isArray(participants)) return [];
+    
     const genderCount = participants.reduce(
       (acc, p) => {
-        acc[p.sex.toLowerCase()]++;
+        if (p && p.sex) {
+          const gender = p.sex.toLowerCase();
+          if (gender === 'male' || gender === 'female' || gender === 'intersex') {
+            acc[gender]++;
+          }
+        }
         return acc;
       },
-      { male: 0, female: 0 }
+      { male: 0, female: 0, intersex: 0 }
     );
 
     return Object.entries(genderCount).map(([name, value]) => ({
@@ -130,43 +153,54 @@ export default function DemographicAnalysis() {
   };
 
   const processAgeData = (participants) => {
+    if (!participants || !Array.isArray(participants)) return [];
+
     const ageGroups = {
-      "Below 18": { male: 0, female: 0 },
-      "18-24": { male: 0, female: 0 },
-      "25-34": { male: 0, female: 0 },
-      "35-44": { male: 0, female: 0 },
-      "45-54": { male: 0, female: 0 },
-      "Above 55": { male: 0, female: 0 },
+      "Below 18": { male: 0, female: 0, intersex: 0 },
+      "18-24": { male: 0, female: 0, intersex: 0 },
+      "25-34": { male: 0, female: 0, intersex: 0 },
+      "35-44": { male: 0, female: 0, intersex: 0 },
+      "45-54": { male: 0, female: 0, intersex: 0 },
+      "Above 55": { male: 0, female: 0, intersex: 0 },
     };
 
     participants.forEach((p) => {
-      const age = parseInt(p.age);
-      const sex = p.sex.toLowerCase();
-      if (age < 18) ageGroups["Below 18"][sex]++;
-      else if (age >= 18 && age <= 24) ageGroups["18-24"][sex]++;
-      else if (age >= 25 && age <= 34) ageGroups["25-34"][sex]++;
-      else if (age >= 35 && age <= 44) ageGroups["35-44"][sex]++;
-      else if (age >= 45 && age <= 54) ageGroups["45-54"][sex]++;
-      else if (age >= 55) ageGroups["Above 55"][sex]++;
+      if (p && p.age && p.sex) {
+        const age = parseInt(p.age);
+        const sex = p.sex.toLowerCase();
+        if (!isNaN(age) && (sex === 'male' || sex === 'female' || sex === 'intersex')) {
+          if (age < 18) ageGroups["Below 18"][sex]++;
+          else if (age <= 24) ageGroups["18-24"][sex]++;
+          else if (age <= 34) ageGroups["25-34"][sex]++;
+          else if (age <= 44) ageGroups["35-44"][sex]++;
+          else if (age <= 54) ageGroups["45-54"][sex]++;
+          else ageGroups["Above 55"][sex]++;
+        }
+      }
     });
 
     return Object.entries(ageGroups).map(([name, value]) => ({
       name,
       male: value.male,
       female: value.female,
-      total: value.male + value.female,
+      intersex: value.intersex,
+      total: value.male + value.female + value.intersex,
     }));
   };
 
   const processEducationData = (participants) => {
-    const educationCount = participants.reduce((acc, p) => {
-      const sex = p.sex.toLowerCase();
-      const year = p.year;
+    if (!participants || !Array.isArray(participants)) return [];
 
-      if (!acc[year]) {
-        acc[year] = { male: 0, female: 0 };
+    const educationCount = participants.reduce((acc, p) => {
+      if (p && p.sex && p.year) {
+        const sex = p.sex.toLowerCase();
+        const year = p.year;
+
+        if (!acc[year]) {
+          acc[year] = { male: 0, female: 0, intersex: 0 };
+        }
+        acc[year][sex]++;
       }
-      acc[year][sex]++;
       return acc;
     }, {});
 
@@ -179,23 +213,23 @@ export default function DemographicAnalysis() {
     ];
 
     return orderedYears.map((year) => {
-      const value = educationCount[year] || { male: 0, female: 0 };
+      const value = educationCount[year] || { male: 0, female: 0, intersex: 0 };
       return {
         name: year,
         male: value.male,
         female: value.female,
-        total: value.male + value.female,
+        intersex: value.intersex,
+        total: value.male + value.female + value.intersex,
       };
     });
   };
 
   const processEthnicData = (participants) => {
     const ethnicCount = participants.reduce((acc, p) => {
-      const group =
-        p.ethnicGroup === "Other" ? p.otherEthnicGroup : p.ethnicGroup;
+      const group = p.ethnicGroup === "Other" ? p.otherEthnicGroup : p.ethnicGroup;
       const sex = p.sex.toLowerCase();
       if (!acc[group]) {
-        acc[group] = { male: 0, female: 0 };
+        acc[group] = { male: 0, female: 0, intersex: 0 };
       }
       acc[group][sex]++;
       return acc;
@@ -205,7 +239,8 @@ export default function DemographicAnalysis() {
       name,
       male: value.male,
       female: value.female,
-      total: value.male + value.female,
+      intersex: value.intersex,
+      total: value.male + value.female + value.intersex,
     }));
   };
 
@@ -213,7 +248,7 @@ export default function DemographicAnalysis() {
     const schoolCount = participants.reduce((acc, p) => {
       const sex = p.sex.toLowerCase();
       if (!acc[p.school]) {
-        acc[p.school] = { male: 0, female: 0 };
+        acc[p.school] = { male: 0, female: 0, intersex: 0 };
       }
       acc[p.school][sex]++;
       return acc;
@@ -223,7 +258,8 @@ export default function DemographicAnalysis() {
       name,
       male: value.male,
       female: value.female,
-      total: value.male + value.female,
+      intersex: value.intersex,
+      total: value.male + value.female + value.intersex,
     }));
   };
 
@@ -231,7 +267,7 @@ export default function DemographicAnalysis() {
     const sectionCount = participants.reduce((acc, p) => {
       const sex = p.sex.toLowerCase();
       if (!acc[p.section]) {
-        acc[p.section] = { male: 0, female: 0 };
+        acc[p.section] = { male: 0, female: 0, intersex: 0 };
       }
       acc[p.section][sex]++;
       return acc;
@@ -241,7 +277,8 @@ export default function DemographicAnalysis() {
       name,
       male: value.male,
       female: value.female,
-      total: value.male + value.female,
+      intersex: value.intersex,
+      total: value.male + value.female + value.intersex,
     }));
   };
 
@@ -265,78 +302,91 @@ export default function DemographicAnalysis() {
     link: "#FF6F61",
     cta: "#F9A825",
     success: "#A7FFEB",
-    chartColors: ["#2D89EF", "#4DB6AC", "#FF6F61", "#9C27B0"], // Blue, Teal, Coral, Violet
+    chartColors: ["#2D89EF", "#4DB6AC", "#FF6F61", "#9C27B0"], // Blue, Teal, Coral, Purple
   };
 
   if (!currentUser) {
-    return (
-      <div className="p-4 text-center">
-        <p className="text-red-500">
-          Please sign in to view demographic analysis.
-        </p>
-      </div>
-    );
+    return <GADConnectSimpleLoader />;
   }
+  
 
   return (
     <div className="space-y-4 p-4 bg-[#F5F5F5]">
-      {isLoading && <GADConnectSimpleLoader />}
-      <Tabs value={activeSection} onValueChange={setActiveSection}>
-        <TabsList className="bg-white">
-          <TabsTrigger
-            value="demographic"
-            className="data-[state=active]:bg-[#2D89EF] data-[state=active]:text-white"
-          >
-            Demographic Overview
-          </TabsTrigger>{" "}
-        </TabsList>
-        <TabsContent value="demographic">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-[#37474F]">
-              {selectedEventName}
-            </h2>
-            <Select onValueChange={setSelectedEvent} value={selectedEvent}>
-              <SelectTrigger className="w-[200px] bg-white border-[#4DB6AC]">
-                <SelectValue placeholder="Select event" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Events</SelectItem>
-                {events.map((event) => (
-                  <SelectItem key={event.$id} value={event.$id}>
-                    {event.eventName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <GenderBreakdown
-              data={demographicData.genderData}
-              colors={colors.chartColors}
-            />
-            <AgeDistribution
-              data={demographicData.ageData}
-              colors={colors.chartColors}
-            />
-            <EducationLevel
-              data={demographicData.educationData}
-              colors={colors.chartColors}
-            />
-            <EthnicGroupAnalysis
-              data={demographicData.ethnicData}
-              colors={colors.chartColors}
-            />
-            <SchoolDistribution
-              data={demographicData.schoolData}
-              colors={colors.chartColors}
-            />
-            <SectionDistribution
-              data={demographicData.sectionData}
-              colors={colors.chartColors}
-            />
-          </div>
-        </TabsContent>
-      </Tabs>
+      {isLoading ? (
+        <GADConnectSimpleLoader />
+      ) : (
+        <Tabs value={activeSection} onValueChange={setActiveSection}>
+          <TabsList className="bg-white">
+            <TabsTrigger
+              value="demographic"
+              className="data-[state=active]:bg-[#2D89EF] data-[state=active]:text-white"
+            >
+              Demographic Overview
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="demographic">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-[#37474F]">
+                {selectedEventName}
+              </h2>
+              <Select 
+                onValueChange={(value) => {
+                  setSelectedEvent(value);
+                  const event = events.find(e => e.$id === value);
+                  setSelectedEventName(event ? event.eventName : "All Events");
+                }} 
+                value={selectedEvent}
+              >
+                <SelectTrigger className="w-[200px] bg-white border-[#4DB6AC]">
+                  <SelectValue placeholder="Select event" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Events</SelectItem>
+                  {events.map((event) => (
+                    <SelectItem key={event.$id} value={event.$id}>
+                      {event.eventName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {demographicData.genderData.length > 0 ? (
+                <>
+                  <GenderBreakdown
+                    data={demographicData.genderData}
+                    colors={colors.chartColors}
+                  />
+                  <AgeDistribution
+                    data={demographicData.ageData}
+                    colors={colors.chartColors}
+                  />
+                  <EducationLevel
+                    data={demographicData.educationData}
+                    colors={colors.chartColors}
+                  />
+                  <EthnicGroupAnalysis
+                    data={demographicData.ethnicData}
+                    colors={colors.chartColors}
+                  />
+                  <SchoolDistribution
+                    data={demographicData.schoolData}
+                    colors={colors.chartColors}
+                  />
+                  <SectionDistribution
+                    data={demographicData.sectionData}
+                    colors={colors.chartColors}
+                  />
+                </>
+              ) : (
+                <div className="col-span-2 text-center py-4">
+                  <p>No data available for the selected event.</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

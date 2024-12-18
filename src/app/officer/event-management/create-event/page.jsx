@@ -36,6 +36,8 @@ import {
 } from "@/lib/appwrite";
 import { schoolOptions } from "@/utils/participantUtils";
 import { getNonAcademicCategories } from "@/utils/eventUtils";
+import { useTabContext } from "@/context/TabContext"; // Import the context hook
+
 
 export default function CreateEvent({ onEventCreated, user }) {
   const [eventName, setEventName] = useState("");
@@ -49,6 +51,7 @@ export default function CreateEvent({ onEventCreated, user }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [isTimeValid, setIsTimeValid] = useState(true);
+  const { setActiveTab } = useTabContext();
 
   const nonAcademicCategories = getNonAcademicCategories();
 
@@ -125,47 +128,40 @@ export default function CreateEvent({ onEventCreated, user }) {
         eventTimeTo
       );
       if (hasTimeConflict) {
-        toast.error("Time conflict detected with another event at this venue.");
+        toast.error(
+          "There is already an event scheduled at this venue during the selected time."
+        );
         setLoading(false);
         return;
       }
 
       const newEvent = {
-        eventName,
+        eventName: eventName,
         eventDate: formattedDate,
-        eventTimeFrom,
-        eventTimeTo,
-        eventVenue,
-        eventType,
-        eventCategory,
-        numberOfHours: parseFloat(duration.split(" ")[0]),
-        approvalStatus: "pending",
+        eventTimeFrom: eventTimeFrom,
+        eventTimeTo: eventTimeTo,
+        eventVenue: eventVenue,
+        eventType: eventType,
+        eventCategory: eventCategory,
+        numberOfHours: String(duration),
+        participants: [],
         createdBy: user.$id,
       };
 
-      const createdEvent = await createEvent(newEvent, user.$id);
-      onEventCreated(createdEvent);
+      const createdEvent = await createEvent(newEvent);
 
       await createNotification({
-        userId: "admin", // This is hardcoded
-        type: "approval",
-        title: "New Event Pending Approval",
-        message: `${user.name} has created a new event "${eventName}" that requires approval.`,
-        eventId: createdEvent.$id,
-        actionType: "event_approval",
-        approvalStatus: "pending",
-      });
-
-      // Create notification for the event creator
-      await createNotification({
-        userId: user.$id, // This will be shown to the event creator
+        userId: user.$id,
         type: "event",
         title: "Event Created Successfully",
-        message: `Your event "${eventName}" has been created and is pending approval.`,
-        eventId: createdEvent.$id,
+        message: `Your event "${eventName}" has been created successfully.`,
+        actionType: "event_created",
+        approvalStatus: "approved",
+        status: "pending",
+        read: false
       });
 
-      toast.success("Event created successfully and sent for approval!");
+      toast.success("Event created successfully! Add participants now.");
 
       // Reset form fields
       setEventName("");
@@ -176,6 +172,13 @@ export default function CreateEvent({ onEventCreated, user }) {
       setEventType("");
       setEventCategory("");
       setDuration("");
+
+      // Navigate to participant management tab
+      if (onEventCreated) {
+        onEventCreated(createdEvent.$id);
+      }
+      setActiveTab("participants");
+
     } catch (error) {
       console.error("Error creating event: ", error);
       if (error instanceof Error) {

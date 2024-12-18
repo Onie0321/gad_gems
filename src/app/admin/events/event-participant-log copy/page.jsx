@@ -34,12 +34,12 @@ import {
   eventCollectionId,
   participantCollectionId,
   userCollectionId,
+  client,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 
 import AddParticipant from "./add-participant-dialog/page";
 import EditEvent from "./edit-event-dialog/page";
-import DeleteEvent from "./delete-event-dialog/page";
 import ViewParticipants from "./view-participant-dialog/page";
 import ExportEventsButton from "./export-event/page";
 import GenerateReportButton from "./import-event/page";
@@ -57,6 +57,30 @@ export default function EventParticipantLog() {
 
   useEffect(() => {
     fetchData();
+
+    // Subscribe to event changes
+    const eventUnsubscribe = client.subscribe(
+      `databases.${databaseId}.collections.${eventCollectionId}.documents`,
+      (response) => {
+        console.log("Event update received:", response);
+        fetchData(); // Refresh all data when any event changes
+      }
+    );
+
+    // Subscribe to participant changes
+    const participantUnsubscribe = client.subscribe(
+      `databases.${databaseId}.collections.${participantCollectionId}.documents`,
+      (response) => {
+        console.log("Participant update received:", response);
+        fetchData(); // Refresh all data when any participant changes
+      }
+    );
+
+    // Cleanup subscriptions
+    return () => {
+      eventUnsubscribe();
+      participantUnsubscribe();
+    };
   }, []);
 
   const fetchData = async () => {
@@ -133,6 +157,8 @@ export default function EventParticipantLog() {
 
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     switch (sortCriteria) {
+      case "all":
+        return 0; // No sorting, maintain original order
       case "eventDate":
         return new Date(b.eventDate) - new Date(a.eventDate);
       case "eventName":
@@ -158,36 +184,6 @@ export default function EventParticipantLog() {
     } catch (error) {
       console.error("Error updating event:", error);
       toast.error("Failed to update event");
-    }
-  };
-
-  const handleDeleteEvent = async (eventId) => {
-    try {
-      // Delete event
-      await databases.deleteDocument(databaseId, eventCollectionId, eventId);
-
-      // Delete associated participants
-      const participantsToDelete = await databases.listDocuments(
-        databaseId,
-        participantCollectionId,
-        [Query.equal("eventId", eventId)]
-      );
-
-      await Promise.all(
-        participantsToDelete.documents.map((participant) =>
-          databases.deleteDocument(
-            databaseId,
-            participantCollectionId,
-            participant.$id
-          )
-        )
-      );
-
-      await fetchData(); // Refresh data
-      toast.success("Event and associated participants deleted successfully");
-    } catch (error) {
-      console.error("Error deleting event:", error);
-      toast.error("Failed to delete event");
     }
   };
 
@@ -245,22 +241,10 @@ export default function EventParticipantLog() {
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="eventDate">Event Date</SelectItem>
                 <SelectItem value="eventName">Event Name</SelectItem>
-                <SelectItem value="participantCount">
-                  Participant Count
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select onValueChange={setStatusFilter} defaultValue={statusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="participantCount">Participant Count</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -283,7 +267,6 @@ export default function EventParticipantLog() {
                   Participants (M/F/I)
                 </TableHead>
                 <TableHead>Created By</TableHead> {/* New column */}
-                <TableHead>Status</TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -313,51 +296,7 @@ export default function EventParticipantLog() {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        defaultValue={event.approvalStatus}
-                        onValueChange={async (newStatus) => {
-                          try {
-                            await databases.updateDocument(
-                              databaseId,
-                              eventCollectionId,
-                              event.$id,
-                              { approvalStatus: newStatus }
-                            );
-                            await fetchData();
-                            toast.success(
-                              `Event status updated to ${newStatus}`
-                            );
-                          } catch (error) {
-                            console.error(
-                              "Error updating event status:",
-                              error
-                            );
-                            toast.error("Failed to update event status");
-                          }
-                        }}
-                      >
-                        <SelectTrigger
-                          className={`w-24 h-7 text-xs justify-center
-                          ${
-                            event.approvalStatus === "approved"
-                              ? "bg-green-100 text-green-800"
-                              : event.approvalStatus === "rejected"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          <SelectValue placeholder={event.approvalStatus} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="rejected">Rejected</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TableCell>
+
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-2">
                       <Button
@@ -373,10 +312,6 @@ export default function EventParticipantLog() {
                       <EditEvent
                         event={event}
                         onUpdateEvent={handleUpdateEvent}
-                      />
-                      <DeleteEvent
-                        eventId={event.$id}
-                        onDeleteEvent={handleDeleteEvent}
                       />
                       <ViewParticipants
                         event={event}
@@ -404,18 +339,8 @@ export default function EventParticipantLog() {
           }}
           participants={selectedEvent.participants || []}
           selectedEvent={selectedEvent}
-          onAddParticipant={async (participant, participantId) => {
-            try {
-              await fetchData(); // Refresh the data after adding/updating participant
-              toast.success(
-                participantId
-                  ? "Participant updated successfully!"
-                  : "Participant added successfully!"
-              );
-            } catch (error) {
-              console.error("Error updating participants:", error);
-              toast.error("Failed to update participants");
-            }
+          onAddParticipant={async () => {
+            await fetchData(); // Refresh data after adding/updating participant
           }}
         />
       )}

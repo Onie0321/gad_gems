@@ -101,18 +101,53 @@ export default function ImportEventData() {
   };
 
   const EventPreview = ({ data }) => {
-    const totalParticipants = data.participants.length;
-    const maleParticipants = data.participants.filter(
-      (p) => p.sex === "Male"
-    ).length;
-    const femaleParticipants = data.participants.filter(
-      (p) => p.sex === "Female"
-    ).length;
+    // Format the date
+    const formatEventDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
 
-    const duration = calculateDuration(data.eventMetadata.eventTimeFrom, data.eventMetadata.eventTimeTo);
+    // Format the time range
+    const formatTimeRange = (timeFrom, timeTo) => {
+      const formatTime = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }).toUpperCase();
+      };
+
+      const fromTime = formatTime(timeFrom);
+      const toTime = formatTime(timeTo);
+      return `${fromTime} - ${toTime}`;
+    };
+
+    // Calculate and format duration
+    const formatDuration = (timeFrom, timeTo) => {
+      const start = new Date(timeFrom);
+      const end = new Date(timeTo);
+      const durationMs = end - start;
+      const hours = Math.floor(durationMs / (1000 * 60 * 60));
+      const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    };
+
+    const eventDate = formatEventDate(data.eventMetadata.eventDate);
+    const eventTime = formatTimeRange(
+      data.eventMetadata.eventTimeFrom,
+      data.eventMetadata.eventTimeTo
+    );
+    const duration = formatDuration(
+      data.eventMetadata.eventTimeFrom,
+      data.eventMetadata.eventTimeTo
+    );
 
     return (
-      <Card className="mt-4">
+      <Card>
         <CardHeader>
           <CardTitle>Preview</CardTitle>
         </CardHeader>
@@ -121,16 +156,13 @@ export default function ImportEventData() {
             <strong>Event Name:</strong> {data.eventMetadata.eventName}
           </p>
           <p>
-            <strong>Event Date:</strong>{" "}
-            {formatDateForDisplay(data.eventMetadata.eventDate)}
+            <strong>Event Date:</strong> {eventDate}
           </p>
           <p>
-            <strong>Event Time:</strong> {data.eventMetadata.eventTimeFrom} -{" "}
-            {data.eventMetadata.eventTimeTo}
+            <strong>Event Time:</strong> {eventTime}
           </p>
           <p>
-            <strong>Duration:</strong>{" "}
-            {formatDurationForDisplay(duration)}
+            <strong>Duration:</strong> {duration}
           </p>
           <p>
             <strong>Event Venue:</strong> {data.eventMetadata.eventVenue}
@@ -142,13 +174,15 @@ export default function ImportEventData() {
             <strong>Event Category:</strong> {data.eventMetadata.eventCategory}
           </p>
           <p>
-            <strong>Total Participants:</strong> {totalParticipants}
+            <strong>Total Participants:</strong> {data.participants.length}
           </p>
           <p>
-            <strong>Male Participants:</strong> {maleParticipants}
+            <strong>Male Participants:</strong>{" "}
+            {data.participants.filter((p) => p.sex === "Male").length}
           </p>
           <p>
-            <strong>Female Participants:</strong> {femaleParticipants}
+            <strong>Female Participants:</strong>{" "}
+            {data.participants.filter((p) => p.sex === "Female").length}
           </p>
           <Accordion type="single" collapsible>
             <AccordionItem value="participants">
@@ -157,8 +191,7 @@ export default function ImportEventData() {
                 <ul className="list-disc pl-5">
                   {data.participants.map((participant, index) => (
                     <li key={index}>
-                      {participant.name} - {participant.studentId} (
-                      {participant.sex})
+                      {participant.name} - {participant.studentId} ({participant.sex})
                     </li>
                   ))}
                 </ul>

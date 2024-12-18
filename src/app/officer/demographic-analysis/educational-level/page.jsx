@@ -8,7 +8,7 @@ const COLORS = {
   female: "#ED64A6",
 };
 
-export default function EducationLevel({ data }) {
+export default function EducationLevel({ data, colors }) {
     const CustomTooltip = ({ active, payload, label }) => {
       if (active && payload && payload.length) {
         const male = payload.find(p => p.dataKey === "male")?.value || 0;
@@ -79,6 +79,7 @@ export default function EducationLevel({ data }) {
               />
               <Bar dataKey="male" stackId="a" fill={COLORS.male} />
               <Bar dataKey="female" stackId="a" fill={COLORS.female} />
+              <Bar dataKey="intersex" name="Intersex" fill={colors[2]} />
             </BarChart>
           </ResponsiveContainer>
           <DataTable data={data} />

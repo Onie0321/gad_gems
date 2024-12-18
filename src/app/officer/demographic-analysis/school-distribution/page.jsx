@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { UserIcon as Male, UserIcon as Female } from 'lucide-react'; 
 import DataTable from "../data-table/page";
+import { CartesianGrid } from "recharts";
 
 const COLORS = {
   male: "#4299E1",
@@ -23,7 +24,7 @@ const formatName = (name, existingNames) => {
   return uniqueAcronym;
 };
 
-export default function SchoolDistribution({ data }) {
+export default function SchoolDistribution({ data, colors }) {
   const existingNames = new Set(); 
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -52,41 +53,14 @@ export default function SchoolDistribution({ data }) {
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" />
-            <YAxis
-              dataKey="name"
-              type="category"
-              width={120}
-              interval={0} 
-              tick={({ x, y, payload }) => {
-                // Format the name using the formatName function and pass the existing acronyms set
-                const formattedName = formatName(payload.value, existingNames);
-                return (
-                  <text
-                    x={x - 10}  // Adjust x positioning if needed
-                    y={y}
-                    textAnchor="end"
-                    dominantBaseline="middle"
-                    style={{ fontSize: '12px' }} // Adjust font size as needed
-                  >
-                    {formattedName}
-                  </text>
-                );
-              }}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              iconType="circle"
-              iconSize={10}
-              formatter={(value, entry) => (
-                <span className="flex items-center">
-                  {value === "male" ? <Male size={16} className="mr-2" /> : <Female size={16} className="mr-2" />}
-                  {value.charAt(0).toUpperCase() + value.slice(1)}
-                </span>
-              )}
-            />
-            <Bar dataKey="male" stackId="a" fill={COLORS.male} />
-            <Bar dataKey="female" stackId="a" fill={COLORS.female} />
+            <YAxis dataKey="name" type="category" width={150} />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="male" name="Male" fill={colors[0]} />
+            <Bar dataKey="female" name="Female" fill={colors[1]} />
+            <Bar dataKey="intersex" name="Intersex" fill={colors[2]} />
           </BarChart>
         </ResponsiveContainer>
         <DataTable data={data} />

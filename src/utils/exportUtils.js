@@ -27,8 +27,15 @@ const calculateDuration = (timeFrom, timeTo) => {
   return `${hours} hours ${minutes} minutes`;
 };
 
-export const exportEventsToExcel = async (selectedEventIds, fileName) => {
+export const exportEventsToExcel = async (
+  selectedEventIds,
+  fileName = "events.xlsx"
+) => {
   try {
+    const finalFileName = fileName.endsWith(".xlsx")
+      ? fileName
+      : `${fileName}.xlsx`;
+
     const allEvents = await getEvents();
     const selectedEvents = allEvents.filter((event) =>
       selectedEventIds.includes(event.$id)
@@ -63,7 +70,9 @@ export const exportEventsToExcel = async (selectedEventIds, fileName) => {
           "",
           "",
           "Event Time:",
-          `${formatTime(event.eventTimeFrom)} - ${formatTime(event.eventTimeTo)}`,
+          `${formatTime(event.eventTimeFrom)} - ${formatTime(
+            event.eventTimeTo
+          )}`,
         ],
         [
           "Duration:",
@@ -110,7 +119,9 @@ export const exportEventsToExcel = async (selectedEventIds, fileName) => {
         participant.school,
         participant.year,
         participant.section,
-  participant.ethnicGroup === "Other" ? participant.otherEthnicGroup : participant.ethnicGroup,
+        participant.ethnicGroup === "Other"
+          ? participant.otherEthnicGroup
+          : participant.ethnicGroup,
       ]);
 
       // Combine all data into one sheet
@@ -175,7 +186,7 @@ export const exportEventsToExcel = async (selectedEventIds, fileName) => {
     const blob = new Blob([excelBuffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
-    saveAs(blob, fileName);
+    saveAs(blob, finalFileName);
 
     return true;
   } catch (error) {

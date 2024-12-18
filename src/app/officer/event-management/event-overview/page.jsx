@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -28,25 +27,33 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Plus, Loader2, ArrowUpDown, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
   databases,
+  databaseId,
   eventCollectionId,
   participantCollectionId,
-  getParticipants,
-  subscribeToRealTimeUpdates,
   getCurrentUser,
-  Query,
-  getEvents,
+  subscribeToRealTimeUpdates,
 } from "@/lib/appwrite";
 import { client } from "@/lib/appwrite";
-import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
+import { useRouter } from "next/navigation";
+import { useTabContext, TabProvider } from "@/context/TabContext";
+import { Query } from "appwrite";
+import { LoadingAnimation } from "@/components/loading/loading-animation";
 
 export default function EventOverView() {
   const [events, setEvents] = useState([]);
   const [participants, setParticipants] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState("eventDate");
@@ -54,12 +61,54 @@ export default function EventOverView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [eventsPerPage, setEventsPerPage] = useState(5);
   const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { setActiveTab } = useTabContext();
+
+  const fetchData = async (userId) => {
+    try {
+      setLoading(true);
+      const fetchedEvents = await databases.listDocuments(
+        databaseId,
+        eventCollectionId,
+        [
+          Query.equal('createdBy', userId),
+          Query.orderDesc('$createdAt')
+        ]
+      );
+      
+      if (fetchedEvents.documents.length > 0) {
+        setEvents(fetchedEvents.documents);
+
+        // Fetch all participants for all events
+        const participantsResponse = await databases.listDocuments(
+          databaseId,
+          participantCollectionId,
+          [
+            Query.equal("eventId", fetchedEvents.documents.map(event => event.$id))
+          ]
+        );
+
+        setParticipants(participantsResponse.documents);
+      } else {
+        setEvents([]);
+        setParticipants([]);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to fetch data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchUserAndData = async () => {
       try {
         const user = await getCurrentUser();
+        console.log("Current user:", user);
         setCurrentUser(user);
+
         if (user) {
           await fetchData(user.$id);
 
@@ -94,6 +143,15 @@ export default function EventOverView() {
     fetchUserAndData();
   }, []);
 
+  // Add debug logging for state changes
+  useEffect(() => {
+    console.log("Events state updated:", events);
+  }, [events]);
+
+  useEffect(() => {
+    console.log("Participants state updated:", participants);
+  }, [participants]);
+
   useEffect(() => {
     const unsubscribe = client.subscribe(
       `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID}.documents`,
@@ -123,45 +181,6 @@ export default function EventOverView() {
       unsubscribe();
     };
   }, []);
-
-  const fetchData = async (userId) => {
-    try {
-      setLoading(true);
-      const fetchedEvents = await getEvents(userId);
-      console.log("Fetched events:", fetchedEvents);
-
-      // Update events while preserving existing data
-      setEvents((prevEvents) => {
-        return fetchedEvents.map((newEvent) => {
-          const existingEvent = prevEvents.find((e) => e.$id === newEvent.$id);
-          return existingEvent ? { ...existingEvent, ...newEvent } : newEvent;
-        });
-      });
-
-      if (fetchedEvents.length > 0) {
-        const allParticipants = await Promise.all(
-          fetchedEvents.map((event) => getParticipants(event.$id, userId))
-        );
-
-        setParticipants((prevParticipants) => {
-          const newParticipants = allParticipants.flat();
-          return newParticipants.map((newParticipant) => {
-            const existingParticipant = prevParticipants.find(
-              (p) => p.$id === newParticipant.$id
-            );
-            return existingParticipant
-              ? { ...existingParticipant, ...newParticipant }
-              : newParticipant;
-          });
-        });
-      }
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      setError("Failed to fetch data.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const summaryStats = useMemo(() => {
     const totalParticipants = participants.length;
@@ -200,19 +219,14 @@ export default function EventOverView() {
   });
 
   const getParticipantCounts = (eventId) => {
-    const eventParticipants = participants.filter((p) => p.eventId === eventId);
-    const maleCount = eventParticipants.filter((p) => p.sex === "Male").length;
-    const femaleCount = eventParticipants.filter(
-      (p) => p.sex === "Female"
-    ).length;
-    const intersexCount = eventParticipants.filter(
-      (p) => p.sex === "Intersex"
-    ).length;
+    // Filter participants for this specific event
+    const eventParticipants = participants.filter(p => p.eventId === eventId);
+    
     return {
       total: eventParticipants.length,
-      male: maleCount,
-      female: femaleCount,
-      intersex: intersexCount,
+      male: eventParticipants.filter(p => p.sex === "Male").length,
+      female: eventParticipants.filter(p => p.sex === "Female").length,
+      intersex: eventParticipants.filter(p => p.sex === "Intersex").length
     };
   };
 
@@ -255,8 +269,12 @@ export default function EventOverView() {
     setSortDirection("desc");
   };
 
+  const handleNavigateToCreateEvent = () => {
+    setActiveTab("createEvent");
+  };
+
   if (loading) {
-    return <GADConnectSimpleLoader />;
+    return <LoadingAnimation message="Loading events data..." />;
   }
 
   if (error) {
@@ -273,11 +291,55 @@ export default function EventOverView() {
     );
   }
 
+  if (events.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>No Events Found</CardTitle>
+            <CardDescription>
+              There are currently no events in the system.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">To get started:</p>
+              <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+                <li>Click the "Add Event" button above</li>
+                <li>Fill in the event details</li>
+                <li>Submit the form to create your first event</li>
+              </ul>
+            </div>
+          </CardContent>
+          <CardFooter className="justify-center">
+            <Button onClick={handleNavigateToCreateEvent}>
+              <Plus className="mr-2 h-4 w-4" /> Add Your First Event
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  if (filteredEvents.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between">
+          <h2 className="text-2xl font-bold">Recent Events</h2>
+          <Button onClick={handleNavigateToCreateEvent}>
+            <Plus className="mr-2 h-4 w-4" /> Add Event
+          </Button>
+        </div>
+        {/* ... rest of the no search results UI ... */}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between">
         <h2 className="text-2xl font-bold">Recent Events</h2>
-        <Button onClick={() => {}}>
+        <Button onClick={handleNavigateToCreateEvent}>
           <Plus className="mr-2 h-4 w-4" /> Add Event
         </Button>
       </div>
@@ -359,12 +421,8 @@ export default function EventOverView() {
               </Button>
             </TableHead>
             <TableHead>Location</TableHead>
-            <TableHead>Status</TableHead>
             <TableHead className="text-right">
-              <Button
-                variant="ghost"
-                onClick={() => handleSort("totalParticipants")}
-              >
+              <Button variant="ghost" onClick={() => handleSort("totalParticipants")}>
                 Participants
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
@@ -382,24 +440,10 @@ export default function EventOverView() {
                   {format(parseISO(event.eventDate), "MMMM d, yyyy")}
                 </TableCell>
                 <TableCell>{event.eventVenue}</TableCell>
-                <TableCell>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      event.approvalStatus === "approved"
-                        ? "bg-green-100 text-green-800"
-                        : event.approvalStatus === "rejected"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {event.approvalStatus || "Pending"}
-                  </span>
-                </TableCell>
                 <TableCell className="text-right">
                   <div>(Total: {participantCounts.total})</div>
                   <div className="text-sm text-muted-foreground">
-                    (M: {participantCounts.male} | F: {participantCounts.female}{" "}
-                    | I: {participantCounts.intersex})
+                    (M: {participantCounts.male} | F: {participantCounts.female} | I: {participantCounts.intersex})
                   </div>
                 </TableCell>
               </TableRow>

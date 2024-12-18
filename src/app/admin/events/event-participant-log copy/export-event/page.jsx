@@ -98,9 +98,10 @@ export default function ExportEventsButton() {
   const handleExport = async () => {
     try {
       setIsLoading(true);
-      await exportEventsToExcel(selectedEvents, "events.xlsx");
+      await exportEventsToExcel(selectedEvents, fileName);
       toast.success("Events exported successfully to Excel");
     } catch (error) {
+      console.error("Error exporting events:", error);
       toast.error("Export failed. Please try again.");
     } finally {
       setIsLoading(false);
@@ -214,13 +215,12 @@ export default function ExportEventsButton() {
                 <Input
                   id="file-name"
                   value={fileName}
-                  onChange={(e) =>
-                    setFileName(
-                      e.target.value.endsWith(".xlsx")
-                        ? e.target.value
-                        : `${e.target.value}.xlsx`
-                    )
-                  }
+                  onChange={(e) => {
+                    const newName = e.target.value.endsWith('.xlsx') 
+                      ? e.target.value 
+                      : `${e.target.value}.xlsx`;
+                    setFileName(newName);
+                  }}
                   placeholder="Enter file name"
                   className="col-span-3"
                 />
