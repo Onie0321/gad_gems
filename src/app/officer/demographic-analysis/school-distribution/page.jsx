@@ -1,6 +1,20 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
-import { UserIcon as Male, UserIcon as Female } from 'lucide-react'; 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
+import { UserIcon as Male, UserIcon as Female } from "lucide-react";
 import DataTable from "../data-table/page";
 import { CartesianGrid } from "recharts";
 
@@ -10,8 +24,8 @@ const COLORS = {
 };
 
 const formatName = (name, existingNames) => {
-  const words = name.split(' ').filter(word => word.toLowerCase() !== 'and');  // Remove 'and'
-  let acronym = words.map(word => word.charAt(0).toUpperCase()).join('');  // Create acronym
+  const words = name.split(" ").filter((word) => word.toLowerCase() !== "and"); // Remove 'and'
+  let acronym = words.map((word) => word.charAt(0).toUpperCase()).join(""); // Create acronym
 
   let uniqueAcronym = acronym;
   let counter = 1;
@@ -25,12 +39,12 @@ const formatName = (name, existingNames) => {
 };
 
 export default function SchoolDistribution({ data, colors }) {
-  const existingNames = new Set(); 
+  const existingNames = new Set();
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-      const male = payload.find(p => p.dataKey === "male")?.value || 0;
-      const female = payload.find(p => p.dataKey === "female")?.value || 0;
+      const male = payload.find((p) => p.dataKey === "male")?.value || 0;
+      const female = payload.find((p) => p.dataKey === "female")?.value || 0;
       const total = male + female;
       return (
         <div className="bg-white p-2 border rounded shadow">
@@ -48,7 +62,9 @@ export default function SchoolDistribution({ data, colors }) {
     <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle>School Distribution</CardTitle>
-        <CardDescription>Distribution of participants by school</CardDescription>
+        <CardDescription>
+          Distribution of participants by school
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -60,7 +76,6 @@ export default function SchoolDistribution({ data, colors }) {
             <Legend />
             <Bar dataKey="male" name="Male" fill={colors[0]} />
             <Bar dataKey="female" name="Female" fill={colors[1]} />
-            <Bar dataKey="intersex" name="Intersex" fill={colors[2]} />
           </BarChart>
         </ResponsiveContainer>
         <DataTable data={data} />

@@ -85,7 +85,7 @@ export default function DemographicAnalysis() {
 
       // Process gender data
       const genderCounts = allParticipants.reduce((acc, participant) => {
-        const gender = participant.sex || "Unspecified";
+        const gender = participant.sex ;
         acc[gender] = (acc[gender] || 0) + 1;
         return acc;
       }, {});
@@ -122,7 +122,7 @@ export default function DemographicAnalysis() {
 
       // Process education data
       const educationCounts = allParticipants.reduce((acc, participant) => {
-        const education = participant.educationLevel || "Unspecified";
+        const education = participant.educationLevel ;
         acc[education] = (acc[education] || 0) + 1;
         return acc;
       }, {});
@@ -137,7 +137,7 @@ export default function DemographicAnalysis() {
 
       // Process ethnicity data
       const ethnicityCounts = allParticipants.reduce((acc, participant) => {
-        const ethnicity = participant.ethnicity || "Unspecified";
+        const ethnicity = participant.ethnicity ;
         acc[ethnicity] = (acc[ethnicity] || 0) + 1;
         return acc;
       }, {});
@@ -152,7 +152,7 @@ export default function DemographicAnalysis() {
 
       // Process school data
       const schoolCounts = allParticipants.reduce((acc, participant) => {
-        const school = participant.school || "Unspecified";
+        const school = participant.school;
         acc[school] = (acc[school] || 0) + 1;
         return acc;
       }, {});
@@ -164,7 +164,7 @@ export default function DemographicAnalysis() {
 
       // Process section data
       const sectionCounts = allParticipants.reduce((acc, participant) => {
-        const section = participant.section || "Unspecified";
+        const section = participant.section;
         acc[section] = (acc[section] || 0) + 1;
         return acc;
       }, {});
@@ -372,7 +372,7 @@ export default function DemographicAnalysis() {
         </CardContent>
       </Card>
 
-      {/* Education Level Card */}
+      {/* Education Level Card 
       <Card>
         <CardHeader>
           <CardTitle>Education Level Distribution</CardTitle>
@@ -431,7 +431,7 @@ export default function DemographicAnalysis() {
             </TableBody>
           </Table>
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Add similar cards for Ethnicity, School, and Section with their respective color schemes */}
     </div>

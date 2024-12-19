@@ -79,7 +79,6 @@ export default function EducationLevel({ data, colors }) {
               />
               <Bar dataKey="male" stackId="a" fill={COLORS.male} />
               <Bar dataKey="female" stackId="a" fill={COLORS.female} />
-              <Bar dataKey="intersex" name="Intersex" fill={colors[2]} />
             </BarChart>
           </ResponsiveContainer>
           <DataTable data={data} />

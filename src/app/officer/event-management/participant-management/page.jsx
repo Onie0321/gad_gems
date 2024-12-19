@@ -63,11 +63,16 @@ import {
   isStudentIdComplete,
   checkDuplicates,
 } from "@/utils/participantUtils";
-import { createParticipant, getCurrentUser, checkDuplicateParticipant } from "@/lib/appwrite";
+import {
+  createParticipant,
+  getCurrentUser,
+  checkDuplicateParticipant,
+} from "@/lib/appwrite";
 import EditParticipantDialog from "./edit-participant-dialog/page";
 import DeleteParticipantDialog from "./delete-participant-dialog/page";
 import { debounce } from "lodash";
 import { usePathname, useRouter } from "next/navigation";
+import ParticipantTypeSelector from "./participant-type-selector/page";
 
 export default function ParticipantManagement({
   events,
@@ -87,6 +92,10 @@ export default function ParticipantManagement({
     section: "",
     ethnicGroup: "",
     otherEthnicGroup: "",
+    department: "",
+    position: "",
+    organization: "",
+    contactNumber: "",
   });
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -94,13 +103,12 @@ export default function ParticipantManagement({
   const [totalParticipants, setTotalParticipants] = useState(0);
   const [totalMaleParticipants, setTotalMaleParticipants] = useState(0);
   const [totalFemaleParticipants, setTotalFemaleParticipants] = useState(0);
-  const [totalIntersexParticipants, setTotalIntersexParticipants] = useState(0);
   const [showAutofillDialog, setShowAutofillDialog] = useState(false);
   const [autofillData, setAutofillData] = useState(null);
   const [newEntryInfo, setNewEntryInfo] = useState({});
   const [duplicateErrors, setDuplicateErrors] = useState({
     studentId: "",
-    name: ""
+    name: "",
   });
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [hasAddedParticipants, setHasAddedParticipants] = useState(false);
@@ -109,6 +117,7 @@ export default function ParticipantManagement({
   const pathname = usePathname();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [participantType, setParticipantType] = useState("student");
 
   const currentEvent = events.find((e) => e.$id === currentEventId);
   const isEventSelected = !!currentEvent;
@@ -124,9 +133,6 @@ export default function ParticipantManagement({
     );
     setTotalFemaleParticipants(
       currentEventParticipants.filter((p) => p.sex === "Female").length
-    );
-    setTotalIntersexParticipants(
-      currentEventParticipants.filter((p) => p.sex === "Intersex").length
     );
   }, [participants, currentEventId]);
 
@@ -184,8 +190,14 @@ export default function ParticipantManagement({
     e.preventDefault();
 
     // Check for duplicates before submitting
-    const isDuplicateId = await checkDuplicateInCurrentEvent("studentId", participantData.studentId);
-    const isDuplicateName = await checkDuplicateInCurrentEvent("name", participantData.name);
+    const isDuplicateId = await checkDuplicateInCurrentEvent(
+      "studentId",
+      participantData.studentId
+    );
+    const isDuplicateName = await checkDuplicateInCurrentEvent(
+      "name",
+      participantData.name
+    );
 
     if (isDuplicateId || isDuplicateName) {
       toast.error("Cannot add duplicate participant");
@@ -234,6 +246,10 @@ export default function ParticipantManagement({
           section: "",
           ethnicGroup: "",
           otherEthnicGroup: "",
+          department: "",
+          position: "",
+          organization: "",
+          contactNumber: "",
         });
       }
     } catch (error) {
@@ -255,6 +271,10 @@ export default function ParticipantManagement({
       section: "",
       ethnicGroup: "",
       otherEthnicGroup: "",
+      department: "",
+      position: "",
+      organization: "",
+      contactNumber: "",
     });
 
     setParticipants([]);
@@ -264,7 +284,6 @@ export default function ParticipantManagement({
     setTotalParticipants(0);
     setTotalMaleParticipants(0);
     setTotalFemaleParticipants(0);
-    setTotalIntersexParticipants(0);
 
     setShowSuccessMessage(true);
     toast.success("Event created successfully.");
@@ -327,7 +346,7 @@ export default function ParticipantManagement({
 
   const checkDuplicateInCurrentEvent = async (field, value) => {
     if (!value || !currentEventId) return false;
-    
+
     try {
       const isDuplicate = await checkDuplicateParticipant(
         currentEventId,
@@ -336,15 +355,17 @@ export default function ParticipantManagement({
       );
 
       if (isDuplicate) {
-        setDuplicateErrors(prev => ({
+        setDuplicateErrors((prev) => ({
           ...prev,
-          [field]: `This ${field === "studentId" ? "Student ID" : "Name"} is already registered in this event.`
+          [field]: `This ${
+            field === "studentId" ? "Student ID" : "Name"
+          } is already registered in this event.`,
         }));
         return true;
       } else {
-        setDuplicateErrors(prev => ({
+        setDuplicateErrors((prev) => ({
           ...prev,
-          [field]: ""
+          [field]: "",
         }));
         return false;
       }
@@ -357,13 +378,16 @@ export default function ParticipantManagement({
 
   const handleStudentIdChange = async (e) => {
     const formattedId = formatStudentId(e.target.value);
-    setParticipantData(prev => ({ ...prev, studentId: formattedId }));
+    setParticipantData((prev) => ({ ...prev, studentId: formattedId }));
 
     if (isStudentIdComplete(formattedId)) {
       try {
         // Check for duplicate in current event first
-        const isDuplicateInEvent = await checkDuplicateInCurrentEvent("studentId", formattedId);
-        
+        const isDuplicateInEvent = await checkDuplicateInCurrentEvent(
+          "studentId",
+          formattedId
+        );
+
         if (isDuplicateInEvent) {
           // If duplicate found, don't proceed with autofill
           return;
@@ -381,22 +405,25 @@ export default function ParticipantManagement({
       }
     } else {
       // Clear duplicate errors when student ID is incomplete
-      setDuplicateErrors(prev => ({
+      setDuplicateErrors((prev) => ({
         ...prev,
-        studentId: ""
+        studentId: "",
       }));
     }
   };
 
   const handleNameChange = async (e) => {
     const name = capitalizeWords(e.target.value);
-    setParticipantData(prev => ({ ...prev, name }));
+    setParticipantData((prev) => ({ ...prev, name }));
 
     if (name.length >= 3) {
       try {
         // Check for duplicate in current event first
-        const isDuplicateInEvent = await checkDuplicateInCurrentEvent("name", name);
-        
+        const isDuplicateInEvent = await checkDuplicateInCurrentEvent(
+          "name",
+          name
+        );
+
         if (isDuplicateInEvent) {
           // If duplicate found, don't proceed with autofill
           return;
@@ -414,9 +441,9 @@ export default function ParticipantManagement({
       }
     } else {
       // Clear duplicate errors when name is too short
-      setDuplicateErrors(prev => ({
+      setDuplicateErrors((prev) => ({
         ...prev,
-        name: ""
+        name: "",
       }));
     }
   };
@@ -439,6 +466,10 @@ export default function ParticipantManagement({
         section: autofillData.section,
         ethnicGroup: autofillData.ethnicGroup,
         otherEthnicGroup: autofillData.otherEthnicGroup || "",
+        department: autofillData.department || "",
+        position: autofillData.position || "",
+        organization: autofillData.organization || "",
+        contactNumber: autofillData.contactNumber || "",
       });
 
       toast.success(
@@ -461,6 +492,28 @@ export default function ParticipantManagement({
     console.log("Dialog state changed:", showAutofillDialog);
     console.log("Found participant:", foundParticipant);
   }, [showAutofillDialog, foundParticipant]);
+
+  useEffect(() => {
+    // Reset form when participant type changes
+    setParticipantData({
+      // Common fields
+      name: "",
+      age: "",
+      sex: "",
+      homeAddress: "",
+
+      // Student-specific fields
+      studentId: participantType === "student" ? "" : undefined,
+      school: participantType === "student" ? "" : undefined,
+      year: participantType === "student" ? "" : undefined,
+      section: participantType === "student" ? "" : undefined,
+      ethnicGroup: participantType === "student" ? "" : undefined,
+      otherEthnicGroup: participantType === "student" ? "" : undefined,
+
+      // Staff-specific fields
+      staffId: participantType === "staff" ? "" : undefined,
+    });
+  }, [participantType]);
 
   return (
     <>
@@ -546,6 +599,15 @@ export default function ParticipantManagement({
               ? `Add participants to ${currentEvent.eventName}`
               : "No active event created"}
           </CardDescription>
+
+          {/* Add participant type selector */}
+          {isEventSelected && (
+            <ParticipantTypeSelector
+              selectedType={participantType}
+              onTypeChange={setParticipantType}
+            />
+          )}
+
           <div className="grid grid-cols-4 gap-4 mb-6">
             <div className="bg-primary text-primary-foreground p-4 rounded-lg">
               <h3 className="text-lg font-semibold">Total Participants</h3>
@@ -558,10 +620,6 @@ export default function ParticipantManagement({
             <div className="bg-pink-500 text-white p-4 rounded-lg">
               <h3 className="text-lg font-semibold">Female Participants</h3>
               <p className="text-3xl font-bold">{totalFemaleParticipants}</p>
-            </div>
-            <div className="bg-purple-500 text-white p-4 rounded-lg">
-              <h3 className="text-lg font-semibold">Intersex Participants</h3>
-              <p className="text-3xl font-bold">{totalIntersexParticipants}</p>
             </div>
           </div>
           {!isEventSelected && (
@@ -584,257 +642,434 @@ export default function ParticipantManagement({
         <form onSubmit={handleAddParticipant}>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="studentId">Student ID</Label>
-                <Input
-                  id="studentId"
-                  value={participantData.studentId}
-                  onChange={handleStudentIdChange}
-                  placeholder="00-00-0000"
-                  maxLength={10}
-                  disabled={!isEventSelected}
-                  className={duplicateErrors.studentId ? "border-red-500" : ""}
-                />
-                {duplicateErrors.studentId && (
-                  <p className="text-sm text-red-500 font-medium">
-                    {duplicateErrors.studentId}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={participantData.name}
-                  onChange={handleNameChange}
-                  placeholder="Enter full name"
-                  disabled={!isEventSelected}
-                  className={duplicateErrors.name ? "border-red-500" : ""}
-                />
-                {duplicateErrors.name && (
-                  <p className="text-sm text-red-500 font-medium">
-                    {duplicateErrors.name}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sex">Sex at Birth</Label>
-                <Select
-                  value={participantData.sex}
-                  onValueChange={(value) =>
-                    setParticipantData({ ...participantData, sex: value })
-                  }
-                  disabled={!isEventSelected}
-                >
-                  <SelectTrigger id="sex">
-                    <SelectValue placeholder="Select sex at Birth" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
-                    <SelectItem value="Intersex">Intersex</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.sex && (
-                  <p className="text-sm text-red-500">{errors.sex}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="relative">
-                        <Input
-                          id="age"
-                          type="number"
-                          value={participantData.age}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (
-                              value === "" ||
-                              (parseInt(value) >= 1 && parseInt(value) <= 125)
-                            ) {
-                              setParticipantData({
-                                ...participantData,
-                                age: value,
-                              });
-                            }
-                          }}
-                          placeholder="Enter age"
-                          min="1"
-                          max="125"
-                          disabled={!isEventSelected}
-                        />
-                        <HelpCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Age must be between 1 and 125</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                {errors.age && (
-                  <p className="text-sm text-red-500">{errors.age}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="homeAddress">Home Address</Label>
-                <Input
-                  id="homeAddress"
-                  value={participantData.homeAddress}
-                  onChange={(e) =>
-                    setParticipantData({
-                      ...participantData,
-                      homeAddress: capitalizeWords(e.target.value),
-                    })
-                  }
-                  placeholder="Enter home address"
-                  disabled={!isEventSelected}
-                />
-                {errors.homeAddress && (
-                  <p className="text-sm text-red-500">{errors.homeAddress}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="school">School</Label>
-                <Select
-                  onValueChange={(value) =>
-                    setParticipantData({
-                      ...participantData,
-                      school: value,
-                      year: "",
-                      section: "",
-                    })
-                  }
-                  value={participantData.school}
-                  disabled={!isEventSelected}
-                >
-                  <SelectTrigger id="school">
-                    <SelectValue placeholder="Select school" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {schoolOptions.map((school) => (
-                      <SelectItem key={school.abbr} value={school.name}>
-                        {school.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.school && (
-                  <p className="text-sm text-red-500">{errors.school}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="year">Year</Label>
-                <Select
-                  onValueChange={(value) =>
-                    setParticipantData({
-                      ...participantData,
-                      year: value,
-                      section: "",
-                    })
-                  }
-                  value={participantData.year}
-                  disabled={!participantData.school}
-                >
-                  <SelectTrigger id="year">
-                    <SelectValue
-                      placeholder={
-                        participantData.school
-                          ? "Select year"
-                          : "Select school first"
+              {participantType === "student" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="studentId">Student ID</Label>
+                    <Input
+                      id="studentId"
+                      value={participantData.studentId}
+                      onChange={handleStudentIdChange}
+                      placeholder="00-00-0000"
+                      maxLength={10}
+                      disabled={!isEventSelected}
+                      className={
+                        duplicateErrors.studentId ? "border-red-500" : ""
                       }
                     />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[
-                      "First Year",
-                      "Second Year",
-                      "Third Year",
-                      "Fourth Year",
-                      "Fifth Year",
-                    ].map((year) => (
-                      <SelectItem key={year} value={year}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.year && (
-                  <p className="text-sm text-red-500">{errors.year}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="section">Section</Label>
-                <Input
-                  id="section"
-                  value={participantData.section}
-                  onChange={(e) =>
-                    setParticipantData({
-                      ...participantData,
-                      section: capitalizeWords(e.target.value),
-                    })
-                  }
-                  placeholder="Enter section"
-                  disabled={!participantData.year}
-                />
-                {errors.section && (
-                  <p className="text-sm text-red-500">{errors.section}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ethnicGroup">Ethnic Group</Label>
-                <Select
-                  value={participantData.ethnicGroup}
-                  onValueChange={(value) =>
-                    setParticipantData({
-                      ...participantData,
-                      ethnicGroup: value,
-                      otherEthnicGroup:
-                        value === "Other"
-                          ? ""
-                          : participantData.otherEthnicGroup,
-                    })
-                  }
-                  disabled={!isEventSelected}
-                >
-                  <SelectTrigger id="ethnicGroup">
-                    <SelectValue placeholder="Select ethnic group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Tagalog">Tagalog</SelectItem>
-                    <SelectItem value="Cebuano">Cebuano</SelectItem>
-                    <SelectItem value="Ilocano">Ilocano</SelectItem>
-                    <SelectItem value="Bicolano">Bicolano</SelectItem>
-                    <SelectItem value="Waray">Waray</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.ethnicGroup && (
-                  <p className="text-sm text-red-500">{errors.ethnicGroup}</p>
-                )}
-              </div>
-              {participantData.ethnicGroup === "Other" && (
-                <div className="space-y-2">
-                  <Label htmlFor="otherEthnicGroup">Specify Ethnic Group</Label>
-                  <Input
-                    id="otherEthnicGroup"
-                    value={participantData.otherEthnicGroup}
-                    onChange={(e) =>
-                      setParticipantData({
-                        ...participantData,
-                        otherEthnicGroup: capitalizeWords(e.target.value),
-                      })
-                    }
-                    placeholder="Enter ethnic group"
-                  />
-                  {errors.otherEthnicGroup && (
-                    <p className="text-sm text-red-500">
-                      {errors.otherEthnicGroup}
-                    </p>
+                    {duplicateErrors.studentId && (
+                      <p className="text-sm text-red-500 font-medium">
+                        {duplicateErrors.studentId}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                      id="name"
+                      value={participantData.name}
+                      onChange={handleNameChange}
+                      placeholder="Enter full name"
+                      disabled={!isEventSelected}
+                      className={duplicateErrors.name ? "border-red-500" : ""}
+                    />
+                    {duplicateErrors.name && (
+                      <p className="text-sm text-red-500 font-medium">
+                        {duplicateErrors.name}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sex">Sex at Birth</Label>
+                    <Select
+                      value={participantData.sex}
+                      onValueChange={(value) =>
+                        setParticipantData({ ...participantData, sex: value })
+                      }
+                      disabled={!isEventSelected}
+                    >
+                      <SelectTrigger id="sex">
+                        <SelectValue placeholder="Select sex at Birth" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.sex && (
+                      <p className="text-sm text-red-500">{errors.sex}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="age">Age</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="relative">
+                            <Input
+                              id="age"
+                              type="number"
+                              value={participantData.age}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (
+                                  value === "" ||
+                                  (parseInt(value) >= 1 &&
+                                    parseInt(value) <= 125)
+                                ) {
+                                  setParticipantData({
+                                    ...participantData,
+                                    age: value,
+                                  });
+                                }
+                              }}
+                              placeholder="Enter age"
+                              min="1"
+                              max="125"
+                              disabled={!isEventSelected}
+                            />
+                            <HelpCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Age must be between 1 and 125</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    {errors.age && (
+                      <p className="text-sm text-red-500">{errors.age}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="homeAddress">Home Address</Label>
+                    <Input
+                      id="homeAddress"
+                      value={participantData.homeAddress}
+                      onChange={(e) =>
+                        setParticipantData({
+                          ...participantData,
+                          homeAddress: capitalizeWords(e.target.value),
+                        })
+                      }
+                      placeholder="Enter home address"
+                      disabled={!isEventSelected}
+                    />
+                    {errors.homeAddress && (
+                      <p className="text-sm text-red-500">
+                        {errors.homeAddress}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="school">School</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        setParticipantData({
+                          ...participantData,
+                          school: value,
+                          year: "",
+                          section: "",
+                        })
+                      }
+                      value={participantData.school}
+                      disabled={!isEventSelected}
+                    >
+                      <SelectTrigger id="school">
+                        <SelectValue placeholder="Select school" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {schoolOptions.map((school) => (
+                          <SelectItem key={school.abbr} value={school.name}>
+                            {school.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.school && (
+                      <p className="text-sm text-red-500">{errors.school}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="year">Year</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        setParticipantData({
+                          ...participantData,
+                          year: value,
+                          section: "",
+                        })
+                      }
+                      value={participantData.year}
+                      disabled={!participantData.school}
+                    >
+                      <SelectTrigger id="year">
+                        <SelectValue
+                          placeholder={
+                            participantData.school
+                              ? "Select year"
+                              : "Select school first"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[
+                          "First Year",
+                          "Second Year",
+                          "Third Year",
+                          "Fourth Year",
+                          "Fifth Year",
+                        ].map((year) => (
+                          <SelectItem key={year} value={year}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.year && (
+                      <p className="text-sm text-red-500">{errors.year}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="section">Section</Label>
+                    <Input
+                      id="section"
+                      value={participantData.section}
+                      onChange={(e) =>
+                        setParticipantData({
+                          ...participantData,
+                          section: capitalizeWords(e.target.value),
+                        })
+                      }
+                      placeholder="Enter section"
+                      disabled={!participantData.year}
+                    />
+                    {errors.section && (
+                      <p className="text-sm text-red-500">{errors.section}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ethnicGroup">Ethnic Group</Label>
+                    <Select
+                      value={participantData.ethnicGroup}
+                      onValueChange={(value) =>
+                        setParticipantData({
+                          ...participantData,
+                          ethnicGroup: value,
+                          otherEthnicGroup:
+                            value === "Other"
+                              ? ""
+                              : participantData.otherEthnicGroup,
+                        })
+                      }
+                      disabled={!isEventSelected}
+                    >
+                      <SelectTrigger id="ethnicGroup">
+                        <SelectValue placeholder="Select ethnic group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Tagalog">Tagalog</SelectItem>
+                        <SelectItem value="Cebuano">Cebuano</SelectItem>
+                        <SelectItem value="Ilocano">Ilocano</SelectItem>
+                        <SelectItem value="Bicolano">Bicolano</SelectItem>
+                        <SelectItem value="Waray">Waray</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.ethnicGroup && (
+                      <p className="text-sm text-red-500">
+                        {errors.ethnicGroup}
+                      </p>
+                    )}
+                  </div>
+                  {participantData.ethnicGroup === "Other" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="otherEthnicGroup">
+                        Specify Ethnic Group
+                      </Label>
+                      <Input
+                        id="otherEthnicGroup"
+                        value={participantData.otherEthnicGroup}
+                        onChange={(e) =>
+                          setParticipantData({
+                            ...participantData,
+                            otherEthnicGroup: capitalizeWords(e.target.value),
+                          })
+                        }
+                        placeholder="Enter ethnic group"
+                      />
+                      {errors.otherEthnicGroup && (
+                        <p className="text-sm text-red-500">
+                          {errors.otherEthnicGroup}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
+              ) : participantType === "staff" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="staffId">Staff/Faculty ID</Label>
+                    <Input
+                      id="staffId"
+                      value={participantData.staffId}
+                      onChange={(e) =>
+                        setParticipantData({
+                          ...participantData,
+                          staffId: e.target.value,
+                        })
+                      }
+                      placeholder="Enter Staff/Faculty ID"
+                      disabled={!isEventSelected}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                      id="name"
+                      value={participantData.name}
+                      onChange={(e) =>
+                        setParticipantData({
+                          ...participantData,
+                          name: capitalizeWords(e.target.value),
+                        })
+                      }
+                      placeholder="Enter full name"
+                      disabled={!isEventSelected}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="age">Age</Label>
+                    <Input
+                      id="age"
+                      type="number"
+                      value={participantData.age}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (
+                          value === "" ||
+                          (parseInt(value) >= 1 && parseInt(value) <= 125)
+                        ) {
+                          setParticipantData({
+                            ...participantData,
+                            age: value,
+                          });
+                        }
+                      }}
+                      placeholder="Enter age"
+                      min="1"
+                      max="125"
+                      disabled={!isEventSelected}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sex">Sex at Birth</Label>
+                    <Select
+                      value={participantData.sex}
+                      onValueChange={(value) =>
+                        setParticipantData({ ...participantData, sex: value })
+                      }
+                      disabled={!isEventSelected}
+                    >
+                      <SelectTrigger id="sex">
+                        <SelectValue placeholder="Select sex at Birth" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="homeAddress">Address</Label>
+                    <Input
+                      id="homeAddress"
+                      value={participantData.homeAddress}
+                      onChange={(e) =>
+                        setParticipantData({
+                          ...participantData,
+                          homeAddress: capitalizeWords(e.target.value),
+                        })
+                      }
+                      placeholder="Enter address"
+                      disabled={!isEventSelected}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                      id="name"
+                      value={participantData.name}
+                      onChange={(e) =>
+                        setParticipantData({
+                          ...participantData,
+                          name: capitalizeWords(e.target.value),
+                        })
+                      }
+                      placeholder="Enter full name"
+                      disabled={!isEventSelected}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="age">Age</Label>
+                    <Input
+                      id="age"
+                      type="number"
+                      value={participantData.age}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (
+                          value === "" ||
+                          (parseInt(value) >= 1 && parseInt(value) <= 125)
+                        ) {
+                          setParticipantData({
+                            ...participantData,
+                            age: value,
+                          });
+                        }
+                      }}
+                      placeholder="Enter age"
+                      min="1"
+                      max="125"
+                      disabled={!isEventSelected}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sex">Sex at Birth</Label>
+                    <Select
+                      value={participantData.sex}
+                      onValueChange={(value) =>
+                        setParticipantData({ ...participantData, sex: value })
+                      }
+                      disabled={!isEventSelected}
+                    >
+                      <SelectTrigger id="sex">
+                        <SelectValue placeholder="Select sex at Birth" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="homeAddress">Address</Label>
+                    <Input
+                      id="homeAddress"
+                      value={participantData.homeAddress}
+                      onChange={(e) =>
+                        setParticipantData({
+                          ...participantData,
+                          homeAddress: capitalizeWords(e.target.value),
+                        })
+                      }
+                      placeholder="Enter address"
+                      disabled={!isEventSelected}
+                    />
+                  </div>
+                </>
               )}
             </div>
           </CardContent>

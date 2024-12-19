@@ -74,7 +74,6 @@ export default function AgeDistribution({ data, colors }) {
             <Legend />
             <Bar dataKey="male" name="Male" fill={colors[0]} />
             <Bar dataKey="female" name="Female" fill={colors[1]} />
-            <Bar dataKey="intersex" name="Intersex" fill={colors[2]} />
           </BarChart>
         </ResponsiveContainer>
         <DataTable data={data} />

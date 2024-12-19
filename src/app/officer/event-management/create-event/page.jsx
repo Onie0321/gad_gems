@@ -52,6 +52,8 @@ export default function CreateEvent({ onEventCreated, user }) {
   const [errors, setErrors] = useState({});
   const [isTimeValid, setIsTimeValid] = useState(true);
   const { setActiveTab } = useTabContext();
+  const [tempTimeFrom, setTempTimeFrom] = useState("");
+  const [tempTimeTo, setTempTimeTo] = useState("");
 
   const nonAcademicCategories = getNonAcademicCategories();
 
@@ -246,24 +248,54 @@ export default function CreateEvent({ onEventCreated, user }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="eventTimeFrom">Start Time</Label>
-              <Input
-                id="eventTimeFrom"
-                type="time"
-                value={eventTimeFrom}
-                onChange={(e) => setEventTimeFrom(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="eventTimeFrom"
+                  type="time"
+                  value={tempTimeFrom}
+                  onChange={(e) => {
+                    setTempTimeFrom(e.target.value);
+                    setEventTimeFrom(e.target.value);
+                    if (e.target.value && eventTimeTo) {
+                      const start = parse(e.target.value, "HH:mm", new Date());
+                      const end = parse(eventTimeTo, "HH:mm", new Date());
+                      if (isBefore(end, start)) {
+                        setIsTimeValid(false);
+                        toast.warning("End time cannot be earlier than start time.");
+                      } else {
+                        setIsTimeValid(true);
+                      }
+                    }
+                  }}
+                />
+              </div>
               {errors.eventTimeFrom && (
                 <p className="text-sm text-red-500">{errors.eventTimeFrom}</p>
               )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="eventTimeTo">End Time</Label>
-              <Input
-                id="eventTimeTo"
-                type="time"
-                value={eventTimeTo}
-                onChange={(e) => setEventTimeTo(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="eventTimeTo"
+                  type="time"
+                  value={tempTimeTo}
+                  onChange={(e) => {
+                    setTempTimeTo(e.target.value);
+                    setEventTimeTo(e.target.value);
+                    if (eventTimeFrom && e.target.value) {
+                      const start = parse(eventTimeFrom, "HH:mm", new Date());
+                      const end = parse(e.target.value, "HH:mm", new Date());
+                      if (isBefore(end, start)) {
+                        setIsTimeValid(false);
+                        toast.warning("End time cannot be earlier than start time.");
+                      } else {
+                        setIsTimeValid(true);
+                      }
+                    }
+                  }}
+                />
+              </div>
               {errors.eventTimeTo && (
                 <p className="text-sm text-red-500">{errors.eventTimeTo}</p>
               )}
