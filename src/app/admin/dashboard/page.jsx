@@ -81,7 +81,7 @@ export default function DashboardOverview() {
           return {
             ...event,
             participants: participantsResponse.documents,
-            createdByName: creatorResponse.name || "Unknown"
+            createdByName: creatorResponse.name || "Unknown",
           };
         })
       );
@@ -245,7 +245,7 @@ export default function DashboardOverview() {
                           ? "#2196F3"
                           : entry.name === "Female"
                           ? "#E91E63"
-                          : "#FFC107"
+                          : "#FFC107",
                     }}
                   ></div>
                   <span className="text-xs">
@@ -285,11 +285,8 @@ export default function DashboardOverview() {
                   const femaleCount = participants.filter(
                     (p) => p.sex === "Female"
                   ).length;
-                  const intersexCount = participants.filter(
-                    (p) => p.sex === "Intersex"
-                  ).length;
-                  const totalParticipants =
-                    maleCount + femaleCount + intersexCount;
+
+                  const totalParticipants = maleCount + femaleCount;
 
                   return (
                     <TableRow key={event.$id}>
@@ -304,19 +301,15 @@ export default function DashboardOverview() {
                       <TableCell>{event.eventVenue}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center">
-                          <div>
-                            Total: {maleCount + femaleCount + intersexCount}
-                          </div>
+                          <div>Total: {maleCount + femaleCount}</div>
                           <div className="text-sm text-muted-foreground">
                             <span className="text-blue-600">{maleCount}</span>/
-                            <span className="text-pink-600">{femaleCount}</span>/
-                            <span className="text-purple-600">{intersexCount}</span>
+                            <span className="text-pink-600">{femaleCount}</span>
+                            /
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {event.createdByName}
-                      </TableCell>
+                      <TableCell>{event.createdByName}</TableCell>
                     </TableRow>
                   );
                 })}
