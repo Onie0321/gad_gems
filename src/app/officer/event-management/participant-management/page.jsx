@@ -62,17 +62,33 @@ import {
   handleAutofill,
   isStudentIdComplete,
   checkDuplicates,
+  formatStaffFacultyId,
+  getInitialParticipantData,
+  cleanParticipantData,
+  handleParticipantTypeChange,
+  handleInputChange,
+  updateParticipantCounts,
 } from "@/utils/participantUtils";
 import {
   createParticipant,
   getCurrentUser,
   checkDuplicateParticipant,
+  databases,
+  databaseId,
+  participantCollectionId,
+  eventCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
 } from "@/lib/appwrite";
 import EditParticipantDialog from "./edit-participant-dialog/page";
 import DeleteParticipantDialog from "./delete-participant-dialog/page";
 import { debounce } from "lodash";
 import { usePathname, useRouter } from "next/navigation";
 import ParticipantTypeSelector from "./participant-type-selector/page";
+import { ID } from "appwrite";
+import DataTable from "../../demographic-analysis/data-table/page";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ParticipantTables from "./participant-tables/page";
 
 export default function ParticipantManagement({
   events,
@@ -81,22 +97,9 @@ export default function ParticipantManagement({
   user,
   setActiveTab,
 }) {
-  const [participantData, setParticipantData] = useState({
-    studentId: "",
-    name: "",
-    sex: "",
-    age: "",
-    homeAddress: "",
-    school: "",
-    year: "",
-    section: "",
-    ethnicGroup: "",
-    otherEthnicGroup: "",
-    department: "",
-    position: "",
-    organization: "",
-    contactNumber: "",
-  });
+  const [participantData, setParticipantData] = useState(
+    getInitialParticipantData("student")
+  );
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -122,174 +125,231 @@ export default function ParticipantManagement({
   const currentEvent = events.find((e) => e.$id === currentEventId);
   const isEventSelected = !!currentEvent;
 
-  // Effect to update counters whenever participants change
   useEffect(() => {
-    const currentEventParticipants = participants.filter(
-      (p) => p.eventId === currentEventId
-    );
-    setTotalParticipants(currentEventParticipants.length);
-    setTotalMaleParticipants(
-      currentEventParticipants.filter((p) => p.sex === "Male").length
-    );
-    setTotalFemaleParticipants(
-      currentEventParticipants.filter((p) => p.sex === "Female").length
+    updateParticipantCounts(
+      participants,
+      currentEventId,
+      setTotalParticipants,
+      setTotalMaleParticipants,
+      setTotalFemaleParticipants
     );
   }, [participants, currentEventId]);
 
-  const handleInputChange = async (field, value) => {
-    try {
-      if (field === "studentId" || field === "name") {
-        if (field === "studentId" && !isStudentIdComplete(value)) {
-          setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
-          setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-          return;
-        }
-
-        const result = await debouncedCheckDuplicates(
-          field,
-          value,
-          currentEventId
-        );
-        if (result) {
-          const { duplicateError, newEntryInfo } = result;
-          setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
-          setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
-        }
-
-        if (value && field === "studentId") {
-          const autofillData = await handleAutofill(value, currentEventId);
-          if (autofillData) {
-            setAutofillData(autofillData);
-            setShowAutofillDialog(true);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error in handleInputChange:", error);
-      toast.error("An error occurred while processing your input.");
-    }
+  const onParticipantTypeChange = (type) => {
+    handleParticipantTypeChange(
+      type,
+      setParticipantType,
+      setParticipantData,
+      setErrors
+    );
   };
 
-  const debouncedCheckDuplicates = debounce(async (field, value) => {
-    const { duplicateError, newEntryInfo } = await checkDuplicates(
+  const onInputChange = async (field, value) => {
+    await handleInputChange(
       field,
       value,
-      currentEventId
+      participantData,
+      setParticipantData,
+      currentEventId,
+      setDuplicateErrors,
+      setNewEntryInfo,
+      setAutofillData,
+      setShowAutofillDialog
     );
-    setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
-    setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
-  }, 500);
-
-  const handleAutofillCancel = () => {
-    setShowAutofillDialog(false);
-    setFoundParticipant(null);
   };
 
-  // In your handleAddParticipant function
   const handleAddParticipant = async (e) => {
     e.preventDefault();
-
-    // Check for duplicates before submitting
-    const isDuplicateId = await checkDuplicateInCurrentEvent(
-      "studentId",
-      participantData.studentId
-    );
-    const isDuplicateName = await checkDuplicateInCurrentEvent(
-      "name",
-      participantData.name
+    console.log(
+      "Starting participant submission:",
+      participantData,
+      participantType
     );
 
-    if (isDuplicateId || isDuplicateName) {
-      toast.error("Cannot add duplicate participant");
-      return;
-    }
-
-    if (!validateParticipantForm(participantData, setErrors)) return;
-
-    if (!currentEvent) {
-      toast.error("No event selected");
-      return;
-    }
-
-    if (!user || !user.$id) {
-      toast.error("User not authenticated. Please log in and try again.");
-      return;
-    }
-
-    setLoading(true);
     try {
-      const newParticipant = {
-        ...participantData,
-        age: parseInt(participantData.age),
+      const validationErrors = validateParticipantForm(
+        participantData,
+        participantType
+      );
+      if (validationErrors) {
+        setErrors(validationErrors);
+        toast.error("Please fill in all required fields.");
+        return;
+      }
+
+      if (!currentEvent) {
+        toast.error("No event selected");
+        return;
+      }
+
+      setLoading(true);
+      let createdParticipant;
+      let participantReference;
+
+      // Clean the data based on participant type
+      const cleanedData = {
+        ...cleanParticipantData(participantData, participantType),
         eventId: currentEventId,
-        createdBy: user.name,
       };
 
-      const createdParticipant = await createParticipant(
-        newParticipant,
-        user.$id
-      );
+      console.log("Cleaned data for submission:", cleanedData);
+
+      switch (participantType) {
+        case "student":
+          createdParticipant = await databases.createDocument(
+            databaseId,
+            participantCollectionId,
+            ID.unique(),
+            {
+              studentId: cleanedData.studentId,
+              name: cleanedData.name,
+              sex: cleanedData.sex,
+              age: parseInt(cleanedData.age),
+              homeAddress: cleanedData.homeAddress,
+              school: cleanedData.school,
+              year: cleanedData.year,
+              section: cleanedData.section,
+              ethnicGroup: cleanedData.ethnicGroup,
+              eventId: cleanedData.eventId,
+              createdBy: user.$id,
+            }
+          );
+          participantReference = `student_${createdParticipant.$id}`;
+          break;
+
+        case "staff":
+          createdParticipant = await databases.createDocument(
+            databaseId,
+            staffFacultyCollectionId,
+            ID.unique(),
+            {
+              staffFacultyId: cleanedData.staffFacultyId,
+              name: cleanedData.name,
+              age: parseInt(cleanedData.age),
+              sex: cleanedData.sex,
+              address: cleanedData.address,
+              ethnicGroup: cleanedData.ethnicGroup,
+              eventId: cleanedData.eventId,
+            }
+          );
+          participantReference = `staff_${createdParticipant.$id}`;
+          break;
+
+        case "community":
+          createdParticipant = await databases.createDocument(
+            databaseId,
+            communityCollectionId,
+            ID.unique(),
+            {
+              name: cleanedData.name,
+              age: parseInt(cleanedData.age),
+              sex: cleanedData.sex,
+              address: cleanedData.address,
+              ethnicGroup: cleanedData.ethnicGroup,
+              eventId: cleanedData.eventId,
+            }
+          );
+          participantReference = `community_${createdParticipant.$id}`;
+          break;
+      }
 
       if (createdParticipant) {
+        // Update event participants
+        const updatedParticipants = [
+          ...(currentEvent.participants || []),
+          participantReference,
+        ];
+
+        await databases.updateDocument(
+          databaseId,
+          eventCollectionId,
+          currentEventId,
+          { participants: updatedParticipants }
+        );
+
         setParticipants((prev) => [...prev, createdParticipant]);
-        setHasAddedParticipants(true); // Set the flag when first participant is added
-        toast.success(`Participant added to ${currentEvent.eventName}`);
-        // Reset form
-        setParticipantData({
-          studentId: "",
-          name: "",
-          sex: "",
-          age: "",
-          homeAddress: "",
-          school: "",
-          year: "",
-          section: "",
-          ethnicGroup: "",
-          otherEthnicGroup: "",
-          department: "",
-          position: "",
-          organization: "",
-          contactNumber: "",
-        });
+        setHasAddedParticipants(true);
+
+        // Reset form with correct initial state
+        setParticipantData(getInitialParticipantData(participantType));
+        setErrors({});
+
+        toast.success(
+          `${
+            participantType.charAt(0).toUpperCase() + participantType.slice(1)
+          } ${cleanedData.name} added successfully`
+        );
       }
     } catch (error) {
-      console.error("Error details:", error);
+      console.error("Error adding participant:", error);
       toast.error(`Error adding participant: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
-  const handleFinishAddingParticipants = () => {
-    setParticipantData({
-      studentId: "",
-      name: "",
-      sex: "",
-      age: "",
-      homeAddress: "",
-      school: "",
-      year: "",
-      section: "",
-      ethnicGroup: "",
-      otherEthnicGroup: "",
-      department: "",
-      position: "",
-      organization: "",
-      contactNumber: "",
-    });
 
-    setParticipants([]);
-    setCurrentEventId(null);
-    setHasAddedParticipants(false);
+  const handleFinishAddingParticipants = async () => {
+    try {
+      // Get the current event with its participants
+      const event = await databases.getDocument(
+        databaseId,
+        eventCollectionId,
+        currentEventId
+      );
 
-    setTotalParticipants(0);
-    setTotalMaleParticipants(0);
-    setTotalFemaleParticipants(0);
+      // Count participants by type
+      const participantCounts = event.participants.reduce((acc, ref) => {
+        const [type] = ref.split("_");
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {});
 
-    setShowSuccessMessage(true);
-    toast.success("Event created successfully.");
+      // Create detailed summary message
+      const summaryMessage = `Event "${event.eventName}" completed!\n
+      ${
+        participantCounts.student
+          ? `Students: ${participantCounts.student}\n`
+          : ""
+      }
+      ${
+        participantCounts.staff
+          ? `Staff/Faculty: ${participantCounts.staff}\n`
+          : ""
+      }
+      ${
+        participantCounts.community
+          ? `Community Members: ${participantCounts.community}\n`
+          : ""
+      }
+      Total Participants: ${event.participants.length}`;
 
-    // Redirect to EventOverview
-    setActiveTab("overview");
+      toast.success(summaryMessage, {
+        autoClose: 5000,
+      });
+
+      // Reset states
+      setParticipantData({
+        name: "",
+        sex: "",
+        age: "",
+        homeAddress: "",
+        studentId: "",
+        school: "",
+        year: "",
+        section: "",
+        ethnicGroup: "",
+        otherEthnicGroup: "",
+        staffFacultyId: "",
+      });
+
+      setParticipants([]);
+      setCurrentEventId(null);
+      setHasAddedParticipants(false);
+      setActiveTab("overview");
+    } catch (error) {
+      console.error("Error finishing event:", error);
+      toast.error("Error completing event participants");
+    }
   };
 
   const handleUpdateParticipant = (updatedParticipant) => {
@@ -466,10 +526,8 @@ export default function ParticipantManagement({
         section: autofillData.section,
         ethnicGroup: autofillData.ethnicGroup,
         otherEthnicGroup: autofillData.otherEthnicGroup || "",
-        department: autofillData.department || "",
+        school: autofillData.school || "",
         position: autofillData.position || "",
-        organization: autofillData.organization || "",
-        contactNumber: autofillData.contactNumber || "",
       });
 
       toast.success(
@@ -511,9 +569,420 @@ export default function ParticipantManagement({
       otherEthnicGroup: participantType === "student" ? "" : undefined,
 
       // Staff-specific fields
-      staffId: participantType === "staff" ? "" : undefined,
+      staffFacultyId: participantType === "staff" ? "" : undefined,
     });
   }, [participantType]);
+
+  const renderCommonFields = () => (
+    <>
+      <div className="grid w-full items-center gap-1.5">
+        <Label htmlFor="name">Name</Label>
+        <Input
+          type="text"
+          id="name"
+          placeholder="Enter full name"
+          value={participantData.name}
+          onChange={(e) =>
+            setParticipantData({
+              ...participantData,
+              name: capitalizeWords(e.target.value),
+            })
+          }
+        />
+      </div>
+      <div className="grid w-full items-center gap-1.5">
+        <Label htmlFor="sex">Sex at Birth</Label>
+        <Select
+          value={participantData.sex}
+          onValueChange={(value) =>
+            setParticipantData({ ...participantData, sex: value })
+          }
+        >
+          <SelectTrigger id="sex">
+            <SelectValue placeholder="Select sex at Birth" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Male">Male</SelectItem>
+            <SelectItem value="Female">Female</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid w-full items-center gap-1.5">
+        <Label htmlFor="age">Age</Label>
+        <Input
+          type="number"
+          id="age"
+          placeholder="Enter age"
+          value={participantData.age}
+          onChange={(e) =>
+            setParticipantData({ ...participantData, age: e.target.value })
+          }
+        />
+      </div>
+      <div className="grid w-full items-center gap-1.5">
+        <Label htmlFor="homeAddress">Home Address</Label>
+        <Input
+          type="text"
+          id="homeAddress"
+          placeholder="Enter home address"
+          value={participantData.homeAddress}
+          onChange={(e) =>
+            setParticipantData({
+              ...participantData,
+              homeAddress: capitalizeWords(e.target.value),
+            })
+          }
+        />
+      </div>
+    </>
+  );
+
+  const renderStudentFields = () => (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="school">School</Label>
+        <Select
+          onValueChange={(value) =>
+            setParticipantData({
+              ...participantData,
+              school: value,
+              year: "",
+              section: "",
+            })
+          }
+          value={participantData.school}
+          disabled={!isEventSelected}
+        >
+          <SelectTrigger id="school">
+            <SelectValue placeholder="Select school" />
+          </SelectTrigger>
+          <SelectContent>
+            {schoolOptions.map((school) => (
+              <SelectItem key={school.abbr} value={school.name}>
+                {school.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {errors.school && (
+          <p className="text-sm text-red-500">{errors.school}</p>
+        )}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="year">Year</Label>
+        <Select
+          onValueChange={(value) =>
+            setParticipantData({
+              ...participantData,
+              year: value,
+              section: "",
+            })
+          }
+          value={participantData.year}
+          disabled={!participantData.school}
+        >
+          <SelectTrigger id="year">
+            <SelectValue
+              placeholder={
+                participantData.school ? "Select year" : "Select school first"
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {[
+              "First Year",
+              "Second Year",
+              "Third Year",
+              "Fourth Year",
+              "Fifth Year",
+            ].map((year) => (
+              <SelectItem key={year} value={year}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {errors.year && <p className="text-sm text-red-500">{errors.year}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="section">Section</Label>
+        <Input
+          id="section"
+          value={participantData.section}
+          onChange={(e) =>
+            setParticipantData({
+              ...participantData,
+              section: capitalizeWords(e.target.value),
+            })
+          }
+          placeholder="Enter section"
+          disabled={!participantData.year}
+        />
+        {errors.section && (
+          <p className="text-sm text-red-500">{errors.section}</p>
+        )}
+      </div>
+    </>
+  );
+
+  const renderParticipantTypeFields = () => {
+    switch (participantType) {
+      case "student":
+        return (
+          <div className="grid w-full items-center gap-1.5">
+            <Label htmlFor="studentId">Student ID</Label>
+            <Input
+              type="text"
+              id="studentId"
+              placeholder="Enter student ID"
+              value={participantData.studentId}
+              onChange={(e) => {
+                const formattedId = formatStudentId(e.target.value);
+                setParticipantData({
+                  ...participantData,
+                  studentId: formattedId,
+                });
+              }}
+            />
+          </div>
+        );
+
+      case "staff":
+        return (
+          <div className="grid w-full items-center gap-1.5">
+            <Label htmlFor="staffFacultyId">Staff/Faculty ID</Label>
+            <Input
+              type="text"
+              id="staffFacultyId"
+              placeholder="Enter staff/faculty ID"
+              value={participantData.staffFacultyId}
+              onChange={(e) => {
+                const formattedId = formatStaffFacultyId(e.target.value);
+                setParticipantData({
+                  ...participantData,
+                  staffFacultyId: formattedId,
+                });
+              }}
+              maxLength={3}
+            />
+          </div>
+        );
+
+      case "community":
+        return null; // No additional fields for community members
+    }
+  };
+
+  const renderEthnicGroupFields = () => (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="ethnicGroup">Ethnic Group</Label>
+        <Select
+          value={participantData.ethnicGroup}
+          onValueChange={(value) =>
+            setParticipantData({
+              ...participantData,
+              ethnicGroup: value,
+              otherEthnicGroup:
+                value === "Other" ? "" : participantData.otherEthnicGroup,
+            })
+          }
+          disabled={!isEventSelected}
+        >
+          <SelectTrigger id="ethnicGroup">
+            <SelectValue placeholder="Select ethnic group" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Tagalog">Tagalog</SelectItem>
+            <SelectItem value="Cebuano">Cebuano</SelectItem>
+            <SelectItem value="Ilocano">Ilocano</SelectItem>
+            <SelectItem value="Bicolano">Bicolano</SelectItem>
+            <SelectItem value="Waray">Waray</SelectItem>
+            <SelectItem value="Other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+        {errors.ethnicGroup && (
+          <p className="text-sm text-red-500">{errors.ethnicGroup}</p>
+        )}
+      </div>
+      {participantData.ethnicGroup === "Other" && (
+        <div className="space-y-2">
+          <Label htmlFor="otherEthnicGroup">Specify Ethnic Group</Label>
+          <Input
+            id="otherEthnicGroup"
+            value={participantData.otherEthnicGroup}
+            onChange={(e) =>
+              setParticipantData({
+                ...participantData,
+                otherEthnicGroup: capitalizeWords(e.target.value),
+              })
+            }
+            placeholder="Enter ethnic group"
+          />
+          {errors.otherEthnicGroup && (
+            <p className="text-sm text-red-500">{errors.otherEthnicGroup}</p>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  // Add this component for the statistics card
+  const StatisticsCard = ({ participants }) => {
+    const stats = participants.reduce((acc, p) => {
+      const type =
+        p.type ||
+        (p.studentId ? "student" : p.staffFacultyId ? "staff" : "community");
+      const sex = p.sex;
+
+      if (!acc[type]) {
+        acc[type] = { total: 0, male: 0, female: 0 };
+      }
+
+      acc[type].total++;
+      if (sex === "Male") acc[type].male++;
+      if (sex === "Female") acc[type].female++;
+
+      return acc;
+    }, {});
+
+    return (
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Participant Statistics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <h3 className="font-semibold">Students</h3>
+              <p>Total: {stats.student?.total || 0}</p>
+              <p>Male: {stats.student?.male || 0}</p>
+              <p>Female: {stats.student?.female || 0}</p>
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold">Staff/Faculty</h3>
+              <p>Total: {stats.staff?.total || 0}</p>
+              <p>Male: {stats.staff?.male || 0}</p>
+              <p>Female: {stats.staff?.female || 0}</p>
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold">Community</h3>
+              <p>Total: {stats.community?.total || 0}</p>
+              <p>Male: {stats.community?.male || 0}</p>
+              <p>Female: {stats.community?.female || 0}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Add these column definitions before the return statement
+  const studentColumns = [
+    {
+      accessorKey: "studentId",
+      header: "Student ID",
+    },
+    {
+      accessorKey: "name",
+      header: "Name",
+    },
+    {
+      accessorKey: "sex",
+      header: "Sex",
+    },
+    {
+      accessorKey: "age",
+      header: "Age",
+    },
+    {
+      accessorKey: "homeAddress",
+      header: "Address",
+    },
+    {
+      accessorKey: "school",
+      header: "School",
+    },
+    {
+      accessorKey: "year",
+      header: "Year",
+    },
+    {
+      accessorKey: "section",
+      header: "Section",
+    },
+    {
+      accessorKey: "ethnicGroup",
+      header: "Ethnic Group",
+    },
+  ];
+
+  const staffColumns = [
+    {
+      accessorKey: "staffFacultyId",
+      header: "Staff/Faculty ID",
+    },
+    {
+      accessorKey: "name",
+      header: "Name",
+    },
+    {
+      accessorKey: "sex",
+      header: "Sex",
+    },
+    {
+      accessorKey: "age",
+      header: "Age",
+    },
+    {
+      accessorKey: "homeAddress",
+      header: "Address",
+    },
+    {
+      accessorKey: "ethnicGroup",
+      header: "Ethnic Group",
+    },
+  ];
+
+  const communityColumns = [
+    {
+      accessorKey: "name",
+      header: "Name",
+    },
+    {
+      accessorKey: "sex",
+      header: "Sex",
+    },
+    {
+      accessorKey: "age",
+      header: "Age",
+    },
+    {
+      accessorKey: "homeAddress",
+      header: "Address",
+    },
+    {
+      accessorKey: "ethnicGroup",
+      header: "Ethnic Group",
+    },
+  ];
+
+  const resetForm = () => {
+    setParticipantData({
+      name: "",
+      sex: "",
+      age: "",
+      homeAddress: "",
+      studentId: "",
+      school: "",
+      year: "",
+      section: "",
+      ethnicGroup: "",
+      otherEthnicGroup: "",
+      staffFacultyId: "",
+    });
+    setErrors({});
+  };
 
   return (
     <>
@@ -642,435 +1111,10 @@ export default function ParticipantManagement({
         <form onSubmit={handleAddParticipant}>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              {participantType === "student" ? (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="studentId">Student ID</Label>
-                    <Input
-                      id="studentId"
-                      value={participantData.studentId}
-                      onChange={handleStudentIdChange}
-                      placeholder="00-00-0000"
-                      maxLength={10}
-                      disabled={!isEventSelected}
-                      className={
-                        duplicateErrors.studentId ? "border-red-500" : ""
-                      }
-                    />
-                    {duplicateErrors.studentId && (
-                      <p className="text-sm text-red-500 font-medium">
-                        {duplicateErrors.studentId}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      value={participantData.name}
-                      onChange={handleNameChange}
-                      placeholder="Enter full name"
-                      disabled={!isEventSelected}
-                      className={duplicateErrors.name ? "border-red-500" : ""}
-                    />
-                    {duplicateErrors.name && (
-                      <p className="text-sm text-red-500 font-medium">
-                        {duplicateErrors.name}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sex">Sex at Birth</Label>
-                    <Select
-                      value={participantData.sex}
-                      onValueChange={(value) =>
-                        setParticipantData({ ...participantData, sex: value })
-                      }
-                      disabled={!isEventSelected}
-                    >
-                      <SelectTrigger id="sex">
-                        <SelectValue placeholder="Select sex at Birth" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Male">Male</SelectItem>
-                        <SelectItem value="Female">Female</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.sex && (
-                      <p className="text-sm text-red-500">{errors.sex}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="age">Age</Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="relative">
-                            <Input
-                              id="age"
-                              type="number"
-                              value={participantData.age}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                if (
-                                  value === "" ||
-                                  (parseInt(value) >= 1 &&
-                                    parseInt(value) <= 125)
-                                ) {
-                                  setParticipantData({
-                                    ...participantData,
-                                    age: value,
-                                  });
-                                }
-                              }}
-                              placeholder="Enter age"
-                              min="1"
-                              max="125"
-                              disabled={!isEventSelected}
-                            />
-                            <HelpCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Age must be between 1 and 125</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    {errors.age && (
-                      <p className="text-sm text-red-500">{errors.age}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="homeAddress">Home Address</Label>
-                    <Input
-                      id="homeAddress"
-                      value={participantData.homeAddress}
-                      onChange={(e) =>
-                        setParticipantData({
-                          ...participantData,
-                          homeAddress: capitalizeWords(e.target.value),
-                        })
-                      }
-                      placeholder="Enter home address"
-                      disabled={!isEventSelected}
-                    />
-                    {errors.homeAddress && (
-                      <p className="text-sm text-red-500">
-                        {errors.homeAddress}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="school">School</Label>
-                    <Select
-                      onValueChange={(value) =>
-                        setParticipantData({
-                          ...participantData,
-                          school: value,
-                          year: "",
-                          section: "",
-                        })
-                      }
-                      value={participantData.school}
-                      disabled={!isEventSelected}
-                    >
-                      <SelectTrigger id="school">
-                        <SelectValue placeholder="Select school" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {schoolOptions.map((school) => (
-                          <SelectItem key={school.abbr} value={school.name}>
-                            {school.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.school && (
-                      <p className="text-sm text-red-500">{errors.school}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="year">Year</Label>
-                    <Select
-                      onValueChange={(value) =>
-                        setParticipantData({
-                          ...participantData,
-                          year: value,
-                          section: "",
-                        })
-                      }
-                      value={participantData.year}
-                      disabled={!participantData.school}
-                    >
-                      <SelectTrigger id="year">
-                        <SelectValue
-                          placeholder={
-                            participantData.school
-                              ? "Select year"
-                              : "Select school first"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[
-                          "First Year",
-                          "Second Year",
-                          "Third Year",
-                          "Fourth Year",
-                          "Fifth Year",
-                        ].map((year) => (
-                          <SelectItem key={year} value={year}>
-                            {year}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.year && (
-                      <p className="text-sm text-red-500">{errors.year}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="section">Section</Label>
-                    <Input
-                      id="section"
-                      value={participantData.section}
-                      onChange={(e) =>
-                        setParticipantData({
-                          ...participantData,
-                          section: capitalizeWords(e.target.value),
-                        })
-                      }
-                      placeholder="Enter section"
-                      disabled={!participantData.year}
-                    />
-                    {errors.section && (
-                      <p className="text-sm text-red-500">{errors.section}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ethnicGroup">Ethnic Group</Label>
-                    <Select
-                      value={participantData.ethnicGroup}
-                      onValueChange={(value) =>
-                        setParticipantData({
-                          ...participantData,
-                          ethnicGroup: value,
-                          otherEthnicGroup:
-                            value === "Other"
-                              ? ""
-                              : participantData.otherEthnicGroup,
-                        })
-                      }
-                      disabled={!isEventSelected}
-                    >
-                      <SelectTrigger id="ethnicGroup">
-                        <SelectValue placeholder="Select ethnic group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Tagalog">Tagalog</SelectItem>
-                        <SelectItem value="Cebuano">Cebuano</SelectItem>
-                        <SelectItem value="Ilocano">Ilocano</SelectItem>
-                        <SelectItem value="Bicolano">Bicolano</SelectItem>
-                        <SelectItem value="Waray">Waray</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.ethnicGroup && (
-                      <p className="text-sm text-red-500">
-                        {errors.ethnicGroup}
-                      </p>
-                    )}
-                  </div>
-                  {participantData.ethnicGroup === "Other" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="otherEthnicGroup">
-                        Specify Ethnic Group
-                      </Label>
-                      <Input
-                        id="otherEthnicGroup"
-                        value={participantData.otherEthnicGroup}
-                        onChange={(e) =>
-                          setParticipantData({
-                            ...participantData,
-                            otherEthnicGroup: capitalizeWords(e.target.value),
-                          })
-                        }
-                        placeholder="Enter ethnic group"
-                      />
-                      {errors.otherEthnicGroup && (
-                        <p className="text-sm text-red-500">
-                          {errors.otherEthnicGroup}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : participantType === "staff" ? (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="staffId">Staff/Faculty ID</Label>
-                    <Input
-                      id="staffId"
-                      value={participantData.staffId}
-                      onChange={(e) =>
-                        setParticipantData({
-                          ...participantData,
-                          staffId: e.target.value,
-                        })
-                      }
-                      placeholder="Enter Staff/Faculty ID"
-                      disabled={!isEventSelected}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      value={participantData.name}
-                      onChange={(e) =>
-                        setParticipantData({
-                          ...participantData,
-                          name: capitalizeWords(e.target.value),
-                        })
-                      }
-                      placeholder="Enter full name"
-                      disabled={!isEventSelected}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="age">Age</Label>
-                    <Input
-                      id="age"
-                      type="number"
-                      value={participantData.age}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (
-                          value === "" ||
-                          (parseInt(value) >= 1 && parseInt(value) <= 125)
-                        ) {
-                          setParticipantData({
-                            ...participantData,
-                            age: value,
-                          });
-                        }
-                      }}
-                      placeholder="Enter age"
-                      min="1"
-                      max="125"
-                      disabled={!isEventSelected}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sex">Sex at Birth</Label>
-                    <Select
-                      value={participantData.sex}
-                      onValueChange={(value) =>
-                        setParticipantData({ ...participantData, sex: value })
-                      }
-                      disabled={!isEventSelected}
-                    >
-                      <SelectTrigger id="sex">
-                        <SelectValue placeholder="Select sex at Birth" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Male">Male</SelectItem>
-                        <SelectItem value="Female">Female</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="homeAddress">Address</Label>
-                    <Input
-                      id="homeAddress"
-                      value={participantData.homeAddress}
-                      onChange={(e) =>
-                        setParticipantData({
-                          ...participantData,
-                          homeAddress: capitalizeWords(e.target.value),
-                        })
-                      }
-                      placeholder="Enter address"
-                      disabled={!isEventSelected}
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      value={participantData.name}
-                      onChange={(e) =>
-                        setParticipantData({
-                          ...participantData,
-                          name: capitalizeWords(e.target.value),
-                        })
-                      }
-                      placeholder="Enter full name"
-                      disabled={!isEventSelected}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="age">Age</Label>
-                    <Input
-                      id="age"
-                      type="number"
-                      value={participantData.age}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (
-                          value === "" ||
-                          (parseInt(value) >= 1 && parseInt(value) <= 125)
-                        ) {
-                          setParticipantData({
-                            ...participantData,
-                            age: value,
-                          });
-                        }
-                      }}
-                      placeholder="Enter age"
-                      min="1"
-                      max="125"
-                      disabled={!isEventSelected}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sex">Sex at Birth</Label>
-                    <Select
-                      value={participantData.sex}
-                      onValueChange={(value) =>
-                        setParticipantData({ ...participantData, sex: value })
-                      }
-                      disabled={!isEventSelected}
-                    >
-                      <SelectTrigger id="sex">
-                        <SelectValue placeholder="Select sex at Birth" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Male">Male</SelectItem>
-                        <SelectItem value="Female">Female</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="homeAddress">Address</Label>
-                    <Input
-                      id="homeAddress"
-                      value={participantData.homeAddress}
-                      onChange={(e) =>
-                        setParticipantData({
-                          ...participantData,
-                          homeAddress: capitalizeWords(e.target.value),
-                        })
-                      }
-                      placeholder="Enter address"
-                      disabled={!isEventSelected}
-                    />
-                  </div>
-                </>
-              )}
+              {renderParticipantTypeFields()}
+              {renderCommonFields()}
+              {participantType === "student" && renderStudentFields()}
+              {renderEthnicGroupFields()}
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
@@ -1119,39 +1163,13 @@ export default function ParticipantManagement({
             </div>
           </CardFooter>
         </form>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Student ID</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Sex</TableHead>
-              <TableHead>Age</TableHead>
-              <TableHead>School</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {participants.map((participant) => (
-              <TableRow key={participant.$id}>
-                <TableCell>{participant.studentId}</TableCell>
-                <TableCell>{participant.name}</TableCell>
-                <TableCell>{participant.sex}</TableCell>
-                <TableCell>{participant.age}</TableCell>
-                <TableCell>{participant.school}</TableCell>
-                <TableCell>
-                  <EditParticipantDialog
-                    participant={participant}
-                    onUpdateParticipant={handleUpdateParticipant}
-                  />
-                  <DeleteParticipantDialog
-                    participant={participant}
-                    onDeleteParticipant={handleDeleteParticipant}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        {isEventSelected && (
+          <ParticipantTables
+            participants={participants}
+            onUpdateParticipant={handleUpdateParticipant}
+            onDeleteParticipant={handleDeleteParticipant}
+          />
+        )}
       </Card>
     </>
   );

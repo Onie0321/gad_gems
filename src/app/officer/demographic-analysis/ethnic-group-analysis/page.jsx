@@ -1,4 +1,17 @@
 export default function EthnicGroupAnalysis({ data, colors }) {
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Ethnic Group Distribution</CardTitle>
+        </CardHeader>
+        <CardContent className="flex justify-center items-center h-[300px] text-muted-foreground">
+          No data available for the selected ethnic group filters.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>

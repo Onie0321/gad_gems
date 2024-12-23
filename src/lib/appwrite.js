@@ -41,6 +41,12 @@ export const notificationsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID;
 export const activityLogsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_ACTIVITYLOGS_COLLECTION_ID;
+export const newsCollectionId =
+  process.env.NEXT_PUBLIC_APPWRITE_NEWS_COLLECTION_ID;
+export const staffFacultyCollectionId =
+  process.env.NEXT_PUBLIC_APPWRITE_STAFFFACULTY_COLLECTION_ID;
+export const communityCollectionId =
+  process.env.NEXT_PUBLIC_APPWRITE_COMMUNITY_COLLECTION_ID;
 
 export const account = new Account(client);
 //const avatars = new Avatars(client);
@@ -553,28 +559,47 @@ export const checkTimeConflict = async (
   eventTimeTo
 ) => {
   try {
-    // Convert eventTimeFrom and eventTimeTo to ISO 860s
-    const eventTimeFromISO = new Date(
-      `${eventDate}T${eventTimeFrom}:00`
-    ).toISOString();
-    const eventTimeToISO = new Date(
-      `${eventDate}T${eventTimeTo}:00`
-    ).toISOString();
+    // Ensure we have a valid date to work with
+    const date = new Date(eventDate);
+    if (isNaN(date.getTime())) {
+      throw new Error("Invalid date provided");
+    }
 
-    const response = await databases.listDocuments(
+    // Format the date part (YYYY-MM-DD)
+    const formattedDate = date.toISOString().split("T")[0];
+
+    // Combine date with time for comparison
+    const startDateTime = new Date(`${formattedDate}T${eventTimeFrom}`);
+    const endDateTime = new Date(`${formattedDate}T${eventTimeTo}`);
+
+    // Query existing events
+    const existingEvents = await databases.listDocuments(
       databaseId,
       eventCollectionId,
       [
-        Query.equal("eventDate", eventDate),
         Query.equal("eventVenue", eventVenue),
-        Query.lessThan("eventTimeTo", eventTimeFromISO),
-        Query.greaterThan("eventTimeFrom", eventTimeToISO),
+        Query.equal("eventDate", formattedDate),
       ]
     );
 
-    return response.total > 0;
+    // Check for time conflicts
+    for (const event of existingEvents.documents) {
+      const existingStart = new Date(`${formattedDate}T${event.eventTimeFrom}`);
+      const existingEnd = new Date(`${formattedDate}T${event.eventTimeTo}`);
+
+      // Check if there's an overlap
+      if (
+        (startDateTime >= existingStart && startDateTime < existingEnd) ||
+        (endDateTime > existingStart && endDateTime <= existingEnd) ||
+        (startDateTime <= existingStart && endDateTime >= existingEnd)
+      ) {
+        return true; // Conflict found
+      }
+    }
+
+    return false; // No conflict
   } catch (error) {
-    console.error("Error checking for time conflict:", error);
+    console.error("Error checking time conflict:", error);
     throw error;
   }
 };

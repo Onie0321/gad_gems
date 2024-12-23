@@ -270,7 +270,7 @@ export default function DashboardOverview() {
                   <TableHead>Date</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead className="text-center">
-                    Participants (M/F/I)
+                    Participants (M/F)
                   </TableHead>
                   <TableHead>Created By</TableHead>
                 </TableRow>
@@ -305,7 +305,6 @@ export default function DashboardOverview() {
                           <div className="text-sm text-muted-foreground">
                             <span className="text-blue-600">{maleCount}</span>/
                             <span className="text-pink-600">{femaleCount}</span>
-                            /
                           </div>
                         </div>
                       </TableCell>

@@ -39,6 +39,20 @@ const formatName = (name, existingNames) => {
 };
 
 export default function SchoolDistribution({ data, colors }) {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>School Distribution</CardTitle>
+          <CardDescription>Distribution of participants by school</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center items-center h-[300px] text-muted-foreground">
+          No data available for the selected school filters.
+        </CardContent>
+      </Card>
+    );
+  }
+
   const existingNames = new Set();
 
   const CustomTooltip = ({ active, payload, label }) => {

@@ -71,12 +71,9 @@ export default function EventOverView() {
       const fetchedEvents = await databases.listDocuments(
         databaseId,
         eventCollectionId,
-        [
-          Query.equal('createdBy', userId),
-          Query.orderDesc('$createdAt')
-        ]
+        [Query.equal("createdBy", userId), Query.orderDesc("$createdAt")]
       );
-      
+
       if (fetchedEvents.documents.length > 0) {
         setEvents(fetchedEvents.documents);
 
@@ -85,7 +82,10 @@ export default function EventOverView() {
           databaseId,
           participantCollectionId,
           [
-            Query.equal("eventId", fetchedEvents.documents.map(event => event.$id))
+            Query.equal(
+              "eventId",
+              fetchedEvents.documents.map((event) => event.$id)
+            ),
           ]
         );
 
@@ -190,9 +190,6 @@ export default function EventOverView() {
     const femaleParticipants = participants.filter(
       (p) => p.sex === "Female"
     ).length;
-    const intersexParticipants = participants.filter(
-      (p) => p.sex === "Intersex"
-    ).length;
 
     return {
       total: events.length,
@@ -201,7 +198,6 @@ export default function EventOverView() {
       totalParticipants,
       maleParticipants,
       femaleParticipants,
-      intersexParticipants,
     };
   }, [events, participants]);
 
@@ -220,13 +216,12 @@ export default function EventOverView() {
 
   const getParticipantCounts = (eventId) => {
     // Filter participants for this specific event
-    const eventParticipants = participants.filter(p => p.eventId === eventId);
-    
+    const eventParticipants = participants.filter((p) => p.eventId === eventId);
+
     return {
       total: eventParticipants.length,
-      male: eventParticipants.filter(p => p.sex === "Male").length,
-      female: eventParticipants.filter(p => p.sex === "Female").length,
-      intersex: eventParticipants.filter(p => p.sex === "Intersex").length
+      male: eventParticipants.filter((p) => p.sex === "Male").length,
+      female: eventParticipants.filter((p) => p.sex === "Female").length,
     };
   };
 
@@ -378,8 +373,7 @@ export default function EventOverView() {
             </p>
             <p className="text-sm text-muted-foreground">
               (Male: {summaryStats.maleParticipants} | Female:{" "}
-              {summaryStats.femaleParticipants} | Intersex:{" "}
-              {summaryStats.intersexParticipants})
+              {summaryStats.femaleParticipants})
             </p>
           </div>
         </CardContent>
@@ -422,7 +416,10 @@ export default function EventOverView() {
             </TableHead>
             <TableHead>Location</TableHead>
             <TableHead className="text-right">
-              <Button variant="ghost" onClick={() => handleSort("totalParticipants")}>
+              <Button
+                variant="ghost"
+                onClick={() => handleSort("totalParticipants")}
+              >
                 Participants
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
@@ -443,7 +440,8 @@ export default function EventOverView() {
                 <TableCell className="text-right">
                   <div>(Total: {participantCounts.total})</div>
                   <div className="text-sm text-muted-foreground">
-                    (M: {participantCounts.male} | F: {participantCounts.female} | I: {participantCounts.intersex})
+                    (M: {participantCounts.male} | F: {participantCounts.female}
+                    )
                   </div>
                 </TableCell>
               </TableRow>

@@ -74,10 +74,10 @@ export default function Footer() {
           </div>
           <div>
             <h3 className="font-semibold mb-4">Contact Us</h3>
-            <p>123 Gender Equality Street</p>
-            <p>Inclusivity City, IC 12345</p>
-            <p>Phone: (123) 456-7890</p>
-            <p>Email: info@gadoffice.gov</p>
+            <p>Second Floor, General Education Building</p>
+            <p>Brgy. Zabali, Baler, Aurora</p>
+            <p>Phone: +63 928 503 2000</p>
+            <p>Email: ascot.edu.ph</p>
           </div>
         </div>
         <div className="mt-8 text-center text-sm text-muted-foreground">

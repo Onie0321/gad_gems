@@ -23,13 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Users,
-  BarChart,
-  Edit,
-  Eye,
-  Loader2,
-} from "lucide-react";
+import { Users, BarChart, Edit, Eye, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import {
@@ -46,11 +40,10 @@ import {
   deleteParticipant,
   getCurrentUser,
   subscribeToEventUpdates,
-  databaseId
+  databaseId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { LoadingAnimation } from "@/components/loading/loading-animation";
-
 import AddParticipant from "./add-participant-dialog/page";
 import EditEvent from "./edit-event-dialog/page";
 import ViewParticipants from "./view-participant-dialog/page";
@@ -109,7 +102,10 @@ export default function EventParticipantLog() {
           databaseId,
           participantCollectionId,
           [
-            Query.equal("eventId", response.documents.map(event => event.$id))
+            Query.equal(
+              "eventId",
+              response.documents.map((event) => event.$id)
+            ),
           ]
         );
 
@@ -317,15 +313,11 @@ export default function EventParticipantLog() {
     const femaleCount = eventParticipants.filter(
       (p) => p.sex === "Female"
     ).length;
-    const intersexCount = eventParticipants.filter(
-      (p) => p.sex === "Intersex"
-    ).length;
 
     return {
       total: eventParticipants.length,
       male: maleCount,
       female: femaleCount,
-      intersex: intersexCount,
     };
   };
 
@@ -441,7 +433,8 @@ export default function EventParticipantLog() {
                     <TableCell className="text-center">
                       <div>Total: {participantCounts.total}</div>
                       <div className="text-sm text-muted-foreground">
-                        (M: {participantCounts.male} | F: {participantCounts.female} | I: {participantCounts.intersex})
+                        (M: {participantCounts.male} | F:{" "}
+                        {participantCounts.female})
                       </div>
                     </TableCell>
                     <TableCell>
