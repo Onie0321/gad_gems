@@ -16,6 +16,7 @@ export default function Header() {
             width={48}
             height={48}
             className="rounded-full border-2 border-violet-300"
+            priority
           />
           <span className="font-bold text-xl text-violet-800">GAD Office</span>
         </Link>

@@ -12,6 +12,7 @@ import {
   UserPlus,
   BarChart2,
   Loader2,
+  ImageIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import HomepageSettings from "./homepage-settings/page";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
@@ -173,6 +174,8 @@ export default function AdminDashboard() {
 
       case "demographics":
         return <DemographicAnalysis />;
+      case "homepage":
+        return <HomepageSettings />;
       default:
         return <DashboardOverview {...props} />;
     }
@@ -198,7 +201,7 @@ export default function AdminDashboard() {
   if (!currentUser) {
     return (
       <div className="flex h-screen flex-col items-center justify-center">
-       <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -251,6 +254,14 @@ export default function AdminDashboard() {
             >
               <Users className="mr-2 h-4 w-4" />
               Demographics
+            </Button>
+            <Button
+              variant={activeSection === "homepage" ? "default" : "ghost"}
+              className="w-full justify-start mb-2"
+              onClick={() => setActiveSection("homepage")}
+            >
+              <ImageIcon className="mr-2 h-4 w-4" />
+              Homepage Settings
             </Button>
           </nav>
         </div>

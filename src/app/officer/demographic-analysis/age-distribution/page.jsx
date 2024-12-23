@@ -24,6 +24,20 @@ const COLORS = {
 };
 
 export default function AgeDistribution({ data, colors }) {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Age Distribution</CardTitle>
+          <CardDescription>Distribution of participants by age range</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center items-center h-[300px] text-muted-foreground">
+          No data available for the selected age filters.
+        </CardContent>
+      </Card>
+    );
+  }
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const male = payload.find((p) => p.dataKey === "male")?.value || 0;
