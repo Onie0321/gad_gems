@@ -1,32 +1,53 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UpcomingEvents } from "./upcoming-events/page";
-import { PastEvents } from "./past-events/page";
 import EventParticipantLog from "./event-participant-log copy/page";
-import { EventCalendar } from "./calendar/page";
+import EventAnalysis from "./event-analysis/page";
+import { SearchFilter } from "./search/page";
+import { useState, useEffect } from "react";
+import { getCurrentAcademicPeriod, databases } from "@/lib/appwrite";
+import { Query } from "appwrite";
 
 export default function EventManagementSystem() {
-  return (
-    <Tabs defaultValue="upcoming" className="w-full mt-4">
-      <TabsList>
-        <TabsTrigger value="upcoming">Upcoming Events</TabsTrigger>
-        <TabsTrigger value="calendar">Calendar</TabsTrigger>
-        <TabsTrigger value="past">Past Events</TabsTrigger>
-        <TabsTrigger value="log">Event & Participant Log</TabsTrigger>
-      </TabsList>
-      <TabsContent value="upcoming">
-        <UpcomingEvents />
-      </TabsContent>
-      <TabsContent value="calendar">
-        <EventCalendar />
-      </TabsContent>
-      <TabsContent value="past">
-        <PastEvents />
-      </TabsContent>
+  const [currentPeriod, setCurrentPeriod] = useState(null);
 
+  useEffect(() => {
+    const loadCurrentPeriod = async () => {
+      const period = await getCurrentAcademicPeriod();
+      setCurrentPeriod(period);
+    };
+    loadCurrentPeriod();
+  }, []);
+
+  const fetchEvents = async () => {
+    if (!currentPeriod) return;
+
+    const response = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [
+        Query.equal("isArchived", false),
+        Query.equal("academicPeriodId", currentPeriod.$id),
+      ]
+    );
+    // Rest of your code...
+  };
+
+  return (
+    <Tabs defaultValue="log" className="w-full mt-4">
+      <TabsList>
+        <TabsTrigger value="log">Event & Participant Log</TabsTrigger>
+        <TabsTrigger value="analysis">Event Analysis</TabsTrigger>
+        <TabsTrigger value="choices">Search</TabsTrigger>
+      </TabsList>
       <TabsContent value="log">
         <EventParticipantLog />
+      </TabsContent>
+      <TabsContent value="analysis">
+        <EventAnalysis />
+      </TabsContent>
+      <TabsContent value="choices">
+        <SearchFilter />
       </TabsContent>
     </Tabs>
   );

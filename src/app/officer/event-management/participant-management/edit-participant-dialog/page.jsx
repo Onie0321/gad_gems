@@ -145,7 +145,6 @@ export default function EditParticipantDialog({
               <SelectContent>
                 <SelectItem value="Male">Male</SelectItem>
                 <SelectItem value="Female">Female</SelectItem>
-                <SelectItem value="Intersex">Intersex</SelectItem>
               </SelectContent>
             </Select>
             {errors.sex && <p className="text-sm text-red-500">{errors.sex}</p>}

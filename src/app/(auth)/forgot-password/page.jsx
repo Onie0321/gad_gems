@@ -1,4 +1,3 @@
-// src/app/forgot-password/page.jsx
 "use client";
 
 import { useState } from "react";
@@ -14,13 +13,13 @@ import {
 } from "@/components/ui/card";
 import { Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { account } from "@/lib/appwrite";
 import Link from "next/link";
-import { ActivityTypes } from "@/lib/constants";
+import { account } from "@/lib/appwrite";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState("");
   const { toast } = useToast();
 
   const handleForgotPassword = async (e) => {
@@ -28,21 +27,16 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      await account.createRecovery(
-        email,
-        `${window.location.origin}/reset-password`
-      );
+      // Include the email in the recovery URL
+      const recoveryUrl = `${
+        window.location.origin
+      }/reset-password?email=${encodeURIComponent(email)}`;
+      await account.createRecovery(email, recoveryUrl);
 
-      // Log the password reset request
-      const user = await getCurrentUser();
-      if (user) {
-        await logActivity(user.$id, "password_reset_requested");
-      }
-
+      setMessage("Recovery email sent. Please check your inbox.");
       toast({
         title: "Recovery Email Sent",
-        description:
-          "If an account exists with this email, you will receive password reset instructions.",
+        description: "Please check your inbox for password reset instructions.",
         variant: "success",
       });
       setEmail("");
@@ -98,6 +92,9 @@ export default function ForgotPassword() {
             >
               {isLoading ? "Sending..." : "Send Reset Instructions"}
             </Button>
+            {message && (
+              <p className="text-center text-sm text-[#37474F]">{message}</p>
+            )}
             <div className="text-center">
               <Link
                 href="/sign-in"

@@ -1,115 +1,465 @@
-import { Bar, BarChart, Line, LineChart, Pie, PieChart, ResponsiveContainer } from "recharts"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+"use client";
 
-export default function DemographicsSection() {
-  const ageData = [
-    { age: "18-24", count: 200 },
-    { age: "25-34", count: 300 },
-    { age: "35-44", count: 250 },
-    { age: "45-54", count: 150 },
-    { age: "55+", count: 100 },
-  ]
+import React, { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Tooltip } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import {
+  databases,
+  databaseId,
+  eventCollectionId,
+  participantCollectionId,
+  getCurrentAcademicPeriod,
+} from "@/lib/appwrite";
+import { Query } from "appwrite";
+import { Loader2 } from "lucide-react";
 
-  const genderData = [
-    { name: "Female", value: 60 },
-    { name: "Male", value: 35 },
-    { name: "Non-binary", value: 5 },
-  ]
+export default function DemographicAnalysis() {
+  const [loading, setLoading] = useState(true);
+  const [genderData, setGenderData] = useState([]);
+  const [ageData, setAgeData] = useState([]);
+  const [educationData, setEducationData] = useState([]);
+  const [ethnicityData, setEthnicityData] = useState([]);
+  const [schoolData, setSchoolData] = useState([]);
+  const [sectionData, setSectionData] = useState([]);
+  const [hasParticipants, setHasParticipants] = useState(true);
 
-  const locationData = [
-    { name: "North America", value: 400 },
-    { name: "Europe", value: 300 },
-    { name: "Asia", value: 200 },
-    { name: "Other", value: 100 },
-  ]
+  useEffect(() => {
+    fetchDemographicData();
+  }, []);
 
-  const participationTrendData = [
-    { year: 2019, participants: 800 },
-    { year: 2020, participants: 1000 },
-    { year: 2021, participants: 1200 },
-    { year: 2022, participants: 1500 },
-    { year: 2023, participants: 1800 },
-  ]
+  const fetchDemographicData = async () => {
+    try {
+      setLoading(true);
+      setHasParticipants(true);
+      console.log("Fetching demographic data...");
+
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+      }
+
+      // Fetch all events first
+      const eventsResponse = await databases.listDocuments(
+        databaseId,
+        eventCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+        ]
+      );
+
+      // Fetch all participants
+      const participantsResponse = await databases.listDocuments(
+        databaseId,
+        participantCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+        ]
+      );
+
+      console.log("Participants response:", participantsResponse);
+
+      const allParticipants = participantsResponse.documents;
+
+      if (allParticipants.length === 0) {
+        setHasParticipants(false);
+        setLoading(false);
+        return;
+      }
+
+      // Process gender data
+      const genderCounts = allParticipants.reduce((acc, participant) => {
+        const gender = participant.sex;
+        acc[gender] = (acc[gender] || 0) + 1;
+        return acc;
+      }, {});
+
+      console.log("Gender counts:", genderCounts);
+      setGenderData(
+        Object.entries(genderCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Process age data
+      const ageRanges = {
+        "18-24": 0,
+        "25-34": 0,
+        "35-44": 0,
+        "45-54": 0,
+        "55+": 0,
+      };
+
+      allParticipants.forEach((participant) => {
+        const age = parseInt(participant.age);
+        if (!isNaN(age)) {
+          if (age <= 24) ageRanges["18-24"]++;
+          else if (age <= 34) ageRanges["25-34"]++;
+          else if (age <= 44) ageRanges["35-44"]++;
+          else if (age <= 54) ageRanges["45-54"]++;
+          else ageRanges["55+"]++;
+        }
+      });
+
+      console.log("Age ranges:", ageRanges);
+      setAgeData(
+        Object.entries(ageRanges).map(([age, count]) => ({ age, count }))
+      );
+
+      // Process education data
+      const educationCounts = allParticipants.reduce((acc, participant) => {
+        const education = participant.educationLevel;
+        acc[education] = (acc[education] || 0) + 1;
+        return acc;
+      }, {});
+
+      console.log("Education counts:", educationCounts);
+      setEducationData(
+        Object.entries(educationCounts).map(([level, count]) => ({
+          level,
+          count,
+        }))
+      );
+
+      // Process ethnicity data
+      const ethnicityCounts = allParticipants.reduce((acc, participant) => {
+        const ethnicity = participant.ethnicity;
+        acc[ethnicity] = (acc[ethnicity] || 0) + 1;
+        return acc;
+      }, {});
+
+      console.log("Ethnicity counts:", ethnicityCounts);
+      setEthnicityData(
+        Object.entries(ethnicityCounts).map(([group, count]) => ({
+          group,
+          count,
+        }))
+      );
+
+      // Process school data
+      const schoolCounts = allParticipants.reduce((acc, participant) => {
+        const school = participant.school;
+        acc[school] = (acc[school] || 0) + 1;
+        return acc;
+      }, {});
+
+      console.log("School counts:", schoolCounts);
+      setSchoolData(
+        Object.entries(schoolCounts).map(([name, count]) => ({ name, count }))
+      );
+
+      // Process section data
+      const sectionCounts = allParticipants.reduce((acc, participant) => {
+        const section = participant.section;
+        acc[section] = (acc[section] || 0) + 1;
+        return acc;
+      }, {});
+
+      console.log("Section counts:", sectionCounts);
+      setSectionData(
+        Object.entries(sectionCounts).map(([name, count]) => ({ name, count }))
+      );
+    } catch (error) {
+      console.error("Error fetching demographic data:", error);
+      setHasParticipants(false);
+      console.log("Error details:", {
+        message: error.message,
+        code: error.code,
+        response: error.response,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add this useEffect to monitor the data states
+  useEffect(() => {
+    if (genderData.length > 0) {
+      console.log("Updated Gender Data:", genderData);
+    }
+    if (ageData.length > 0) {
+      console.log("Updated Age Data:", ageData);
+    }
+    if (educationData.length > 0) {
+      console.log("Updated Education Data:", educationData);
+    }
+  }, [genderData, ageData, educationData]);
+
+  // Define color schemes
+  const genderColors = {
+    Male: "#2196F3", // Blue
+    Female: "#E91E63", // Pink
+  };
+
+  const ageColors = [
+    "#FF6B6B", // Coral
+    "#4ECDC4", // Turquoise
+    "#45B7D1", // Sky Blue
+    "#96CEB4", // Sage
+    "#FFEEAD", // Light Yellow
+  ];
+
+  const educationColors = [
+    "#FF9F1C", // Orange
+    "#2EC4B6", // Teal
+    "#E71D36", // Red
+    "#011627", // Navy
+    "#FDFFFC", // White
+    "#7209B7", // Purple
+  ];
+
+  const ethnicityColors = [
+    "#588157", // Forest Green
+    "#3A86FF", // Blue
+    "#8338EC", // Purple
+    "#FF006E", // Pink
+    "#FB5607", // Orange
+    "#FFBE0B", // Yellow
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasParticipants) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center text-gray-500">
+        <p className="text-lg">
+          No participants found for the current academic period
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
+      {/* Gender Breakdown Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Demographic Overview</CardTitle>
-          <CardDescription>Analysis of participant demographics across all events</CardDescription>
+          <CardTitle>Gender Distribution</CardTitle>
+          <CardDescription>
+            Distribution of participants by gender
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="age">
-            <TabsList>
-              <TabsTrigger value="age">Age Distribution</TabsTrigger>
-              <TabsTrigger value="gender">Gender Distribution</TabsTrigger>
-              <TabsTrigger value="location">Location</TabsTrigger>
-            </TabsList>
-            <TabsContent value="age">
-              <ChartContainer config={{ age: { label: "Age Group", color: "hsl(var(--chart-1))" } }} className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={ageData}>
-                    <Bar dataKey="count" fill="var(--color-age)" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </TabsContent>
-            <TabsContent value="gender">
-              <ChartContainer config={{ gender: { label: "Gender", color: "hsl(var(--chart-2))" } }} className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={genderData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="var(--color-gender)"
-                      label
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </TabsContent>
-            <TabsContent value="location">
-              <ChartContainer config={{ location: { label: "Location", color: "hsl(var(--chart-3))" } }} className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={locationData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="var(--color-location)"
-                      label
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Participation Trends</CardTitle>
-          <CardDescription>Year-over-year participation growth</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={{ participants: { label: "Participants", color: "hsl(var(--chart-4))" } }} className="h-[300px]">
+          <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={participationTrendData}>
-                <Line type="monotone" dataKey="participants" stroke="var(--color-participants)" />
-              </LineChart>
+              <PieChart>
+                <Pie
+                  data={genderData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={120}
+                  label={({ name, percent }) =>
+                    `${name} ${(percent * 100).toFixed(0)}%`
+                  }
+                >
+                  {genderData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={genderColors[entry.name] || "#999999"}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
             </ResponsiveContainer>
-          </ChartContainer>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Gender</TableHead>
+                <TableHead>Count</TableHead>
+                <TableHead>Percentage</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {genderData.map((item) => {
+                const total = genderData.reduce(
+                  (sum, curr) => sum + curr.value,
+                  0
+                );
+                const percentage = ((item.value / total) * 100).toFixed(1);
+                return (
+                  <TableRow key={item.name}>
+                    <TableCell className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{
+                          backgroundColor: genderColors[item.name] || "#999999",
+                        }}
+                      />
+                      {item.name}
+                    </TableCell>
+                    <TableCell>{item.value}</TableCell>
+                    <TableCell>{percentage}%</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
+
+      {/* Age Distribution Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Age Distribution</CardTitle>
+          <CardDescription>Age groups of participants</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={ageData}>
+                <XAxis dataKey="age" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="count">
+                  {ageData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={ageColors[index % ageColors.length]}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Age Group</TableHead>
+                <TableHead>Count</TableHead>
+                <TableHead>Percentage</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ageData.map((item, index) => {
+                const total = ageData.reduce(
+                  (sum, curr) => sum + curr.count,
+                  0
+                );
+                const percentage = ((item.count / total) * 100).toFixed(1);
+                return (
+                  <TableRow key={item.age}>
+                    <TableCell className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{
+                          backgroundColor: ageColors[index % ageColors.length],
+                        }}
+                      />
+                      {item.age}
+                    </TableCell>
+                    <TableCell>{item.count}</TableCell>
+                    <TableCell>{percentage}%</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Education Level Card 
+      <Card>
+        <CardHeader>
+          <CardTitle>Education Level Distribution</CardTitle>
+          <CardDescription>Education levels of participants</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={educationData} layout="vertical">
+                <XAxis type="number" />
+                <YAxis dataKey="level" type="category" width={150} />
+                <Tooltip />
+                <Bar dataKey="count">
+                  {educationData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={educationColors[index % educationColors.length]}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Education Level</TableHead>
+                <TableHead>Count</TableHead>
+                <TableHead>Percentage</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {educationData.map((item, index) => {
+                const total = educationData.reduce(
+                  (sum, curr) => sum + curr.count,
+                  0
+                );
+                const percentage = ((item.count / total) * 100).toFixed(1);
+                return (
+                  <TableRow key={item.level}>
+                    <TableCell className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{
+                          backgroundColor:
+                            educationColors[index % educationColors.length],
+                        }}
+                      />
+                      {item.level}
+                    </TableCell>
+                    <TableCell>{item.count}</TableCell>
+                    <TableCell>{percentage}%</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card> */}
+
+      {/* Add similar cards for Ethnicity, School, and Section with their respective color schemes */}
     </div>
-  )
+  );
 }

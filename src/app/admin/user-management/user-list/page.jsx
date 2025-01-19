@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Search, Eye, Pencil, Trash2, Check, X } from "lucide-react";
+import { Loader2, Search, Eye, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -38,8 +38,11 @@ import {
   updateUserStatus,
   logActivity,
   databases,
+  databaseId,
+  userCollectionId,
+  activityLogsCollectionId,
 } from "@/lib/appwrite";
-import { Query } from "appwrite";
+import { Query, ID } from "appwrite";
 import { Label } from "@/components/ui/label";
 import { SelectStatus } from "@/components/ui/selectStatus";
 
@@ -54,7 +57,6 @@ export default function UserList() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
     email: "",
@@ -104,29 +106,6 @@ export default function UserList() {
       role: user.role,
     });
     setIsEditOpen(true);
-  };
-
-  const handleDelete = async (userId) => {
-    try {
-      await databases.deleteDocument(databaseId, usersCollectionId, userId);
-
-      await logActivity(userId, "User deleted");
-
-      setUsers(users.filter((user) => user.$id !== userId));
-      setIsDeleteOpen(false);
-
-      toast({
-        title: "Success",
-        description: "User deleted successfully",
-        variant: "success",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete user",
-        variant: "destructive",
-      });
-    }
   };
 
   const handleUpdate = async (e) => {
@@ -234,9 +213,7 @@ export default function UserList() {
     <Card className="p-6">
       <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">
-          Total Users: {users.length}
-        </h2>
+        
         <div className="flex gap-2">
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded-full bg-yellow-100"></div>
@@ -356,20 +333,7 @@ export default function UserList() {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedUser(user);
-                        setIsDeleteOpen(true);
-                      }}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                   </TableCell>
-                  {/* Add Dialogs */}
                   <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
                     <DialogContent>
                       <DialogHeader>
@@ -453,32 +417,6 @@ export default function UserList() {
                           <Button type="submit">Save changes</Button>
                         </DialogFooter>
                       </form>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
-                        <DialogDescription>
-                          Are you sure you want to delete this user? This action
-                          cannot be undone.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsDeleteOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          onClick={() => handleDelete(selectedUser?.$id)}
-                        >
-                          Delete
-                        </Button>
-                      </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 </TableRow>

@@ -1,7 +1,22 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
-import { UserIcon as Male, UserIcon as Female } from 'lucide-react'; 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
+import { UserIcon as Male, UserIcon as Female } from "lucide-react";
 import DataTable from "../data-table/page";
+import { CartesianGrid } from "recharts";
 
 const COLORS = {
   male: "#4299E1",
@@ -9,8 +24,8 @@ const COLORS = {
 };
 
 const formatName = (name, existingNames) => {
-  const words = name.split(' ').filter(word => word.toLowerCase() !== 'and');  // Remove 'and'
-  let acronym = words.map(word => word.charAt(0).toUpperCase()).join('');  // Create acronym
+  const words = name.split(" ").filter((word) => word.toLowerCase() !== "and"); // Remove 'and'
+  let acronym = words.map((word) => word.charAt(0).toUpperCase()).join(""); // Create acronym
 
   let uniqueAcronym = acronym;
   let counter = 1;
@@ -23,13 +38,27 @@ const formatName = (name, existingNames) => {
   return uniqueAcronym;
 };
 
-export default function SchoolDistribution({ data }) {
-  const existingNames = new Set(); 
+export default function SchoolDistribution({ data, colors }) {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>School Distribution</CardTitle>
+          <CardDescription>Distribution of participants by school</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center items-center h-[300px] text-muted-foreground">
+          No data available for the selected school filters.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const existingNames = new Set();
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-      const male = payload.find(p => p.dataKey === "male")?.value || 0;
-      const female = payload.find(p => p.dataKey === "female")?.value || 0;
+      const male = payload.find((p) => p.dataKey === "male")?.value || 0;
+      const female = payload.find((p) => p.dataKey === "female")?.value || 0;
       const total = male + female;
       return (
         <div className="bg-white p-2 border rounded shadow">
@@ -47,46 +76,20 @@ export default function SchoolDistribution({ data }) {
     <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle>School Distribution</CardTitle>
-        <CardDescription>Distribution of participants by school</CardDescription>
+        <CardDescription>
+          Distribution of participants by school
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" />
-            <YAxis
-              dataKey="name"
-              type="category"
-              width={120}
-              interval={0} 
-              tick={({ x, y, payload }) => {
-                // Format the name using the formatName function and pass the existing acronyms set
-                const formattedName = formatName(payload.value, existingNames);
-                return (
-                  <text
-                    x={x - 10}  // Adjust x positioning if needed
-                    y={y}
-                    textAnchor="end"
-                    dominantBaseline="middle"
-                    style={{ fontSize: '12px' }} // Adjust font size as needed
-                  >
-                    {formattedName}
-                  </text>
-                );
-              }}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              iconType="circle"
-              iconSize={10}
-              formatter={(value, entry) => (
-                <span className="flex items-center">
-                  {value === "male" ? <Male size={16} className="mr-2" /> : <Female size={16} className="mr-2" />}
-                  {value.charAt(0).toUpperCase() + value.slice(1)}
-                </span>
-              )}
-            />
-            <Bar dataKey="male" stackId="a" fill={COLORS.male} />
-            <Bar dataKey="female" stackId="a" fill={COLORS.female} />
+            <YAxis dataKey="name" type="category" width={150} />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="male" name="Male" fill={colors[0]} />
+            <Bar dataKey="female" name="Female" fill={colors[1]} />
           </BarChart>
         </ResponsiveContainer>
         <DataTable data={data} />
