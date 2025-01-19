@@ -40,21 +40,19 @@ export default function ActivityLogs() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Fetch both logs and users in parallel
       const [logsResponse, usersResponse] = await Promise.all([
         fetchActivityLogs(),
         fetchUsers(),
       ]);
 
-      console.log('Logs Response:', logsResponse);
-      console.log('Users Response:', usersResponse);
+      console.log("Logs Response:", logsResponse);
+      console.log("Users Response:", usersResponse);
 
       // Create users map if usersResponse exists and has documents
       const userMap = {};
       usersResponse.forEach((user) => {
         userMap[user.$id] = user.name;
       });
-
 
       setLogs(logsResponse || []);
       setUsers(userMap);
@@ -76,10 +74,18 @@ export default function ActivityLogs() {
       users[log.userId]?.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (filterType === "all") return matchesSearch;
-    if (filterType === "signed") return matchesSearch && (log.activityType.includes("Sign In") || log.activityType.includes("Sign Out"));
-    if (filterType === "event") return matchesSearch && log.activityType.includes("Event");
-    if (filterType === "participant") return matchesSearch && log.activityType.includes("Participant");
-    if (filterType === "profile") return matchesSearch && log.activityType.includes("Profile");
+    if (filterType === "signed")
+      return (
+        matchesSearch &&
+        (log.activityType.includes("Sign In") ||
+          log.activityType.includes("Sign Out"))
+      );
+    if (filterType === "event")
+      return matchesSearch && log.activityType.includes("Event");
+    if (filterType === "participant")
+      return matchesSearch && log.activityType.includes("Participant");
+    if (filterType === "profile")
+      return matchesSearch && log.activityType.includes("Profile");
     return matchesSearch;
   });
 
@@ -102,7 +108,9 @@ export default function ActivityLogs() {
               <SelectItem value="all">All Activities</SelectItem>
               <SelectItem value="signed">Sign In/Out</SelectItem>
               <SelectItem value="event">Event Activities</SelectItem>
-              <SelectItem value="participant">Participant Activities</SelectItem>
+              <SelectItem value="participant">
+                Participant Activities
+              </SelectItem>
               <SelectItem value="profile">Profile Updates</SelectItem>
             </SelectContent>
           </Select>

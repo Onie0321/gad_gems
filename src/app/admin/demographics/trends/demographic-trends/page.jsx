@@ -1,8 +1,10 @@
+"use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChartComponent } from "@/components/charts/BarCharts";
+import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
 
 export const DemographicTrends= ({ ageData, ethnicData }) => {
-  if (!ageData || !ethnicData) return <div>Loading...</div>;
+  if (!ageData || !ethnicData) return <GADConnectSimpleLoader />;
 
   return (
     <div className="space-y-6">

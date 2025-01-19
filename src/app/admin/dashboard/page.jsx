@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import { Calendar, Users, PieChartIcon, Users2 } from "lucide-react";
+import { Query } from "appwrite";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,9 @@ import {
   databaseId,
   databases,
   fetchTotals,
+  eventCollectionId,
+  participantCollectionId,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 
 export default function DashboardOverview() {
@@ -48,11 +52,61 @@ export default function DashboardOverview() {
     fetchData();
   }, []);
 
-  // Update your fetchData function
   const fetchData = async () => {
     try {
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+      }
+
+      // Fetch events with participants and creator information
+      const eventsResponse = await databases.listDocuments(
+        databaseId,
+        eventCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+          Query.orderDesc("$createdAt"),
+          Query.limit(3),
+        ]
+      );
+
+      const events = eventsResponse.documents;
+
+      // Fetch participants for each event
+      const eventsWithParticipants = await Promise.all(
+        events.map(async (event) => {
+          const participantsResponse = await databases.listDocuments(
+            databaseId,
+            participantCollectionId,
+            [
+              Query.equal("eventId", event.$id),
+              Query.equal("isArchived", false),
+              Query.equal("academicPeriodId", currentPeriod.$id),
+            ]
+          );
+
+          // Fetch creator information
+          const creatorResponse = await databases.getDocument(
+            databaseId,
+            userCollectionId,
+            event.createdBy
+          );
+
+          return {
+            ...event,
+            participants: participantsResponse.documents,
+            createdByName: creatorResponse.name || "Unknown",
+          };
+        })
+      );
+
+      setEvents(eventsWithParticipants);
+
+      // Calculate other statistics for non-archived data only
       const {
-        events,
         totalEvents,
         academicEvents,
         nonAcademicEvents,
@@ -60,9 +114,8 @@ export default function DashboardOverview() {
         sexDistribution,
         ageDistribution,
         locationDistribution,
-      } = await fetchTotals();
+      } = await fetchTotals(currentPeriod.$id);
 
-      setEvents(events);
       setTotalEvents(totalEvents);
       setAcademicEvents(academicEvents);
       setNonAcademicEvents(nonAcademicEvents);
@@ -186,11 +239,11 @@ export default function DashboardOverview() {
                       <Cell
                         key={`cell-${index}`}
                         fill={
-                          index === 0
-                            ? "#8884d8"
-                            : index === 1
-                            ? "#82ca9d"
-                            : "#ffc658"
+                          entry.name === "Male"
+                            ? "#2196F3"
+                            : entry.name === "Female"
+                            ? "#E91E63"
+                            : "#FFC107"
                         }
                       />
                     ))}
@@ -205,11 +258,11 @@ export default function DashboardOverview() {
                     className="w-3 h-3 mr-1"
                     style={{
                       backgroundColor:
-                        index === 0
-                          ? "#8884d8"
-                          : index === 1
-                          ? "#82ca9d"
-                          : "#ffc658",
+                        entry.name === "Male"
+                          ? "#2196F3"
+                          : entry.name === "Female"
+                          ? "#E91E63"
+                          : "#FFC107",
                     }}
                   ></div>
                   <span className="text-xs">
@@ -233,40 +286,49 @@ export default function DashboardOverview() {
                   <TableHead>Event Name</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead className="text-center">Participants</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="text-center">
+                    Participants (M/F)
+                  </TableHead>
+                  <TableHead>Created By</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.slice(0, 3).map((event) => (
-                  <TableRow key={event.$id}>
-                    <TableCell>{event.eventName}</TableCell>
-                    <TableCell>
-                      {new Date(event.eventDate).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell>{event.eventVenue}</TableCell>
-                    <TableCell className="text-center">
-                      {event.participantCount}{" "}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          event.approvalStatus === "approved"
-                            ? "success"
-                            : event.approvalStatus === "pending"
-                            ? "warning"
-                            : "destructive"
-                        }
-                      >
-                        {event.approvalStatus}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {events.map((event) => {
+                  // Calculate gender counts for this event
+                  const participants = event.participants || [];
+                  const maleCount = participants.filter(
+                    (p) => p.sex === "Male"
+                  ).length;
+                  const femaleCount = participants.filter(
+                    (p) => p.sex === "Female"
+                  ).length;
+
+                  const totalParticipants = maleCount + femaleCount;
+
+                  return (
+                    <TableRow key={event.$id}>
+                      <TableCell>{event.eventName}</TableCell>
+                      <TableCell>
+                        {new Date(event.eventDate).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </TableCell>
+                      <TableCell>{event.eventVenue}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center">
+                          <div>Total: {maleCount + femaleCount}</div>
+                          <div className="text-sm text-muted-foreground">
+                            <span className="text-blue-600">{maleCount}</span>/
+                            <span className="text-pink-600">{femaleCount}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{event.createdByName}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

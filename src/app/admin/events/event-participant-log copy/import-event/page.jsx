@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,6 +26,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { getCurrentAcademicPeriod } from "@/lib/appwrite";
 
 export default function ImportEventData() {
   const [file, setFile] = useState(null);
@@ -31,6 +34,20 @@ export default function ImportEventData() {
   const [error, setError] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentPeriod, setCurrentPeriod] = useState(null);
+
+  useEffect(() => {
+    const loadCurrentPeriod = async () => {
+      try {
+        const period = await getCurrentAcademicPeriod();
+        setCurrentPeriod(period);
+      } catch (error) {
+        console.error("Error loading academic period:", error);
+        toast.error("Failed to load academic period");
+      }
+    };
+    loadCurrentPeriod();
+  }, []);
 
   const handleFileChange = async (event) => {
     if (event.target.files && event.target.files[0]) {
@@ -38,6 +55,12 @@ export default function ImportEventData() {
       setFile(selectedFile);
       setError(null);
       try {
+        if (!currentPeriod) {
+          throw new Error(
+            "No active academic period found. Please set up an academic period first."
+          );
+        }
+
         const data = await readFile(selectedFile);
         console.log("File data:", data);
         const eventMetadata = extractEventMetadata(data);
@@ -45,8 +68,16 @@ export default function ImportEventData() {
         const participants = extractParticipants(data);
         console.log("Extracted participants:", participants);
         setPreviewData({
-          eventMetadata,
-          participants,
+          eventMetadata: {
+            ...eventMetadata,
+            academicPeriodId: currentPeriod.$id,
+            isArchived: false,
+          },
+          participants: participants.map((participant) => ({
+            ...participant,
+            academicPeriodId: currentPeriod.$id,
+            isArchived: false,
+          })),
         });
       } catch (error) {
         console.error("Error parsing file:", error);
@@ -73,12 +104,19 @@ export default function ImportEventData() {
       return;
     }
 
+    if (!currentPeriod) {
+      toast.error(
+        "No active academic period. Please set up an academic period first."
+      );
+      return;
+    }
+
     setIsImporting(true);
     setError(null);
 
     try {
       validateFileType(file);
-      const result = await importEventAndParticipants(file);
+      const result = await importEventAndParticipants(file, currentPeriod.$id);
       toast.success(result.message);
       setFile(null);
       setPreviewData(null);
@@ -101,18 +139,57 @@ export default function ImportEventData() {
   };
 
   const EventPreview = ({ data }) => {
-    const totalParticipants = data.participants.length;
-    const maleParticipants = data.participants.filter(
-      (p) => p.sex === "Male"
-    ).length;
-    const femaleParticipants = data.participants.filter(
-      (p) => p.sex === "Female"
-    ).length;
+    // Format the date
+    const formatEventDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    };
 
-    const duration = calculateDuration(data.eventMetadata.eventTimeFrom, data.eventMetadata.eventTimeTo);
+    // Format the time range
+    const formatTimeRange = (timeFrom, timeTo) => {
+      const formatTime = (dateString) => {
+        const date = new Date(dateString);
+        return date
+          .toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+          .toUpperCase();
+      };
+
+      const fromTime = formatTime(timeFrom);
+      const toTime = formatTime(timeTo);
+      return `${fromTime} - ${toTime}`;
+    };
+
+    // Calculate and format duration
+    const formatDuration = (timeFrom, timeTo) => {
+      const start = new Date(timeFrom);
+      const end = new Date(timeTo);
+      const durationMs = end - start;
+      const hours = Math.floor(durationMs / (1000 * 60 * 60));
+      const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `${hours} hour${hours !== 1 ? "s" : ""} ${minutes} minute${
+        minutes !== 1 ? "s" : ""
+      }`;
+    };
+
+    const eventDate = formatEventDate(data.eventMetadata.eventDate);
+    const eventTime = formatTimeRange(
+      data.eventMetadata.eventTimeFrom,
+      data.eventMetadata.eventTimeTo
+    );
+    const duration = formatDuration(
+      data.eventMetadata.eventTimeFrom,
+      data.eventMetadata.eventTimeTo
+    );
 
     return (
-      <Card className="mt-4">
+      <Card>
         <CardHeader>
           <CardTitle>Preview</CardTitle>
         </CardHeader>
@@ -121,16 +198,13 @@ export default function ImportEventData() {
             <strong>Event Name:</strong> {data.eventMetadata.eventName}
           </p>
           <p>
-            <strong>Event Date:</strong>{" "}
-            {formatDateForDisplay(data.eventMetadata.eventDate)}
+            <strong>Event Date:</strong> {eventDate}
           </p>
           <p>
-            <strong>Event Time:</strong> {data.eventMetadata.eventTimeFrom} -{" "}
-            {data.eventMetadata.eventTimeTo}
+            <strong>Event Time:</strong> {eventTime}
           </p>
           <p>
-            <strong>Duration:</strong>{" "}
-            {formatDurationForDisplay(duration)}
+            <strong>Duration:</strong> {duration}
           </p>
           <p>
             <strong>Event Venue:</strong> {data.eventMetadata.eventVenue}
@@ -142,13 +216,15 @@ export default function ImportEventData() {
             <strong>Event Category:</strong> {data.eventMetadata.eventCategory}
           </p>
           <p>
-            <strong>Total Participants:</strong> {totalParticipants}
+            <strong>Total Participants:</strong> {data.participants.length}
           </p>
           <p>
-            <strong>Male Participants:</strong> {maleParticipants}
+            <strong>Male Participants:</strong>{" "}
+            {data.participants.filter((p) => p.sex === "Male").length}
           </p>
           <p>
-            <strong>Female Participants:</strong> {femaleParticipants}
+            <strong>Female Participants:</strong>{" "}
+            {data.participants.filter((p) => p.sex === "Female").length}
           </p>
           <Accordion type="single" collapsible>
             <AccordionItem value="participants">
@@ -189,7 +265,9 @@ export default function ImportEventData() {
           {previewData ? (
             <EventPreview data={previewData} />
           ) : (
-            <p className="text-center text-gray-500">No file chosen. Upload a file to see the preview.</p>
+            <p className="text-center text-gray-500">
+              No file chosen. Upload a file to see the preview.
+            </p>
           )}
           {error && (
             <div className="text-red-500 mt-2" role="alert">
@@ -209,4 +287,3 @@ export default function ImportEventData() {
     </Dialog>
   );
 }
-

@@ -18,7 +18,12 @@ import Link from "next/link";
 import { Lock, Mail, Eye, EyeOff, User } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { useToast } from "@/hooks/use-toast";
-import { createUser, account, createNotification } from "@/lib/appwrite";
+import {
+  createUser,
+  account,
+  createNotification,
+  logActivity,
+} from "@/lib/appwrite";
 import dynamic from "next/dynamic";
 
 const MotionDiv = dynamic(
@@ -37,7 +42,7 @@ const calculatePasswordStrength = (password) => {
   return Math.min(score, 100);
 };
 
-export default function SignUpPage() {
+export default function () {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState("");
@@ -59,37 +64,39 @@ export default function SignUpPage() {
   const handleGoogleSignUp = async () => {
     try {
       const currentUrl = window.location.origin;
-      await account.createOAuth2Session(
+      const session = await account.createOAuth2Session(
         "google",
         `${currentUrl}/auth-callback`,
         `${currentUrl}/signup`
       );
 
-       // If successful, create notifications
-    if (session) {
-      const userDetails = await account.get();
-      
-      // Create notification for admin
-      await createNotification({
-        userId: "admin",
-        type: "account",
-        title: "New Google Account Registration",
-        message: `New user ${userDetails.name} has registered via Google.`,
-        actionType: "user_registration",
-        read: false,
-        timestamp: new Date().toISOString()
-      });
+      // If successful, create notifications
+      if (session) {
+        const userDetails = await account.get();
 
-      // Create welcome notification for the new user
-      await createNotification({
-        userId: userDetails.$id,
-        type: "info",
-        title: "Welcome to GAD Nexus",
-        message: `Welcome ${userDetails.name}! Your Google account has been connected successfully.`,
-        read: false,
-        timestamp: new Date().toISOString()
-      });
-    }
+        // Create notification for admin
+        await createNotification({
+          userId: "admin",
+          type: "account",
+          title: "New Google Account Registration",
+          message: `New user ${userDetails.name} has registered via Google.`,
+          actionType: "user_registration",
+          status: "pending",
+          approvalStatus: "pending",
+          read: false,
+        });
+
+        // Create welcome notification for the new user
+        await createNotification({
+          userId: userDetails.$id,
+          type: "info",
+          title: "Welcome to GAD Nexus",
+          message: `Welcome ${userDetails.name}! Your Google account has been connected successfully.`,
+          status: "new",
+          approvalStatus: "none",
+          read: false,
+        });
+      }
     } catch (error) {
       console.error("Google signup error:", error);
       toast({
@@ -117,31 +124,17 @@ export default function SignUpPage() {
         throw new Error("You must agree to the terms and conditions.");
       }
 
+      if (passwordStrength < 50) {
+        throw new Error("Please use a stronger password");
+      }
+
       const newUser = await createUser(email, password, name);
 
       if (newUser) {
-         // Create notification for admin
-      await createNotification({
-        userId: "admin",
-        type: "account",
-        title: "New User Registration",
-        message: `New user ${name} (${email}) has registered and requires approval.`,
-        actionType: "user_registration",
-        read: false,
-        timestamp: new Date().toISOString()
-      });
-      // Create welcome notification for the new user
-      await createNotification({
-        userId: newUser.$id,
-        type: "info",
-        title: "Welcome to GAD Nexus",
-        message: `Welcome ${name}! Your account has been created successfully.`,
-        read: false,
-        timestamp: new Date().toISOString()
-      });
         toast({
           title: "Success",
-          description: "Account created successfully!",
+          description:
+            "Account created successfully! Please wait for admin approval.",
           variant: "success",
         });
         router.push("/sign-in");
@@ -240,7 +233,6 @@ export default function SignUpPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
-                      
                     />
                     <Lock
                       className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -322,7 +314,7 @@ export default function SignUpPage() {
                   >
                     I agree to the{" "}
                     <Link
-                      href="/terms"
+                      href="/signup/terms"
                       className="text-[#FF6F61] hover:text-[#E5635B]"
                     >
                       Terms and Conditions

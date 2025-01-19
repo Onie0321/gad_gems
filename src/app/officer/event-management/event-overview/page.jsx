@@ -1,6 +1,7 @@
+"use client";
+
 import React, { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -26,23 +27,34 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Plus, Loader2, ArrowUpDown, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
   databases,
+  databaseId,
   eventCollectionId,
   participantCollectionId,
-  getParticipants,
-  subscribeToRealTimeUpdates,
   getCurrentUser,
-  Query,
-  getEvents,
+  subscribeToRealTimeUpdates,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
+import { client } from "@/lib/appwrite";
+import { useRouter } from "next/navigation";
+import { useTabContext, TabProvider } from "@/context/TabContext";
+import { Query } from "appwrite";
+import { LoadingAnimation } from "@/components/loading/loading-animation";
 
-export default function EventOverView({ setActiveSection }) {
+export default function EventOverView() {
   const [events, setEvents] = useState([]);
   const [participants, setParticipants] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState("eventDate");
@@ -50,12 +62,68 @@ export default function EventOverView({ setActiveSection }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [eventsPerPage, setEventsPerPage] = useState(5);
   const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { setActiveTab } = useTabContext();
+
+  const fetchData = async (userId) => {
+    try {
+      setLoading(true);
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+        return;
+      }
+
+      const fetchedEvents = await databases.listDocuments(
+        databaseId,
+        eventCollectionId,
+        [
+          Query.equal("createdBy", userId),
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+          Query.orderDesc("$createdAt"),
+        ]
+      );
+
+      if (fetchedEvents.documents.length > 0) {
+        setEvents(fetchedEvents.documents);
+
+        // Fetch all participants for all events
+        const participantsResponse = await databases.listDocuments(
+          databaseId,
+          participantCollectionId,
+          [
+            Query.equal("isArchived", false),
+            Query.equal("academicPeriodId", currentPeriod.$id),
+            Query.equal(
+              "eventId",
+              fetchedEvents.documents.map((event) => event.$id)
+            ),
+          ]
+        );
+
+        setParticipants(participantsResponse.documents);
+      } else {
+        setEvents([]);
+        setParticipants([]);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to fetch data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchUserAndData = async () => {
       try {
         const user = await getCurrentUser();
+        console.log("Current user:", user);
         setCurrentUser(user);
+
         if (user) {
           await fetchData(user.$id);
 
@@ -90,44 +158,44 @@ export default function EventOverView({ setActiveSection }) {
     fetchUserAndData();
   }, []);
 
-  const fetchData = async (userId) => {
-    try {
-      setLoading(true);
-      const fetchedEvents = await getEvents(userId);
-      console.log("Fetched events:", fetchedEvents);
+  // Add debug logging for state changes
+  useEffect(() => {
+    console.log("Events state updated:", events);
+  }, [events]);
 
-      // Update events while preserving existing data
-      setEvents((prevEvents) => {
-        return fetchedEvents.map((newEvent) => {
-          const existingEvent = prevEvents.find((e) => e.$id === newEvent.$id);
-          return existingEvent ? { ...existingEvent, ...newEvent } : newEvent;
-        });
-      });
+  useEffect(() => {
+    console.log("Participants state updated:", participants);
+  }, [participants]);
 
-      if (fetchedEvents.length > 0) {
-        const allParticipants = await Promise.all(
-          fetchedEvents.map((event) => getParticipants(event.$id, userId))
-        );
-
-        setParticipants((prevParticipants) => {
-          const newParticipants = allParticipants.flat();
-          return newParticipants.map((newParticipant) => {
-            const existingParticipant = prevParticipants.find(
-              (p) => p.$id === newParticipant.$id
-            );
-            return existingParticipant
-              ? { ...existingParticipant, ...newParticipant }
-              : newParticipant;
-          });
-        });
+  useEffect(() => {
+    const unsubscribe = client.subscribe(
+      `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID}.documents`,
+      (response) => {
+        if (
+          response.events.includes(
+            "databases.*.collections.*.documents.*.update"
+          ) ||
+          response.events.includes(
+            "databases.*.collections.*.documents.*.create"
+          )
+        ) {
+          // Update the specific event in the local state
+          const updatedEvent = response.payload;
+          setEvents((prevEvents) =>
+            prevEvents.map((event) =>
+              event.$id === updatedEvent.$id
+                ? { ...event, ...updatedEvent }
+                : event
+            )
+          );
+        }
       }
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      setError("Failed to fetch data.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const summaryStats = useMemo(() => {
     const totalParticipants = participants.length;
@@ -137,9 +205,6 @@ export default function EventOverView({ setActiveSection }) {
     const femaleParticipants = participants.filter(
       (p) => p.sex === "Female"
     ).length;
-    const intersexParticipants = participants.filter(
-      (p) => p.sex === "Intersex"
-    ).length;
 
     return {
       total: events.length,
@@ -148,7 +213,6 @@ export default function EventOverView({ setActiveSection }) {
       totalParticipants,
       maleParticipants,
       femaleParticipants,
-      intersexParticipants,
     };
   }, [events, participants]);
 
@@ -166,19 +230,13 @@ export default function EventOverView({ setActiveSection }) {
   });
 
   const getParticipantCounts = (eventId) => {
+    // Filter participants for this specific event
     const eventParticipants = participants.filter((p) => p.eventId === eventId);
-    const maleCount = eventParticipants.filter((p) => p.sex === "Male").length;
-    const femaleCount = eventParticipants.filter(
-      (p) => p.sex === "Female"
-    ).length;
-    const intersexCount = eventParticipants.filter(
-      (p) => p.sex === "Intersex"
-    ).length;
+
     return {
       total: eventParticipants.length,
-      male: maleCount,
-      female: femaleCount,
-      intersex: intersexCount,
+      male: eventParticipants.filter((p) => p.sex === "Male").length,
+      female: eventParticipants.filter((p) => p.sex === "Female").length,
     };
   };
 
@@ -221,64 +279,88 @@ export default function EventOverView({ setActiveSection }) {
     setSortDirection("desc");
   };
 
+  const handleNavigateToCreateEvent = () => {
+    setActiveTab("createEvent");
+  };
+
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <LoadingAnimation message="Loading events..." />;
   }
 
   if (error) {
     return (
       <div className="text-center text-red-500">
         <p>{error}</p>
-        <Button
-          onClick={() => getCurrentUser().then((user) => fetchData(user.id))}
-          className="mt-4"
-        >
+        <Button onClick={() => fetchData()} className="mt-4">
           Retry
         </Button>
       </div>
     );
   }
 
+  // If there are no events, show empty state
+  if (events.length === 0) {
+    return (
+      <Card className="w-full">
+        <CardHeader className="text-center">
+          <CardTitle>No Events Available</CardTitle>
+          <CardDescription>
+            There are no events in the current academic period
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center">
+          <Button onClick={() => setActiveTab("createEvent")}>
+            <Plus className="mr-2 h-4 w-4" /> Create Your First Event
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (filteredEvents.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between">
+          <h2 className="text-2xl font-bold">Recent Events</h2>
+          <Button onClick={handleNavigateToCreateEvent}>
+            <Plus className="mr-2 h-4 w-4" /> Add Event
+          </Button>
+        </div>
+        {/* ... rest of the no search results UI ... */}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between">
-        <h2 className="text-2xl font-bold">Recent Events</h2>
-        <Button onClick={() => setActiveSection("create")}>
-          <Plus className="mr-2 h-4 w-4" /> Add Event
-        </Button>
-      </div>
-      <div className="relative w-full max-w-sm">
-        <Input
-          placeholder="Search events..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1); // Reset to first page when searching
-          }}
-          className="w-full"
-        />
-      </div>
-
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <h3 className="text-lg font-semibold">Total Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.total}</p>
+        <CardHeader>
+          <CardTitle>Event Overview</CardTitle>
+          <CardDescription>View and manage your events</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {events.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-lg">
+                There are no events in the current academic period
+              </p>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">Academic Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.academic}</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-semibold">Total Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.total}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Academic Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.academic}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Non-Academic Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.nonAcademic}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">Non-Academic Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.nonAcademic}</p>
-            </div>
-          </div>
+          )}
           <div className="mt-4 text-center">
             <h3 className="text-lg font-semibold">Total Participants</h3>
             <p className="text-3xl font-bold">
@@ -286,8 +368,7 @@ export default function EventOverView({ setActiveSection }) {
             </p>
             <p className="text-sm text-muted-foreground">
               (Male: {summaryStats.maleParticipants} | Female:{" "}
-              {summaryStats.femaleParticipants} | Intersex:{" "}
-              {summaryStats.intersexParticipants})
+              {summaryStats.femaleParticipants})
             </p>
           </div>
         </CardContent>
@@ -329,8 +410,6 @@ export default function EventOverView({ setActiveSection }) {
               </Button>
             </TableHead>
             <TableHead>Location</TableHead>
-            <TableHead>Status</TableHead> {/* Add status column */}
-
             <TableHead className="text-right">
               <Button
                 variant="ghost"
@@ -353,22 +432,11 @@ export default function EventOverView({ setActiveSection }) {
                   {format(parseISO(event.eventDate), "MMMM d, yyyy")}
                 </TableCell>
                 <TableCell>{event.eventVenue}</TableCell>
-                <TableCell>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      event.status === "approved"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {event.status || "Pending"}
-                  </span>
-                </TableCell>
                 <TableCell className="text-right">
                   <div>(Total: {participantCounts.total})</div>
                   <div className="text-sm text-muted-foreground">
-                    (M: {participantCounts.male} | F: {participantCounts.female}{" "}
-                    | I: {participantCounts.intersex})
+                    (M: {participantCounts.male} | F: {participantCounts.female}
+                    )
                   </div>
                 </TableCell>
               </TableRow>

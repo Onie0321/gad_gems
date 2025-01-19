@@ -1,14 +1,14 @@
-import { AuthProvider } from '@/context/AuthContext';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
-import Script from 'next/script';
+import { AuthProvider } from "@/context/AuthContext";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+import Script from "next/script";
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: 'GAD',
-  description: 'Gender and Development',
+  title: "GAD - Gender and Development",
+  description: "Gender and Development",
 };
 
 export default function RootLayout({ children }) {
@@ -23,8 +23,8 @@ export default function RootLayout({ children }) {
       <body className={`${inter.className}`}>
         <AuthProvider>
           {children}
+          <Toaster />
         </AuthProvider>
-        <Toaster />
       </body>
     </html>
   );

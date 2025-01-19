@@ -38,6 +38,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function PastEvents() {
   const [events, setEvents] = useState([]);
@@ -48,6 +55,10 @@ export function PastEvents() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [approvalAction, setApprovalAction] = useState(null);
   const [user, setUser] = useState(null); // Add this state
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedEventForAction, setSelectedEventForAction] = useState(null);
 
   useEffect(() => {
     const initializeUser = async () => {
@@ -141,6 +152,7 @@ export function PastEvents() {
     }
 
     try {
+      // Update the document
       await databases.updateDocument(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID,
@@ -180,17 +192,27 @@ export function PastEvents() {
     }
   };
 
-  const handleEdit = (eventId) => {
-    // Implement edit functionality
-    console.log("Edit event:", eventId);
+  const handleView = (event) => {
+    setSelectedEventForAction(event);
+    setShowViewDialog(true);
   };
 
-  const handleDelete = async (eventId) => {
+  const handleEdit = (event) => {
+    setSelectedEventForAction(event);
+    setShowEditDialog(true);
+  };
+
+  const handleDelete = (event) => {
+    setSelectedEventForAction(event);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
     try {
       await databases.deleteDocument(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID,
-        eventId
+        selectedEventForAction.$id
       );
       toast({
         title: "Success",
@@ -204,12 +226,10 @@ export function PastEvents() {
         description: "Failed to delete event",
         variant: "destructive",
       });
+    } finally {
+      setShowDeleteDialog(false);
+      setSelectedEventForAction(null);
     }
-  };
-
-  const handleView = (eventId) => {
-    // Implement view functionality
-    console.log("View event:", eventId);
   };
 
   const getCreatorInfo = (createdBy) => {
@@ -248,118 +268,271 @@ export function PastEvents() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Past Events</CardTitle>
-        <CardDescription>View and analyze past events.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Event Name</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Participants</TableHead>
-              <TableHead>Created By</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {events.map((event) => (
-              <TableRow key={event.$id}>
-                <TableCell>{event.eventName}</TableCell>
-                <TableCell>
-                  {new Date(event.eventDate).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </TableCell>
-                <TableCell>{event.eventVenue}</TableCell>
-                <TableCell>{event.participantCount || 0}</TableCell>
-                <TableCell>{getCreatorInfo(event.createdBy)}</TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleView(event.$id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(event.$id)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(event.$id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                    {event.status !== "approved" ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleStatusUpdate(event, "approved")}
-                        className="text-green-600 hover:text-green-700"
-                        disabled={!user} // Disable if user is not loaded
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleStatusUpdate(event, "pending")}
-                        className="text-yellow-600 hover:text-yellow-700"
-                        disabled={!user} // Disable if user is not loaded
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <AlertDialog
-                    open={showApprovalDialog}
-                    onOpenChange={setShowApprovalDialog}
-                  >
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          Confirm Status Update
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to{" "}
-                          {approvalAction === "approved"
-                            ? "approve"
-                            : "set to pending"}{" "}
-                          this event?
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel
-                          onClick={() => setShowApprovalDialog(false)}
-                        >
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmStatusUpdate}>
-                          Confirm
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </TableCell>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Past Events</CardTitle>
+          <CardDescription>View and analyze past events.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Event Name</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Participants</TableHead>
+                <TableHead>Created By</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {events.map((event) => (
+                <TableRow key={event.$id}>
+                  <TableCell>{event.eventName}</TableCell>
+                  <TableCell>
+                    {new Date(event.eventDate).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </TableCell>
+                  <TableCell>{event.eventVenue}</TableCell>
+                  <TableCell>{event.participantCount || 0}</TableCell>
+                  <TableCell>{getCreatorInfo(event.createdBy)}</TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(event)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(event)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(event)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      {event.status !== "approved" ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleStatusUpdate(event, "approved")}
+                          className="text-green-600 hover:text-green-700"
+                          disabled={!user}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleStatusUpdate(event, "pending")}
+                          className="text-yellow-600 hover:text-yellow-700"
+                          disabled={!user}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <AlertDialog
+                      open={showApprovalDialog}
+                      onOpenChange={setShowApprovalDialog}
+                    >
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Confirm Status Update
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to{" "}
+                            {approvalAction === "approved"
+                              ? "approve"
+                              : "set to pending"}{" "}
+                            this event?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel
+                            onClick={() => setShowApprovalDialog(false)}
+                          >
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction onClick={confirmStatusUpdate}>
+                            Confirm
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* View Dialog */}
+      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Event Details</DialogTitle>
+            <DialogDescription>
+              Detailed information about the event
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEventForAction && (
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-semibold">Event Name:</span>
+                      <p>{selectedEventForAction.eventName}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Date:</span>
+                      <p>
+                        {new Date(
+                          selectedEventForAction.eventDate
+                        ).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Venue:</span>
+                      <p>{selectedEventForAction.eventVenue}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Type:</span>
+                      <p>{selectedEventForAction.eventType}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Additional Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-semibold">Status:</span>
+                      <p
+                        className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                          selectedEventForAction.status === "approved"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {selectedEventForAction.status || "Pending"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Created By:</span>
+                      <p>{getCreatorInfo(selectedEventForAction.createdBy)}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Created At:</span>
+                      <p>
+                        {new Date(
+                          selectedEventForAction.$createdAt
+                        ).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Description:</span>
+                      <p>{selectedEventForAction.description}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="col-span-2">
+                <CardHeader>
+                  <CardTitle>Participant Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <span className="font-semibold">Total Participants:</span>
+                      <p className="text-2xl font-bold">
+                        {selectedEventForAction.participantCount || 0}
+                      </p>
+                    </div>
+                    {/* Add more participant statistics here if available */}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Confirmation Dialog */}
+      <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit Event</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to edit this event?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowEditDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                // Implement your edit logic here
+                console.log("Edit event:", selectedEventForAction);
+                setShowEditDialog(false);
+              }}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this event? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

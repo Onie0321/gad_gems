@@ -4,15 +4,17 @@ import { useState, useEffect } from "react";
 import { Calendar, PieChart, Settings, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import EventManagement from "./event-management/page";
+import EventsPage from "./event-management/page";
 import DemographicAnalysis from "./demographic-analysis/page";
 import { Notifications } from "./notifications/page";
 import UserMenu from "./user-menu/page";
-
 import { getCurrentUser } from "@/lib/appwrite";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import WelcomeModal from "@/components/modals/welcome";
-import SettingsSection from "./settings/page";
+import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
+import { useToast } from "@/hooks/use-toast";
+
+// Note: Update chart colors in respective components to use a mix of Blue (#2D89EF), Teal (#4DB6AC), Coral (#FF6F61), and Violet for visual clarity.
 
 export default function OfficerDashboard() {
   const [activeTab, setActiveTab] = useState("event-management");
@@ -22,22 +24,54 @@ export default function OfficerDashboard() {
   const [error, setError] = useState(null);
   const router = useRouter();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
+
+  const primaryButton = "bg-[#2D89EF] text-white hover:bg-[#2D89EF]/90";
+  const secondaryButton = "bg-[#4DB6AC] text-white hover:bg-[#4DB6AC]/90";
+  const linkColor = "text-[#FF6F61] hover:text-[#FF6F61]/80";
+  const ctaArea = "bg-[#F9A825]";
+  const successIndicator = "bg-[#A7FFEB]";
 
   useEffect(() => {
     const checkUserRole = async () => {
       try {
         const currentUser = await getCurrentUser();
-        if (!currentUser || currentUser.role !== "user") {
-          // Redirect non-users to the login page
-          router.push("/sign-in");
-        } else {
+        const isAdminViewing =
+          sessionStorage.getItem("adminViewingOfficer") === "true";
+
+        if (!currentUser) {
+          router.replace("/sign-in");
+          return;
+        }
+
+        // Check if user is admin viewing officer dashboard or is a regular user
+        if (
+          (currentUser.role === "admin" && isAdminViewing) ||
+          currentUser.role === "user"
+        ) {
           setUser(currentUser);
-          if (currentUser.isFirstLogin === true) {
+
+          // Show welcome toast if coming from login
+          if (searchParams.get("login") === "success") {
+            toast({
+              title: "Welcome back!",
+              description: `Successfully signed in as ${currentUser.name}`,
+              duration: 3000,
+            });
+          }
+
+          // Show first-time login modal if applicable
+          if (
+            currentUser.role === "user" &&
+            currentUser.isFirstLogin === true
+          ) {
             setShowWelcomeModal(true);
-            // Update the user's first login status
             await updateUserFirstLogin(currentUser.$id);
           }
-                }
+        } else {
+          router.replace("/sign-in");
+        }
       } catch (err) {
         console.error("Error checking user role:", err);
         setError(
@@ -48,8 +82,14 @@ export default function OfficerDashboard() {
       }
     };
 
+    // Run the check
     checkUserRole();
-  }, [router]);
+
+    // Cleanup function
+    return () => {
+      sessionStorage.removeItem("adminViewingOfficer");
+    };
+  }, []);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -60,31 +100,52 @@ export default function OfficerDashboard() {
       label: "Demographic Analysis",
       icon: PieChart,
     },
-    { id: "settings", label: "Settings", icon: Settings },
   ];
 
+  // Add a back to admin dashboard button if user is admin
+  const BackToAdminButton = () => {
+    if (user?.role === "admin") {
+      return (
+        <Button
+          variant="ghost"
+          className="ml-auto"
+          onClick={() => {
+            sessionStorage.removeItem("adminViewingOfficer");
+            router.replace("/admin");
+          }}
+        >
+          Back to Admin Dashboard
+        </Button>
+      );
+    }
+    return null;
+  };
+
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <GADConnectSimpleLoader />;
   }
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center text-red-500">
+      <div
+        className={`flex h-screen items-center justify-center bg-[#F5F5F5] ${linkColor}`}
+      >
         {error}
       </div>
     );
   }
 
   if (!user) {
-    return null; // This will prevent the dashboard from rendering while redirecting
+    return null;
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-[#F5F5F5]">
+      {user?.role === "admin" && (
+        <div className="fixed top-0 left-0 right-0 bg-blue-500 text-white text-center py-1 text-sm">
+          Viewing as Administrator
+        </div>
+      )}
       {/* Sidebar */}
       <aside
         className={cn(
@@ -99,7 +160,7 @@ export default function OfficerDashboard() {
             className="h-8 w-8 mr-2"
           />
           {isSidebarOpen && (
-            <h1 className="text-2xl font-bold text-primary">GADConnect</h1>
+            <h1 className="text-2xl font-bold text-[#37474F]">GADConnect</h1>
           )}
         </div>
         <nav className="mt-6">
@@ -108,9 +169,9 @@ export default function OfficerDashboard() {
               key={tab.id}
               variant="ghost"
               className={cn(
-                "w-full justify-start",
+                "w-full justify-start text-[#37474F]",
                 !isSidebarOpen && "justify-center px-0",
-                activeTab === tab.id && "bg-gray-100"
+                activeTab === tab.id && "bg-[#2D89EF] text-white"
               )}
               onClick={() => setActiveTab(tab.id)}
             >
@@ -138,12 +199,13 @@ export default function OfficerDashboard() {
                   <Menu className="h-4 w-4" />
                 )}
               </Button>
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-xl font-semibold text-[#37474F]">
                 {activeTab.replace("-", " ").charAt(0).toUpperCase() +
                   activeTab.replace("-", " ").slice(1)}
               </h2>
             </div>
             <div className="flex items-center space-x-4">
+              <BackToAdminButton />
               <Notifications />
               <UserMenu user={user} />
             </div>
@@ -151,9 +213,8 @@ export default function OfficerDashboard() {
         </header>
 
         <div className="p-6">
-          {activeTab === "event-management" && <EventManagement user={user} />}
+          {activeTab === "event-management" && <EventsPage user={user} />}
           {activeTab === "demographic-analysis" && <DemographicAnalysis />}
-          {activeTab === "settings" && <SettingsSection />}
         </div>
       </main>
       {showWelcomeModal && (
