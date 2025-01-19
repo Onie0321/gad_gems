@@ -47,6 +47,8 @@ export const staffFacultyCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_STAFFFACULTY_COLLECTION_ID;
 export const communityCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_COMMUNITY_COLLECTION_ID;
+export const academicPeriodCollectionId =
+  process.env.NEXT_PUBLIC_APPWRITE_ACADEMIC_PERIOD_COLLECTION_ID;
 
 export const account = new Account(client);
 //const avatars = new Avatars(client);
@@ -110,37 +112,40 @@ export async function createUser(email, password, name, role = "user") {
     const newAccount = await account.create(ID.unique(), email, password, name);
     if (!newAccount) throw new Error("Account creation failed.");
 
-    // Create the user document in the database with the role field
+    // Create the user document with more specific fields
     const newUser = await databases.createDocument(
       databaseId,
       userCollectionId,
       ID.unique(),
       {
         accountId: newAccount.$id,
-        isFirstLogin: true,
         email: email,
         name: name,
-        role: role, // Set role to 'admin' or 'user' as needed
-        approvalStatus: "approved",
+        role: role,
+        approvalStatus: "pending", // Set initial status as pending
       }
     );
 
-    // Sign in the new user
-  } catch (error) {
-    // Check if the error is related to password strength
-    if (
-      error.message.includes(
-        "Password must be between 8 and 265 characters long"
-      )
-    ) {
-      throw new Error(
-        "Password must be at least 8 characters long and should not be a commonly used password. Please choose a more secure password."
-      );
-    }
+    // Log the registration activity
+    await logActivity(newUser.$id, "user_registration");
 
-    // Catch any other errors
-    console.error("Error creating user:", error.message);
-    throw new Error("Error creating user");
+    // Create notifications
+    await createNotification({
+      userId: "admin",
+      type: "account",
+      title: "New User Registration",
+      message: `New user ${name} has registered and requires approval.`,
+      actionType: "user_registration",
+      status: "pending",
+    });
+
+    return newUser;
+  } catch (error) {
+    console.error("Error creating user:", error);
+    if (error.code === 400) {
+      throw new Error("Email already exists or invalid password format");
+    }
+    throw new Error(error.message || "Failed to create user");
   }
 }
 
@@ -281,29 +286,33 @@ export async function deleteUser(userId) {
 // Sign In
 export async function SignIn(email, password) {
   try {
-    // Check for existing session and delete it if it exists
+    // Delete any existing session first
     try {
-      const currentSession = await account.getSession("current");
-      if (currentSession) {
-        await account.deleteSession("current");
-      }
-    } catch (sessionError) {
-      // If there's no active session, this error is expected, so we can ignore it
-      console.log("No active session found, proceeding with login.");
+      await account.deleteSession("current");
+    } catch (error) {
+      // Ignore error if no session exists
     }
 
-    // Create a new email session
+    // Create new email session
     const session = await account.createEmailPasswordSession(email, password);
-    if (session) {
-      // Ensure the user has the account scope
-      const currentAccount = await account.get();
-      if (!currentAccount) throw new Error("Unable to retrieve account.");
-      return currentAccount; // Return the account if successful
-    } else {
-      throw new Error("Failed to create session.");
+
+    if (!session) {
+      throw new Error("Failed to create session");
     }
+
+    // Get the account details
+    const accountDetails = await account.get();
+
+    if (!accountDetails) {
+      throw new Error("Failed to get account details");
+    }
+
+    return accountDetails;
   } catch (error) {
-    console.error("Error signing in:", error.message);
+    console.error("SignIn error:", error);
+    if (error.code === 401) {
+      throw new Error("Invalid email or password");
+    }
     throw new Error(error.message || "Error signing in");
   }
 }
@@ -389,38 +398,12 @@ export async function setAdminApproval(userId, approved) {
 
 export const createEvent = async (eventData) => {
   try {
-    // Validate required fields
-    if (
-      !eventData.eventName ||
-      !eventData.eventDate ||
-      !eventData.eventTimeFrom ||
-      !eventData.eventTimeTo ||
-      !eventData.eventVenue ||
-      !eventData.eventType ||
-      !eventData.eventCategory ||
-      !eventData.createdBy
-    ) {
-      throw new Error("Missing required data for event creation");
-    }
-
-    // Ensure participants array exists
-    const eventWithDefaults = {
-      ...eventData,
-      participants: eventData.participants || [],
-      numberOfHours: eventData.numberOfHours || "0",
-    };
-
     const response = await databases.createDocument(
       databaseId,
       eventCollectionId,
       ID.unique(),
-      eventWithDefaults
+      eventData
     );
-
-    if (!response) {
-      throw new Error("Failed to create event. Please try again.");
-    }
-
     return response;
   } catch (error) {
     console.error("Error creating event:", error);
@@ -428,15 +411,21 @@ export const createEvent = async (eventData) => {
   }
 };
 
-export const getEvents = async () => {
+export const getEvents = async (userId = null) => {
   try {
+    let query = [];
+
+    // Add user filter if specified
+    if (userId) {
+      query.push(Query.equal("createdBy", userId));
+    }
+
     const response = await databases.listDocuments(
       databaseId,
       eventCollectionId,
-      [
-        Query.orderDesc("$createdAt"), // Order by creation date, newest first
-      ]
+      query
     );
+
     return response.documents;
   } catch (error) {
     console.error("Error fetching events:", error);
@@ -444,16 +433,20 @@ export const getEvents = async () => {
   }
 };
 
-export const getParticipants = async (eventId) => {
+export const getParticipants = async (eventId = null, userId = null) => {
   try {
     let query = [];
 
-    if (eventId && eventId !== "all") {
-      // If specific event, filter by eventId
+    // Add event filter if specified
+    if (eventId) {
       query.push(Query.equal("eventId", eventId));
     }
 
-    // Fetch participants directly from the participants collection
+    // Add user filter if specified
+    if (userId) {
+      query.push(Query.equal("createdBy", userId));
+    }
+
     const response = await databases.listDocuments(
       databaseId,
       participantCollectionId,
@@ -740,37 +733,6 @@ export const deleteParticipant = async (participantId, userId) => {
   }
 };
 
-export const checkDuplicateParticipant = async (
-  eventId,
-  studentId = "",
-  name = ""
-) => {
-  try {
-    let queries = [Query.equal("eventId", eventId)];
-
-    // Add studentId check if provided
-    if (studentId) {
-      queries.push(Query.equal("studentId", studentId));
-    }
-
-    // Add name check if provided
-    if (name) {
-      queries.push(Query.equal("name", name));
-    }
-
-    const response = await databases.listDocuments(
-      databaseId,
-      participantCollectionId,
-      queries
-    );
-
-    return response.documents.length > 0;
-  } catch (error) {
-    console.error("Error checking duplicate participant:", error);
-    throw error;
-  }
-};
-
 export async function getParticipantByStudentId(studentId) {
   try {
     const response = await databases.listDocuments(
@@ -790,42 +752,136 @@ export async function getParticipantByStudentId(studentId) {
   }
 }
 
-export async function fetchParticipantData(value, currentEventId) {
-  if (!value || !currentEventId) {
-    console.error("Invalid input: value or currentEventId is missing");
+export async function fetchParticipantData(
+  identifier,
+  currentEventId,
+  participantType
+) {
+  console.log("Starting fetchParticipantData with:", {
+    identifier,
+    currentEventId,
+    participantType,
+  });
+
+  if (!identifier || !currentEventId || !participantType) {
+    console.error("Missing required parameters:", {
+      identifier,
+      currentEventId,
+      participantType,
+    });
     return null;
   }
 
   try {
+    // For students, we only need to check the participantCollectionId
+    const query = [
+      Query.equal(
+        participantType === "student"
+          ? "studentId"
+          : participantType === "staff"
+          ? "staffFacultyId"
+          : "name",
+        identifier
+      ),
+      Query.notEqual("eventId", currentEventId), // Exclude current event
+    ];
+
+    console.log("Querying with:", {
+      databaseId,
+      participantCollectionId,
+      query,
+    });
+
+    const response = await databases.listDocuments(
+      databaseId,
+      participantCollectionId, // Always use participantCollectionId for all types
+      query
+    );
+
+    console.log("Database response:", response);
+
+    if (response.total > 0) {
+      const participant = response.documents[0];
+      console.log("Found participant in database:", participant);
+
+      try {
+        // Get the event name
+        const event = await databases.getDocument(
+          databaseId,
+          eventCollectionId,
+          participant.eventId
+        );
+        console.log("Found associated event:", event);
+
+        // Return standardized participant data
+        return {
+          // Common fields
+          name: participant.name,
+          sex: participant.sex,
+          age: participant.age,
+          homeAddress: participant.homeAddress || participant.address,
+          ethnicGroup: participant.ethnicGroup,
+          otherEthnicGroup: participant.otherEthnicGroup,
+
+          // Type-specific fields
+          studentId: participant.studentId,
+          staffFacultyId: participant.staffFacultyId,
+          school: participant.school,
+          year: participant.year,
+          section: participant.section,
+
+          // Event information
+          eventId: participant.eventId,
+          eventName: event.eventName,
+          participantType: participantType,
+        };
+      } catch (eventError) {
+        console.error("Error fetching event details:", eventError);
+        return null;
+      }
+    } else {
+      console.log("No matching participant found");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error in fetchParticipantData:", error);
+    return null;
+  }
+}
+
+// Add this helper function to check for duplicate participants
+export async function checkDuplicateParticipant(
+  eventId,
+  studentId = "",
+  name = ""
+) {
+  console.log("Checking for duplicate participant:", {
+    eventId,
+    studentId,
+    name,
+  });
+
+  try {
+    const queries = [Query.equal("eventId", eventId)];
+
+    if (studentId) {
+      queries.push(Query.equal("studentId", studentId));
+    }
+    if (name) {
+      queries.push(Query.equal("name", name));
+    }
+
     const response = await databases.listDocuments(
       databaseId,
       participantCollectionId,
-      [
-        Query.or([Query.equal("studentId", value), Query.equal("name", value)]),
-        Query.notEqual("eventId", currentEventId),
-      ]
+      queries
     );
 
-    if (response.documents.length > 0) {
-      const participant = response.documents[0];
-      console.log("Participant found:", participant);
-      return {
-        studentId: participant.studentId,
-        name: participant.name,
-        sex: participant.sex,
-        age: participant.age,
-        school: participant.school,
-        year: participant.year,
-        section: participant.section,
-        ethnicGroup: participant.ethnicGroup,
-        otherEthnicGroup: participant.otherEthnicGroup,
-      };
-    }
-    console.log("No matching participant found for value:", value);
-    return null;
+    console.log("Duplicate check response:", response);
+    return response.total > 0;
   } catch (error) {
-    console.error("Error fetching participant data:", error);
-    return null;
+    console.error("Error checking for duplicate participant:", error);
+    throw error;
   }
 }
 
@@ -1571,98 +1627,90 @@ export async function fetchNotifications(filters = []) {
   }
 }
 
-export async function fetchTotals() {
+// Add these helper functions for dashboard calculations
+const calculateSexDistribution = (participants) => {
+  const maleCount = participants.filter((p) => p.sex === "Male").length;
+  const femaleCount = participants.filter((p) => p.sex === "Female").length;
+
+  return [
+    { name: "Male", value: maleCount },
+    { name: "Female", value: femaleCount },
+  ];
+};
+
+const calculateAgeDistribution = (participants) => {
+  const ageGroups = {
+    "Under 18": 0,
+    "18-24": 0,
+    "25-34": 0,
+    "35-44": 0,
+    "45+": 0,
+  };
+
+  participants.forEach((participant) => {
+    const age = participant.age;
+    if (age < 18) ageGroups["Under 18"]++;
+    else if (age <= 24) ageGroups["18-24"]++;
+    else if (age <= 34) ageGroups["25-34"]++;
+    else if (age <= 44) ageGroups["35-44"]++;
+    else ageGroups["45+"]++;
+  });
+
+  return Object.entries(ageGroups).map(([name, value]) => ({ name, value }));
+};
+
+const calculateLocationDistribution = (participants) => {
+  const locations = {};
+  participants.forEach((participant) => {
+    const location = participant.location || "Unknown";
+    locations[location] = (locations[location] || 0) + 1;
+  });
+
+  return Object.entries(locations).map(([name, value]) => ({ name, value }));
+};
+
+export const fetchTotals = async (academicPeriodId) => {
   try {
     // Fetch events
     const eventsResponse = await databases.listDocuments(
       databaseId,
       eventCollectionId,
-      [Query.orderDesc("eventDate")] // Order by date descending
+      [
+        Query.equal("academicPeriodId", academicPeriodId),
+        Query.orderDesc("createdAt"),
+      ]
     );
-    const totalEvents = eventsResponse.total;
-    const events = eventsResponse.documents;
 
-    // Count events by type
+    const events = eventsResponse.documents;
+    const eventIds = events.map((event) => event.$id);
+
+    // Fetch participants only if there are events
+    let participants = [];
+    if (eventIds.length > 0) {
+      const participantsResponse = await databases.listDocuments(
+        databaseId,
+        participantCollectionId,
+        [Query.equal("eventId", eventIds)]
+      );
+      participants = participantsResponse.documents;
+    }
+
+    // Calculate totals
+    const totalEvents = events.length;
     const academicEvents = events.filter(
       (event) => event.eventType === "Academic"
     ).length;
     const nonAcademicEvents = events.filter(
       (event) => event.eventType === "Non-Academic"
     ).length;
+    const totalParticipants = participants.length;
 
-    // Fetch participants for each event
-    const participantsResponse = await databases.listDocuments(
-      databaseId,
-      participantCollectionId,
-      [Query.limit(1000)]
-    );
-
-    // Count participants per event
-    const participantCountByEvent = participantsResponse.documents.reduce(
-      (acc, participant) => {
-        const eventId = participant.eventId;
-        acc[eventId] = (acc[eventId] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
-
-    // Add participant count to each event
-    const eventsWithParticipants = events.map((event) => ({
-      ...event,
-      participantCount: participantCountByEvent[event.$id] || 0,
-    }));
-    const totalParticipants = participantsResponse.total;
-
-    // Calculate sex distribution
-    const sexCounts = participantsResponse.documents.reduce(
-      (acc, participant) => {
-        const sex = participant.sex?.toLowerCase() || "unknown";
-        acc[sex] = (acc[sex] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
-    const sexDistribution = [
-      { name: "Male", value: sexCounts["male"] || 0 },
-      { name: "Female", value: sexCounts["female"] || 0 },
-      { name: "Intersex", value: sexCounts["intersex"] || 0 },
-    ];
-
-    // Calculate age distribution
-    const ageDistribution = participantsResponse.documents.reduce(
-      (acc, participant) => {
-        const age = participant.age;
-        if (age === undefined) return acc;
-
-        const ageRange = getAgeRange(age);
-        const existingRange = acc.find((item) => item.age === ageRange);
-        if (existingRange) {
-          existingRange.count += 1;
-        } else {
-          acc.push({ age: ageRange, count: 1 });
-        }
-        return acc;
-      },
-      []
-    );
-
-    // Calculate location distribution
-    const locationCounts = eventsResponse.documents.reduce((acc, event) => {
-      const venue = event.eventVenue || "Unknown";
-      acc[venue] = (acc[venue] || 0) + 1;
-      return acc;
-    }, {});
-
-    const locationDistribution = Object.entries(locationCounts).map(
-      ([name, value]) => ({
-        name,
-        value,
-      })
-    );
+    // Calculate distributions
+    const sexDistribution = calculateSexDistribution(participants);
+    const ageDistribution = calculateAgeDistribution(participants);
+    const locationDistribution = calculateLocationDistribution(participants);
 
     return {
-      events: eventsWithParticipants,
       totalEvents,
       academicEvents,
       nonAcademicEvents,
@@ -1675,33 +1723,25 @@ export async function fetchTotals() {
     console.error("Error fetching totals:", error);
     throw error;
   }
-}
-
-// Helper function to get age range
-function getAgeRange(age) {
-  if (age < 18) return "0-17";
-  if (age < 25) return "18-24";
-  if (age < 35) return "25-34";
-  if (age < 45) return "35-44";
-  if (age < 55) return "45-54";
-  if (age < 65) return "55-64";
-  return "65+";
-}
+};
 
 export const logActivity = async (userId, activityType) => {
   try {
-    await databases.createDocument(
+    const response = await databases.createDocument(
       databaseId,
       activityLogsCollectionId,
-      ID.unique(),
+      "unique()",
       {
-        userId,
-        activityType,
+        userId: userId,
+        activityType: activityType, // Changed from 'activity' to 'activityType'
         timestamp: new Date().toISOString(),
+        // Add any other required fields for your activities collection
       }
     );
+    return response;
   } catch (error) {
     console.error("Error logging activity:", error);
+    throw error;
   }
 };
 
@@ -1867,6 +1907,516 @@ export const listEvents = async () => {
     return eventsWithParticipants;
   } catch (error) {
     console.error("Error listing events:", error);
+    throw error;
+  }
+};
+// Add this new function to log user registrations
+export const logUserRegistration = async (userId, name) => {
+  await logActivity(userId, `New User Registration: ${name}`);
+};
+
+export const updateEventVisibility = async (eventId, showOnHomepage) => {
+  try {
+    const response = await databases.updateDocument(
+      databaseId,
+      eventCollectionId,
+      eventId,
+      {
+        showOnHomepage: showOnHomepage,
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error updating event visibility:", error);
+    throw error;
+  }
+};
+
+export const getDocumentsForCurrentPeriod = async (
+  collectionId,
+  queries = []
+) => {
+  const currentPeriod = await getCurrentAcademicPeriod();
+
+  if (!currentPeriod) {
+    throw new Error("No active academic period found");
+  }
+
+  return databases.listDocuments(databaseId, collectionId, [
+    Query.greaterThanEqual("createdAt", currentPeriod.startDate),
+    Query.lessThanEqual("createdAt", currentPeriod.endDate),
+    ...queries,
+  ]);
+};
+
+export const PERIOD_TYPES = {
+  FIRST_SEMESTER: "First Semester",
+  SECOND_SEMESTER: "Second Semester",
+  SUMMER: "Summer",
+};
+
+export const createAcademicPeriod = async (
+  startDate,
+  endDate,
+  schoolYear,
+  periodType
+) => {
+  try {
+    return await databases.createDocument(
+      databaseId,
+      academicPeriodCollectionId,
+      "unique()",
+      {
+        startDate,
+        endDate,
+        schoolYear,
+        periodType,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      }
+    );
+  } catch (error) {
+    console.error("Error creating academic period:", error);
+    throw error;
+  }
+};
+
+export const archiveCurrentPeriod = async (periodId) => {
+  try {
+    return await databases.updateDocument(
+      databaseId,
+      academicPeriodCollectionId,
+      periodId,
+      {
+        isActive: false,
+        archivedAt: new Date().toISOString(),
+      }
+    );
+  } catch (error) {
+    console.error("Error archiving period:", error);
+    throw error;
+  }
+};
+
+export const getCurrentAcademicPeriod = async () => {
+  try {
+    const response = await databases.listDocuments(
+      databaseId,
+      academicPeriodCollectionId,
+      [
+        Query.equal("isActive", true),
+        Query.orderDesc("createdAt"),
+        Query.limit(1),
+      ]
+    );
+    return response.documents[0];
+  } catch (error) {
+    console.error("Error getting current period:", error);
+    throw error;
+  }
+};
+
+// Function to archive current data when creating new academic period
+export const archiveCurrentPeriodData = async (oldPeriodId, newPeriodId) => {
+  try {
+    // Archive events and participants
+    const [eventsResponse, participantsResponse] = await Promise.all([
+      databases.listDocuments(databaseId, eventCollectionId),
+      databases.listDocuments(databaseId, participantCollectionId),
+    ]);
+
+    // Update all events to be archived
+    const eventUpdates = eventsResponse.documents.map((event) =>
+      databases.updateDocument(databaseId, eventCollectionId, event.$id, {
+        isArchived: true,
+        academicPeriodId: oldPeriodId,
+        archivedAt: new Date().toISOString(),
+      })
+    );
+
+    // Update all participants to be archived
+    const participantUpdates = participantsResponse.documents.map(
+      (participant) =>
+        databases.updateDocument(
+          databaseId,
+          participantCollectionId,
+          participant.$id,
+          {
+            isArchived: true,
+            academicPeriodId: oldPeriodId,
+            archivedAt: new Date().toISOString(),
+          }
+        )
+    );
+
+    // Wait for all updates to complete
+    await Promise.all([...eventUpdates, ...participantUpdates]);
+
+    return true;
+  } catch (error) {
+    console.error("Error archiving period data:", error);
+    throw new Error("Failed to archive current data");
+  }
+};
+
+// Function to validate academic period data
+export const validateAcademicPeriod = (
+  schoolYear,
+  periodType,
+  startDate,
+  endDate
+) => {
+  const errors = [];
+
+  if (!schoolYear) {
+    errors.push("School year is required");
+  }
+
+  if (!periodType) {
+    errors.push("Period type is required");
+  }
+
+  if (!startDate) {
+    errors.push("Start date is required");
+  }
+
+  if (!endDate) {
+    errors.push("End date is required");
+  }
+
+  if (startDate && endDate && new Date(startDate) >= new Date(endDate)) {
+    errors.push("Start date must be before end date");
+  }
+
+  return errors;
+};
+
+// Function to create a new academic period with data archival
+export const createNewAcademicPeriod = async (
+  schoolYear,
+  periodType,
+  startDate,
+  endDate,
+  currentPeriodId
+) => {
+  try {
+    // First archive the current period if it exists
+    if (currentPeriodId) {
+      await archiveCurrentPeriod(currentPeriodId);
+    }
+
+    // Create new period
+    const newPeriod = await createAcademicPeriod(
+      startDate,
+      endDate,
+      schoolYear,
+      periodType
+    );
+
+    // Archive current data
+    await archiveCurrentPeriodData(currentPeriodId, newPeriod.$id);
+
+    return newPeriod;
+  } catch (error) {
+    console.error("Error creating new academic period:", error);
+    throw error;
+  }
+};
+
+// Event Management Functions
+export const fetchOfficerEvents = async (accountId) => {
+  try {
+    // Get current academic period
+    const currentPeriod = await getCurrentAcademicPeriod();
+    if (!currentPeriod) {
+      throw new Error("No active academic period found");
+    }
+
+    const eventsResponse = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [
+        Query.equal("createdBy", accountId),
+        Query.equal("isArchived", false),
+        Query.equal("academicPeriodId", currentPeriod.$id),
+        Query.orderDesc("$createdAt"),
+      ]
+    );
+
+    return {
+      events: eventsResponse.documents,
+      currentPeriod,
+    };
+  } catch (error) {
+    console.error("Error fetching events:", error);
+    throw error;
+  }
+};
+
+export const fetchEventParticipants = async (eventIds, academicPeriodId) => {
+  try {
+    const participantsResponse = await databases.listDocuments(
+      databaseId,
+      participantCollectionId,
+      [
+        Query.equal("isArchived", false),
+        Query.equal("academicPeriodId", academicPeriodId),
+        Query.equal("eventId", eventIds),
+      ]
+    );
+
+    return participantsResponse.documents;
+  } catch (error) {
+    console.error("Error fetching participants:", error);
+    throw error;
+  }
+};
+
+export const fetchEventOverviewData = async (userId) => {
+  try {
+    const currentPeriod = await getCurrentAcademicPeriod();
+    if (!currentPeriod) {
+      throw new Error("No active academic period found");
+    }
+
+    // Fetch events
+    const eventsResponse = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [
+        Query.equal("createdBy", userId),
+        Query.equal("academicPeriodId", currentPeriod.$id),
+        Query.orderDesc("createdAt"),
+      ]
+    );
+
+    if (eventsResponse.documents.length === 0) {
+      return {
+        events: [],
+        participants: [],
+        currentPeriod,
+        summaryStats: {
+          total: 0,
+          academic: 0,
+          nonAcademic: 0,
+          totalParticipants: 0,
+          maleParticipants: 0,
+          femaleParticipants: 0,
+        },
+      };
+    }
+
+    // Get event IDs
+    const eventIds = eventsResponse.documents.map((event) => event.$id);
+
+    // Fetch participants
+    const participantsResponse = await databases.listDocuments(
+      databaseId,
+      participantCollectionId,
+      [
+        Query.equal("academicPeriodId", currentPeriod.$id),
+        Query.equal("eventId", eventIds),
+      ]
+    );
+
+    // Calculate summary stats
+    const summaryStats = {
+      total: eventsResponse.documents.length,
+      academic: eventsResponse.documents.filter(
+        (e) => e.eventType === "Academic"
+      ).length,
+      nonAcademic: eventsResponse.documents.filter(
+        (e) => e.eventType === "Non-Academic"
+      ).length,
+      totalParticipants: participantsResponse.documents.length,
+      maleParticipants: participantsResponse.documents.filter(
+        (p) => p.sex === "Male"
+      ).length,
+      femaleParticipants: participantsResponse.documents.filter(
+        (p) => p.sex === "Female"
+      ).length,
+    };
+
+    return {
+      events: eventsResponse.documents,
+      participants: participantsResponse.documents,
+      currentPeriod,
+      summaryStats,
+    };
+  } catch (error) {
+    console.error("Error fetching event overview data:", error);
+    throw error;
+  }
+};
+
+export const fetchEventLogData = async (userId) => {
+  try {
+    const currentPeriod = await getCurrentAcademicPeriod();
+    if (!currentPeriod) {
+      throw new Error("No active academic period found");
+    }
+
+    const eventsResponse = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [
+        Query.equal("createdBy", userId),
+        Query.equal("isArchived", false),
+        Query.equal("academicPeriodId", currentPeriod.$id),
+      ]
+    );
+
+    const participantsResponse = await databases.listDocuments(
+      databaseId,
+      participantCollectionId,
+      [
+        Query.equal("isArchived", false),
+        Query.equal("academicPeriodId", currentPeriod.$id),
+        Query.equal(
+          "eventId",
+          eventsResponse.documents.map((event) => event.$id)
+        ),
+      ]
+    );
+
+    return {
+      events: eventsResponse.documents,
+      participants: participantsResponse.documents,
+      currentPeriod,
+    };
+  } catch (error) {
+    console.error("Error fetching log data:", error);
+    throw error;
+  }
+};
+
+// Add these new functions to handle event participant log operations
+
+export const fetchEventParticipantLogData = async (userId) => {
+  try {
+    const currentPeriod = await getCurrentAcademicPeriod();
+    if (!currentPeriod) {
+      throw new Error("No active academic period found");
+    }
+
+    // Fetch events
+    const eventsResponse = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [
+        Query.equal("createdBy", userId),
+        Query.equal("academicPeriodId", currentPeriod.$id),
+        Query.orderDesc("createdAt"),
+      ]
+    );
+
+    if (eventsResponse.documents.length === 0) {
+      return {
+        events: [],
+        participants: [],
+        staffFaculty: [],
+        community: [],
+        currentPeriod,
+      };
+    }
+
+    const eventIds = eventsResponse.documents.map((event) => event.$id);
+
+    // Fetch all participant types
+    const [participantsResponse, staffFacultyResponse, communityResponse] =
+      await Promise.all([
+        databases.listDocuments(databaseId, participantCollectionId, [
+          Query.equal("eventId", eventIds),
+        ]),
+        databases.listDocuments(databaseId, staffFacultyCollectionId, [
+          Query.equal("eventId", eventIds),
+        ]),
+        databases.listDocuments(databaseId, communityCollectionId, [
+          Query.equal("eventId", eventIds),
+        ]),
+      ]);
+
+    return {
+      events: eventsResponse.documents,
+      participants: participantsResponse.documents,
+      staffFaculty: staffFacultyResponse.documents,
+      community: communityResponse.documents,
+      currentPeriod,
+    };
+  } catch (error) {
+    console.error("Error fetching event participant log data:", error);
+    throw error;
+  }
+};
+
+export const getEventParticipantCounts = (
+  eventId,
+  participants,
+  staffFaculty,
+  community
+) => {
+  const studentParticipants = participants.filter((p) => p.eventId === eventId);
+  const staffParticipants = staffFaculty.filter((p) => p.eventId === eventId);
+  const communityParticipants = community.filter((p) => p.eventId === eventId);
+
+  const allParticipants = [
+    ...studentParticipants,
+    ...staffParticipants,
+    ...communityParticipants,
+  ];
+  const maleCount = allParticipants.filter((p) => p.sex === "Male").length;
+  const femaleCount = allParticipants.filter((p) => p.sex === "Female").length;
+
+  return {
+    total: allParticipants.length,
+    male: maleCount,
+    female: femaleCount,
+    students: studentParticipants.length,
+    staff: staffParticipants.length,
+    community: communityParticipants.length,
+  };
+};
+
+export const getStaffFaculty = async (eventId = null) => {
+  try {
+    let query = [];
+
+    // Add event filter if specified
+    if (eventId) {
+      query.push(Query.equal("eventId", eventId));
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      staffFacultyCollectionId,
+      query
+    );
+
+    return response.documents;
+  } catch (error) {
+    console.error("Error fetching staff/faculty:", error);
+    throw error;
+  }
+};
+
+export const getCommunityMembers = async (eventId = null) => {
+  try {
+    let query = [];
+
+    // Add event filter if specified
+    if (eventId) {
+      query.push(Query.equal("eventId", eventId));
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      communityCollectionId,
+      query
+    );
+
+    return response.documents;
+  } catch (error) {
+    console.error("Error fetching community members:", error);
     throw error;
   }
 };

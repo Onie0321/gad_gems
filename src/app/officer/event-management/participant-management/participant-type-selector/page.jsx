@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -7,12 +7,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
-export default function ParticipantTypeSelector({ selectedType, onTypeChange }) {
+export default function ParticipantTypeSelector({
+  participantType,
+  onTypeChange,
+  disabled,
+}) {
   return (
-    <div className="mb-6">
-      <Select value={selectedType} onValueChange={onTypeChange}>
-        <SelectTrigger className="w-[200px]">
+    <div className="space-y-2">
+      <Label htmlFor="participantType">Participant Type</Label>
+      <Select
+        value={participantType}
+        onValueChange={onTypeChange}
+        disabled={disabled}
+      >
+        <SelectTrigger id="participantType">
           <SelectValue placeholder="Select participant type" />
         </SelectTrigger>
         <SelectContent>
@@ -23,4 +33,4 @@ export default function ParticipantTypeSelector({ selectedType, onTypeChange }) 
       </Select>
     </div>
   );
-} 
+}

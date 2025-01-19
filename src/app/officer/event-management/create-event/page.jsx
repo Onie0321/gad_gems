@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "react-toastify";
-import { Loader2, CalendarIcon, ChevronDown } from "lucide-react";
+import { Loader2, CalendarIcon, ChevronDown, Upload } from "lucide-react";
 import {
   format,
   parse,
@@ -43,7 +43,7 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { schoolOptions, getNonAcademicCategories } from "@/utils/eventUtils";
 import { useTabContext } from "@/context/TabContext"; // Import the context hook
@@ -70,6 +70,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ID } from "appwrite";
+import {
+  saveFormData,
+  loadFormData,
+  clearFormData,
+  STORAGE_KEYS,
+} from "@/utils/formPersistence";
+import { importEventAndParticipants } from "@/utils/importUtils";
 
 export default function CreateEvent({ onEventCreated, user }) {
   const [eventName, setEventName] = useState("");
@@ -108,9 +115,62 @@ export default function CreateEvent({ onEventCreated, user }) {
   const [isRangePopoverOpen, setIsRangePopoverOpen] = useState(false);
   const [selectAllNonAcademic, setSelectAllNonAcademic] = useState(false);
   const [selectAllAcademic, setSelectAllAcademic] = useState(false);
+  const [currentAcademicPeriod, setCurrentAcademicPeriod] = useState(null);
 
   const academicCategories = schoolOptions.map((school) => school.name);
   const nonAcademicCategories = getNonAcademicCategories();
+
+  // Load saved form data on component mount
+  useEffect(() => {
+    const savedData = loadFormData(STORAGE_KEYS.CREATE_EVENT);
+    if (savedData) {
+      setEventName(savedData.eventName || "");
+      setEventDate(savedData.eventDate ? new Date(savedData.eventDate) : null);
+      setEventTimeFrom(savedData.eventTimeFrom || "");
+      setEventTimeTo(savedData.eventTimeTo || "");
+      setEventVenue(savedData.eventVenue || "");
+      setEventType(savedData.eventType || []);
+      setEventCategory(savedData.eventCategory || "");
+      setSelectedDates(
+        savedData.selectedDates?.map((date) => new Date(date)) || []
+      );
+      setDateRanges(
+        savedData.dateRanges?.map((range) => ({
+          from: new Date(range.from),
+          to: new Date(range.to),
+        })) || []
+      );
+      setSelectedCategories(savedData.selectedCategories || []);
+    }
+  }, []);
+
+  // Save form data on any change
+  useEffect(() => {
+    const formData = {
+      eventName,
+      eventDate,
+      eventTimeFrom,
+      eventTimeTo,
+      eventVenue,
+      eventType,
+      eventCategory,
+      selectedDates,
+      dateRanges,
+      selectedCategories,
+    };
+    saveFormData(STORAGE_KEYS.CREATE_EVENT, formData);
+  }, [
+    eventName,
+    eventDate,
+    eventTimeFrom,
+    eventTimeTo,
+    eventVenue,
+    eventType,
+    eventCategory,
+    selectedDates,
+    dateRanges,
+    selectedCategories,
+  ]);
 
   useEffect(() => {
     if (eventTimeFrom && eventTimeTo) {
@@ -162,172 +222,117 @@ export default function CreateEvent({ onEventCreated, user }) {
     first.getMonth() === second.getMonth() &&
     first.getDate() === second.getDate();
 
+  // Add useEffect to fetch current academic period
+  useEffect(() => {
+    const fetchAcademicPeriod = async () => {
+      try {
+        const period = await getCurrentAcademicPeriod();
+        if (!period) {
+          toast.error(
+            "No active academic period found. Please set up an academic period first."
+          );
+          return;
+        }
+        setCurrentAcademicPeriod(period);
+      } catch (error) {
+        console.error("Error fetching academic period:", error);
+        toast.error("Failed to fetch academic period");
+      }
+    };
+
+    fetchAcademicPeriod();
+  }, []);
+
   // Main function to handle event creation
   const handleCreateEvent = async (e) => {
     e.preventDefault();
 
-    if (!validateEventForm()) return;
-
-    if (!user || !user.$id) {
-      toast.error("User not authenticated. Please log in and try again.");
+    if (!currentAcademicPeriod) {
+      toast.error(
+        "No active academic period found. Please set up an academic period first."
+      );
       return;
     }
 
-    setLoading(true);
+    // Validate form
+    const validationErrors = validateEventForm({
+      eventName,
+      eventDate,
+      eventTimeFrom,
+      eventTimeTo,
+      eventVenue,
+      eventType,
+      selectedCategories,
+    });
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
     try {
-      // Format dates as ISO datetime strings
-      const formattedDates = selectedDates.map(date => 
-        new Date(date).toISOString()
-      );
+      setLoading(true);
 
-      const formattedDateRanges = dateRanges.map(range => ({
-        from: new Date(range.from).toISOString(),
-        to: new Date(range.to).toISOString()
-      }));
+      // Format the date
+      const formattedDate = format(new Date(eventDate), "yyyy-MM-dd");
 
-      // Use the first date for conflict checking
-      const primaryDate = formattedDates[0] || formattedDateRanges[0]?.from;
-
-      // Check for duplicate events
+      // Check for duplicate event
       const isDuplicate = await checkDuplicateEvent(
         eventName,
-        primaryDate,
+        formattedDate,
         eventVenue
       );
+
       if (isDuplicate) {
-        toast.error("An event with the same name, date, and venue already exists.");
-        setLoading(false);
+        toast.error(
+          "An event with the same name, date, and venue already exists."
+        );
         return;
       }
 
-      // Check for time conflicts
+      // Check for time conflict
       const hasTimeConflict = await checkTimeConflict(
-        primaryDate,
+        formattedDate,
         eventVenue,
         eventTimeFrom,
         eventTimeTo
       );
+
       if (hasTimeConflict) {
-        toast.error("There is already an event scheduled at this venue during the selected time.");
-        setLoading(false);
+        toast.error(
+          "There is a time conflict with another event at this venue."
+        );
         return;
       }
 
-      // Create separate events for each date
-      const createdEvents = await Promise.all(
-        formattedDates.map(async (date) => {
-          // Combine date with time
-          const startDateTime = new Date(date);
-          const [hours, minutes] = eventTimeFrom.split(':');
-          startDateTime.setHours(parseInt(hours), parseInt(minutes), 0);
+      // Create event document
+      const eventData = {
+        eventName,
+        eventDate: formattedDate,
+        eventTimeFrom,
+        eventTimeTo,
+        eventVenue,
+        eventType: eventType.join(", "), // Join array into string
+        eventCategory: selectedCategories.join(", "), // Join array into string
+        numberOfHours: duration,
+        participants: [], // Initialize empty array for participants
+        createdBy: user.$id,
+        showOnHomepage: false,
+        isArchived: false,
+        academicPeriodId: currentAcademicPeriod.$id,
+        createdAt: new Date().toISOString(),
+      };
 
-          const endDateTime = new Date(date);
-          const [endHours, endMinutes] = eventTimeTo.split(':');
-          endDateTime.setHours(parseInt(endHours), parseInt(endMinutes), 0);
+      const newEvent = await createEvent(eventData);
 
-          const eventData = {
-            eventName,
-            eventDate: startDateTime.toISOString(), // Single datetime value
-            eventTimeFrom: startDateTime.toISOString(), // Full datetime for start
-            eventTimeTo: endDateTime.toISOString(), // Full datetime for end
-            eventVenue,
-            eventType: eventType[0], // Since eventType is a string in schema
-            eventCategory,
-            numberOfHours: duration,
-            participants: [],
-            createdBy: user.$id
-          };
-
-          return await databases.createDocument(
-            databaseId,
-            eventCollectionId,
-            ID.unique(),
-            eventData
-          );
-        })
-      );
-
-      // Also create events for date ranges
-      for (const range of dateRanges) {
-        const start = new Date(range.from);
-        const end = new Date(range.to);
-        
-        for (let date = start; date <= end; date.setDate(date.getDate() + 1)) {
-          if (
-            (!excludeWeekends || !isWeekend(date)) && 
-            (!excludeHolidays || !isPhilippineHoliday(date))
-          ) {
-            const startDateTime = new Date(date);
-            const [hours, minutes] = eventTimeFrom.split(':');
-            startDateTime.setHours(parseInt(hours), parseInt(minutes), 0);
-
-            const endDateTime = new Date(date);
-            const [endHours, endMinutes] = eventTimeTo.split(':');
-            endDateTime.setHours(parseInt(endHours), parseInt(endMinutes), 0);
-
-            const eventData = {
-              eventName,
-              eventDate: startDateTime.toISOString(),
-              eventTimeFrom: startDateTime.toISOString(),
-              eventTimeTo: endDateTime.toISOString(),
-              eventVenue,
-              eventType: eventType[0],
-              eventCategory,
-              numberOfHours: duration,
-              participants: [],
-              createdBy: user.$id
-            };
-
-            createdEvents.push(
-              await databases.createDocument(
-                databaseId,
-                eventCollectionId,
-                ID.unique(),
-                eventData
-              )
-            );
-          }
-        }
+      if (newEvent) {
+        toast.success("Event created successfully!");
+        clearFormData(STORAGE_KEYS.CREATE_EVENT);
+        onEventCreated(newEvent);
       }
-
-      // Create notification for the event(s)
-      await createNotification({
-        userId: user.$id,
-        type: "event",
-        title: "Event(s) Created Successfully",
-        message: `Your event "${eventName}" has been created successfully for ${createdEvents.length} date(s).`,
-        actionType: "event_created",
-        approvalStatus: "approved",
-        read: false,
-      });
-
-      toast.success(`Successfully created ${createdEvents.length} event(s)! Add participants now.`);
-
-      // Reset form fields
-      setEventName("");
-      setEventDate([]);
-      setEventTimeFrom("");
-      setEventTimeTo("");
-      setEventVenue("");
-      setEventType([]);
-      setEventCategory("");
-      setDuration("");
-      setSelectedDates([]);
-      setDateRanges([]);
-
-      // Navigate to participant management tab for the first created event
-      if (onEventCreated && createdEvents.length > 0) {
-        onEventCreated(createdEvents[0].$id);
-      }
-      setActiveTab("participants");
-
     } catch (error) {
       console.error("Error creating event: ", error);
-      toast.error(
-        error instanceof Error
-          ? `Error creating event: ${error.message}`
-          : "An unexpected error occurred. Please try again."
-      );
+      toast.error("Failed to create event. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -413,21 +418,82 @@ export default function CreateEvent({ onEventCreated, user }) {
     return { isValid: true };
   };
 
-  const handleSelectAllNonAcademic = (checked) => {
-    setSelectAllNonAcademic(checked);
-    if (checked) {
-      setSelectedCategories(nonAcademicCategories.map((cat) => cat.value));
+  const handleSelectAll = () => {
+    const allCategories = [
+      ...(eventType.includes("Academic") ? academicCategories : []),
+      ...(eventType.includes("Non-Academic") ? nonAcademicCategories : []),
+    ];
+    if (tempSelectedCategories.length === allCategories.length) {
+      setTempSelectedCategories([]);
+      setSelectAllAcademic(false);
+      setSelectAllNonAcademic(false);
     } else {
-      setSelectedCategories([]);
+      setTempSelectedCategories(allCategories);
+      if (eventType.includes("Academic")) setSelectAllAcademic(true);
+      if (eventType.includes("Non-Academic")) setSelectAllNonAcademic(true);
     }
   };
 
   const handleSelectAllAcademic = (checked) => {
-    setSelectAllAcademic(checked);
     if (checked) {
-      setSelectedCategories(academicCategories.map((cat) => cat.value));
+      setTempSelectedCategories((prev) => {
+        const nonAcademicSelected = prev.filter(
+          (cat) => !academicCategories.includes(cat)
+        );
+        return [...nonAcademicSelected, ...academicCategories];
+      });
     } else {
-      setSelectedCategories([]);
+      setTempSelectedCategories((prev) =>
+        prev.filter((cat) => !academicCategories.includes(cat))
+      );
+    }
+    setSelectAllAcademic(checked);
+  };
+
+  const handleSelectAllNonAcademic = (checked) => {
+    if (checked) {
+      setTempSelectedCategories((prev) => {
+        const academicSelected = prev.filter((cat) =>
+          academicCategories.includes(cat)
+        );
+        return [...academicSelected, ...nonAcademicCategories];
+      });
+    } else {
+      setTempSelectedCategories((prev) =>
+        prev.filter((cat) => academicCategories.includes(cat))
+      );
+    }
+    setSelectAllNonAcademic(checked);
+  };
+
+  const handleImportEvent = async (file) => {
+    try {
+      setLoading(true);
+      const result = await importEventAndParticipants(file);
+
+      if (result.success) {
+        toast.success(result.message);
+        // Pass the imported event to the parent handler
+        onEventCreated(result.event);
+      } else {
+        toast.error(result.message || "Failed to import event");
+      }
+    } catch (error) {
+      console.error("Error importing event:", error);
+      toast.error("Failed to import event. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCategoryClick = (category) => {
+    const isSelected = tempSelectedCategories.includes(category);
+    if (isSelected) {
+      setTempSelectedCategories((prev) =>
+        prev.filter((cat) => cat !== category)
+      );
+    } else {
+      setTempSelectedCategories((prev) => [...prev, category]);
     }
   };
 
@@ -941,52 +1007,55 @@ export default function CreateEvent({ onEventCreated, user }) {
                   </DialogHeader>
                   <div className="max-h-[300px] overflow-y-auto">
                     <div className="p-2">
-                      <Button
-                        variant="outline"
-                        className="w-full mb-2"
-                        onClick={() => {
-                          const allCategories = [
-                            ...(eventType.includes("Academic")
-                              ? academicCategories
-                              : []),
-                            ...(eventType.includes("Non-Academic")
-                              ? nonAcademicCategories
-                              : []),
-                          ];
-                          if (
-                            tempSelectedCategories.length ===
-                            allCategories.length
-                          ) {
-                            // If all are selected, unselect all
-                            setTempSelectedCategories([]);
-                          } else {
-                            // Select all available categories
-                            setTempSelectedCategories(allCategories);
-                          }
-                        }}
-                      >
-                        {tempSelectedCategories.length ===
-                        [
-                          ...(eventType.includes("Academic")
-                            ? academicCategories
-                            : []),
-                          ...(eventType.includes("Non-Academic")
-                            ? nonAcademicCategories
-                            : []),
-                        ].length
-                          ? "Unselect All"
-                          : "Select All Categories"}
-                      </Button>
+                      <div className="flex items-center space-x-2 mb-4">
+                        <div
+                          className="flex items-center space-x-2 cursor-pointer"
+                          onClick={() => handleSelectAll()}
+                        >
+                          <Checkbox
+                            checked={
+                              tempSelectedCategories.length ===
+                              [
+                                ...(eventType.includes("Academic")
+                                  ? academicCategories
+                                  : []),
+                                ...(eventType.includes("Non-Academic")
+                                  ? nonAcademicCategories
+                                  : []),
+                              ].length
+                            }
+                            onCheckedChange={handleSelectAll}
+                          />
+                          <label className="text-sm font-bold cursor-pointer select-none">
+                            Select All Categories
+                          </label>
+                        </div>
+                      </div>
 
                       {eventType.includes("Academic") && (
                         <>
                           <div className="font-bold mt-4 mb-2">
                             Academic Categories
                           </div>
+                          <div
+                            className="flex items-center space-x-2 mb-2 cursor-pointer"
+                            onClick={() =>
+                              handleSelectAllAcademic(!selectAllAcademic)
+                            }
+                          >
+                            <Checkbox
+                              checked={selectAllAcademic}
+                              onCheckedChange={handleSelectAllAcademic}
+                            />
+                            <label className="text-sm font-bold cursor-pointer select-none">
+                              Select All Academic
+                            </label>
+                          </div>
                           {academicCategories.map((category) => (
                             <div
                               key={category}
-                              className="flex items-center space-x-2 p-2 hover:bg-accent rounded"
+                              className="flex items-center space-x-2 p-2 hover:bg-accent rounded cursor-pointer"
+                              onClick={() => handleCategoryClick(category)}
                             >
                               <Checkbox
                                 checked={tempSelectedCategories.includes(
@@ -1000,7 +1069,9 @@ export default function CreateEvent({ onEventCreated, user }) {
                                   );
                                 }}
                               />
-                              <label className="text-sm">{category}</label>
+                              <label className="text-sm cursor-pointer select-none">
+                                {category}
+                              </label>
                             </div>
                           ))}
                         </>
@@ -1011,10 +1082,25 @@ export default function CreateEvent({ onEventCreated, user }) {
                           <div className="font-bold mt-4 mb-2">
                             Non-Academic Categories
                           </div>
+                          <div
+                            className="flex items-center space-x-2 mb-2 cursor-pointer"
+                            onClick={() =>
+                              handleSelectAllNonAcademic(!selectAllNonAcademic)
+                            }
+                          >
+                            <Checkbox
+                              checked={selectAllNonAcademic}
+                              onCheckedChange={handleSelectAllNonAcademic}
+                            />
+                            <label className="text-sm font-bold cursor-pointer select-none">
+                              Select All Non-Academic
+                            </label>
+                          </div>
                           {nonAcademicCategories.map((category) => (
                             <div
                               key={category}
-                              className="flex items-center space-x-2 p-2 hover:bg-accent rounded"
+                              className="flex items-center space-x-2 p-2 hover:bg-accent rounded cursor-pointer"
+                              onClick={() => handleCategoryClick(category)}
                             >
                               <Checkbox
                                 checked={tempSelectedCategories.includes(
@@ -1028,7 +1114,9 @@ export default function CreateEvent({ onEventCreated, user }) {
                                   );
                                 }}
                               />
-                              <label className="text-sm">{category}</label>
+                              <label className="text-sm cursor-pointer select-none">
+                                {category}
+                              </label>
                             </div>
                           ))}
                         </>
@@ -1093,6 +1181,7 @@ export default function CreateEvent({ onEventCreated, user }) {
                 id="duration"
                 value={duration}
                 readOnly
+                placeholder="Calculated based on start and end time"
                 className={isTimeValid ? "" : "border-red-500"}
               />
               {!isTimeValid && (
@@ -1103,18 +1192,45 @@ export default function CreateEvent({ onEventCreated, user }) {
             </div>
           </div>
         </CardContent>
-        <CardFooter>
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading || !isTimeValid}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              "Create Event"
-            )}
-          </Button>
+        <CardFooter className="flex justify-between">
+          <div className="flex gap-4">
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Please wait
+                </>
+              ) : (
+                "Create Event"
+              )}
+            </Button>
+            <div className="relative">
+              <input
+                type="file"
+                id="importFile"
+                className="hidden"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    handleImportEvent(e.target.files[0]);
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="default"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById("importFile").click();
+                }}
+                disabled={loading}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import Event
+              </Button>
+            </div>
+          </div>
         </CardFooter>
       </form>
     </Card>

@@ -36,46 +36,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-// Move the data outside the component
-const initialEvents = [
-  {
-    id: 1,
-    name: "Women in Tech Conference",
-    description: "Annual conference promoting gender diversity in technology",
-    date: "2023-05-15",
-    location: "Virtual Event",
-    attendees: 500,
-    imageUrl: "/placeholder.svg?height=200&width=300",
-  },
-  {
-    id: 2,
-    name: "Gender Equality Workshop",
-    description:
-      "Interactive workshop on promoting gender equality in the workplace",
-    date: "2023-06-22",
-    location: "New York City, NY",
-    attendees: 100,
-    imageUrl: "/placeholder.svg?height=200&width=300",
-  },
-  {
-    id: 3,
-    name: "LGBTQ+ Rights Seminar",
-    description: "Seminar on advancing LGBTQ+ rights and inclusivity",
-    date: "2023-07-10",
-    location: "San Francisco, CA",
-    attendees: 250,
-  },
-  {
-    id: 4,
-    name: "Diversity in Leadership Summit",
-    description: "A summit focusing on promoting diversity in leadership roles",
-    date: "2023-08-05",
-    location: "Chicago, IL",
-    attendees: 300,
-    imageUrl: "/placeholder.svg?height=200&width=300",
-  },
-];
+import { databases, databaseId, eventCollectionId } from "@/lib/appwrite";
+import { Query } from "appwrite";
 
 export default function RecentEvents() {
   const [mounted, setMounted] = useState(false);
@@ -83,8 +45,33 @@ export default function RecentEvents() {
   const [visibleEvents, setVisibleEvents] = useState(3);
 
   useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await databases.listDocuments(
+          databaseId,
+          eventCollectionId,
+          [Query.equal("showOnHomepage", true), Query.orderDesc("eventDate")]
+        );
+
+        // Transform the data to match your component's expectations
+        const formattedEvents = response.documents.map((event) => ({
+          id: event.$id,
+          name: event.eventName,
+          description: event.eventDescription || "",
+          date: event.eventDate,
+          location: event.eventVenue,
+          attendees: event.participants?.length || 0,
+          imageUrl: event.imageUrl || "/placeholder.svg?height=200&width=300",
+        }));
+
+        setEvents(formattedEvents);
+      } catch (error) {
+        console.error("Error fetching events:", error);
+      }
+    };
+
     setMounted(true);
-    setEvents(initialEvents);
+    fetchEvents();
   }, []);
 
   const loadMore = () => {

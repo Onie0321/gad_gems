@@ -443,7 +443,6 @@ export default function ParticipantManagement({
                 <SelectContent>
                   <SelectItem value="Male">Male</SelectItem>
                   <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Intersex">Intersex</SelectItem>
                 </SelectContent>
               </Select>
               {errors.sex && (

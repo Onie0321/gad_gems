@@ -11,48 +11,31 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CalendarIcon } from "lucide-react";
-
-// This would typically come from an API or database
-const initialNews = [
-  {
-    id: 1,
-    title: "New Gender Equality Policy",
-    description:
-      "Our organization has implemented a new policy to promote gender equality in the workplace.",
-    imageUrl: "/placeholder.svg?height=200&width=300",
-    date: "2023-07-15",
-    link: "/news/1",
-  },
-  {
-    id: 2,
-    title: "Women's Day Celebration",
-    imageUrl: "/placeholder.svg?height=200&width=300",
-    date: "2023-03-08",
-    link: "/news/2",
-  },
-  {
-    id: 3,
-    description:
-      "Read our latest report on the current state of the gender pay gap in our industry.",
-    date: "2023-06-30",
-    link: "/news/3",
-  },
-  {
-    id: 4,
-    title: "Diversity Training Program",
-    description:
-      "We're launching a new diversity training program next month. Learn more about it here.",
-    link: "/news/4",
-  },
-];
+import { databases, databaseId, newsCollectionId } from "@/lib/appwrite";
+import { Query } from "appwrite";
 
 export default function NewsSection() {
   const [mounted, setMounted] = useState(false);
-  const [news, setNews] = useState(initialNews);
+  const [news, setNews] = useState([]);
   const [visibleNews, setVisibleNews] = useState(3);
 
   useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const response = await databases.listDocuments(
+          databaseId,
+          newsCollectionId,
+          [Query.equal("showOnHomepage", true), Query.orderDesc("date")]
+        );
+
+        setNews(response.documents);
+      } catch (error) {
+        console.error("Error fetching news:", error);
+      }
+    };
+
     setMounted(true);
+    fetchNews();
   }, []);
 
   const loadMore = () => {

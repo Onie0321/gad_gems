@@ -44,6 +44,7 @@ import {
   participantCollectionId,
   getCurrentUser,
   subscribeToRealTimeUpdates,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { client } from "@/lib/appwrite";
 import { useRouter } from "next/navigation";
@@ -68,10 +69,22 @@ export default function EventOverView() {
   const fetchData = async (userId) => {
     try {
       setLoading(true);
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+        return;
+      }
+
       const fetchedEvents = await databases.listDocuments(
         databaseId,
         eventCollectionId,
-        [Query.equal("createdBy", userId), Query.orderDesc("$createdAt")]
+        [
+          Query.equal("createdBy", userId),
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+          Query.orderDesc("$createdAt"),
+        ]
       );
 
       if (fetchedEvents.documents.length > 0) {
@@ -82,6 +95,8 @@ export default function EventOverView() {
           databaseId,
           participantCollectionId,
           [
+            Query.equal("isArchived", false),
+            Query.equal("academicPeriodId", currentPeriod.$id),
             Query.equal(
               "eventId",
               fetchedEvents.documents.map((event) => event.$id)
@@ -269,50 +284,36 @@ export default function EventOverView() {
   };
 
   if (loading) {
-    return <LoadingAnimation message="Loading events data..." />;
+    return <LoadingAnimation message="Loading events..." />;
   }
 
   if (error) {
     return (
       <div className="text-center text-red-500">
         <p>{error}</p>
-        <Button
-          onClick={() => getCurrentUser().then((user) => fetchData(user.id))}
-          className="mt-4"
-        >
+        <Button onClick={() => fetchData()} className="mt-4">
           Retry
         </Button>
       </div>
     );
   }
 
+  // If there are no events, show empty state
   if (events.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>No Events Found</CardTitle>
-            <CardDescription>
-              There are currently no events in the system.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">To get started:</p>
-              <ul className="list-disc list-inside text-sm mt-2 space-y-1">
-                <li>Click the "Add Event" button above</li>
-                <li>Fill in the event details</li>
-                <li>Submit the form to create your first event</li>
-              </ul>
-            </div>
-          </CardContent>
-          <CardFooter className="justify-center">
-            <Button onClick={handleNavigateToCreateEvent}>
-              <Plus className="mr-2 h-4 w-4" /> Add Your First Event
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+      <Card className="w-full">
+        <CardHeader className="text-center">
+          <CardTitle>No Events Available</CardTitle>
+          <CardDescription>
+            There are no events in the current academic period
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center">
+          <Button onClick={() => setActiveTab("createEvent")}>
+            <Plus className="mr-2 h-4 w-4" /> Create Your First Event
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -332,40 +333,34 @@ export default function EventOverView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between">
-        <h2 className="text-2xl font-bold">Recent Events</h2>
-        <Button onClick={handleNavigateToCreateEvent}>
-          <Plus className="mr-2 h-4 w-4" /> Add Event
-        </Button>
-      </div>
-      <div className="relative w-full max-w-sm">
-        <Input
-          placeholder="Search events..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1); // Reset to first page when searching
-          }}
-          className="w-full"
-        />
-      </div>
-
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <h3 className="text-lg font-semibold">Total Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.total}</p>
+        <CardHeader>
+          <CardTitle>Event Overview</CardTitle>
+          <CardDescription>View and manage your events</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {events.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-lg">
+                There are no events in the current academic period
+              </p>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">Academic Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.academic}</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-semibold">Total Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.total}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Academic Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.academic}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Non-Academic Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.nonAcademic}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">Non-Academic Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.nonAcademic}</p>
-            </div>
-          </div>
+          )}
           <div className="mt-4 text-center">
             <h3 className="text-lg font-semibold">Total Participants</h3>
             <p className="text-3xl font-bold">

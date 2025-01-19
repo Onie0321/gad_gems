@@ -3,7 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { listEvents } from "@/lib/appwrite";
+import {
+  databases,
+  databaseId,
+  eventCollectionId,
+  participantCollectionId,
+  getCurrentAcademicPeriod,
+} from "@/lib/appwrite";
+import { Query } from "appwrite";
 import {
   Table,
   TableBody,
@@ -37,18 +44,17 @@ export default function EventAnalysis() {
     genderStats: {
       male: 0,
       female: 0,
-      intersex: 0,
     },
     eventTypes: [],
     participantsByEvent: [],
     participantsByGender: [],
     participantsBySchool: [],
   });
+  const [currentPeriod, setCurrentPeriod] = useState(null);
 
   const GENDER_COLORS = {
     Male: "#2196F3",
     Female: "#E91E63",
-    Intersex: "#FFC107",
   };
 
   // Extended color palette for schools
@@ -69,7 +75,41 @@ export default function EventAnalysis() {
     const fetchEventStats = async () => {
       try {
         setLoading(true);
-        const events = await listEvents();
+        // Get current academic period
+        const period = await getCurrentAcademicPeriod();
+        if (!period) {
+          throw new Error("No active academic period found");
+        }
+        setCurrentPeriod(period);
+
+        // Fetch events for current period
+        const eventsResponse = await databases.listDocuments(
+          databaseId,
+          eventCollectionId,
+          [
+            Query.equal("isArchived", false),
+            Query.equal("academicPeriodId", period.$id),
+          ]
+        );
+
+        // Fetch participants for each event
+        const events = await Promise.all(
+          eventsResponse.documents.map(async (event) => {
+            const participantsResponse = await databases.listDocuments(
+              databaseId,
+              participantCollectionId,
+              [
+                Query.equal("eventId", event.$id),
+                Query.equal("isArchived", false),
+                Query.equal("academicPeriodId", period.$id),
+              ]
+            );
+            return {
+              ...event,
+              participants: participantsResponse.documents,
+            };
+          })
+        );
 
         // Calculate gender counts across all events
         const genderStats = events.reduce(
@@ -80,7 +120,7 @@ export default function EventAnalysis() {
             });
             return acc;
           },
-          { male: 0, female: 0, intersex: 0 }
+          { male: 0, female: 0 }
         );
 
         // Calculate basic stats
@@ -100,14 +140,13 @@ export default function EventAnalysis() {
               acc[gender] = (acc[gender] || 0) + 1;
               return acc;
             },
-            { male: 0, female: 0, intersex: 0 }
-          ) || { male: 0, female: 0, intersex: 0 };
+            { male: 0, female: 0 }
+          ) || { male: 0, female: 0 };
 
           return {
             name: event.eventName,
             male: genderCounts.male,
             female: genderCounts.female,
-            intersex: genderCounts.intersex,
             total: event.participants?.length || 0,
           };
         });
@@ -119,7 +158,7 @@ export default function EventAnalysis() {
             const gender = participant.sex.toLowerCase();
 
             if (!acc[school]) {
-              acc[school] = { male: 0, female: 0, intersex: 0, total: 0 };
+              acc[school] = { male: 0, female: 0, total: 0 };
             }
             acc[school][gender]++;
             acc[school].total++;
@@ -132,7 +171,6 @@ export default function EventAnalysis() {
             name,
             male: counts.male,
             female: counts.female,
-            intersex: counts.intersex,
             total: counts.total,
           }))
           .sort((a, b) => b.total - a.total); // Sort by total participants
@@ -171,6 +209,16 @@ export default function EventAnalysis() {
 
   return (
     <div className="space-y-8 p-6 bg-gray-50">
+      {/* Academic Period Indicator */}
+      {currentPeriod && (
+        <div className="bg-blue-50 p-4 rounded-lg mb-6">
+          <h2 className="text-lg font-semibold text-blue-800">
+            Current Academic Period: {currentPeriod.schoolYear} -{" "}
+            {currentPeriod.periodType}
+          </h2>
+        </div>
+      )}
+
       {/* Stats Cards with Enhanced Design */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="hover:shadow-lg transition-shadow">
@@ -188,7 +236,7 @@ export default function EventAnalysis() {
                   stats.totalEvents
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center space-x-2">
                   <div
                     className="w-3 h-3 rounded-full"
@@ -202,13 +250,6 @@ export default function EventAnalysis() {
                     style={{ backgroundColor: GENDER_COLORS.Female }}
                   ></div>
                   <span>Female: {stats.genderStats.female}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Intersex }}
-                  ></div>
-                  <span>Intersex: {stats.genderStats.intersex}</span>
                 </div>
               </div>
             </div>
@@ -230,7 +271,7 @@ export default function EventAnalysis() {
                   stats.totalParticipants
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center space-x-2">
                   <div
                     className="w-3 h-3 rounded-full"
@@ -244,13 +285,6 @@ export default function EventAnalysis() {
                     style={{ backgroundColor: GENDER_COLORS.Female }}
                   ></div>
                   <span>Female: {stats.genderStats.female}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Intersex }}
-                  ></div>
-                  <span>Intersex: {stats.genderStats.intersex}</span>
                 </div>
               </div>
             </div>
@@ -272,7 +306,7 @@ export default function EventAnalysis() {
                   stats.averageParticipants
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center space-x-2">
                   <div
                     className="w-3 h-3 rounded-full"
@@ -286,13 +320,6 @@ export default function EventAnalysis() {
                     style={{ backgroundColor: GENDER_COLORS.Female }}
                   ></div>
                   <span>Female: {stats.genderStats.female}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Intersex }}
-                  ></div>
-                  <span>Intersex: {stats.genderStats.intersex}</span>
                 </div>
               </div>
             </div>
@@ -344,12 +371,6 @@ export default function EventAnalysis() {
                     fill={GENDER_COLORS.Female}
                     stackId="a"
                   />
-                  <Bar
-                    dataKey="intersex"
-                    name="Intersex"
-                    fill={GENDER_COLORS.Intersex}
-                    stackId="a"
-                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -392,15 +413,7 @@ export default function EventAnalysis() {
                         />
                       ))}
                     </Pie>
-                    <Tooltip
-                      formatter={(value, name) => [`Total: ${value}`, name]}
-                      contentStyle={{
-                        backgroundColor: "rgba(255, 255, 255, 0.95)",
-                        borderRadius: "8px",
-                        border: "none",
-                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                      }}
-                    />
+                    <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -424,11 +437,6 @@ export default function EventAnalysis() {
                             name: `${school.name} (Female)`,
                             value: school.female,
                             color: GENDER_COLORS.Female,
-                          },
-                          {
-                            name: `${school.name} (Intersex)`,
-                            value: school.intersex,
-                            color: GENDER_COLORS.Intersex,
                           },
                         ])
                         .flat()}
@@ -455,22 +463,10 @@ export default function EventAnalysis() {
                             key={`${school.name}-female`}
                             fill={GENDER_COLORS.Female}
                           />,
-                          <Cell
-                            key={`${school.name}-intersex`}
-                            fill={GENDER_COLORS.Intersex}
-                          />,
                         ])
                         .flat()}
                     </Pie>
-                    <Tooltip
-                      formatter={(value, name) => [`Count: ${value}`, name]}
-                      contentStyle={{
-                        backgroundColor: "rgba(255, 255, 255, 0.95)",
-                        borderRadius: "8px",
-                        border: "none",
-                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                      }}
-                    />
+                    <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -503,12 +499,6 @@ export default function EventAnalysis() {
                     >
                       Female
                     </TableHead>
-                    <TableHead
-                      className="text-right font-bold"
-                      style={{ color: GENDER_COLORS.Intersex }}
-                    >
-                      Intersex
-                    </TableHead>
                     <TableHead className="text-right font-bold">
                       Total
                     </TableHead>
@@ -528,9 +518,6 @@ export default function EventAnalysis() {
                       </TableCell>
                       <TableCell className="text-right">
                         {school.female || 0}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {school.intersex || 0}
                       </TableCell>
                       <TableCell className="text-right font-bold">
                         {school.total}

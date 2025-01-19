@@ -35,6 +35,7 @@ import {
   participantCollectionId,
   userCollectionId,
   client,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 
@@ -86,60 +87,62 @@ export default function EventParticipantLog() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      const currentPeriod = await getCurrentAcademicPeriod();
 
-      // Fetch all events
-      const eventsResponse = await databases.listDocuments(
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+      }
+
+      const response = await databases.listDocuments(
         databaseId,
         eventCollectionId,
-        [Query.orderDesc("eventDate")]
+        [
+          Query.equal("academicPeriodId", currentPeriod.$id),
+          Query.orderDesc("createdAt"),
+        ]
       );
-
-      const events = eventsResponse.documents;
-
-      // Fetch all users first to avoid multiple queries
-      const usersResponse = await databases.listDocuments(
-        databaseId,
-        userCollectionId
-      );
-      const users = usersResponse.documents;
 
       // Fetch participants for each event
       const eventsWithParticipants = await Promise.all(
-        events.map(async (event) => {
+        response.documents.map(async (event) => {
           const participantsResponse = await databases.listDocuments(
             databaseId,
             participantCollectionId,
-            [Query.equal("eventId", event.$id)]
+            [
+              Query.equal("eventId", event.$id),
+              Query.equal("academicPeriodId", currentPeriod.$id),
+            ]
           );
 
+          // Calculate participant counts
           const participants = participantsResponse.documents;
-
-          // Calculate gender distribution
-          const genderCounts = {
+          const participantCounts = {
+            total: participants.length,
             male: participants.filter((p) => p.sex === "Male").length,
             female: participants.filter((p) => p.sex === "Female").length,
-            intersex: participants.filter((p) => p.sex === "Intersex").length,
           };
 
-          // Find the creator's name from users
-          const creator = users.find((user) => user.$id === event.createdBy);
-          const creatorName = creator ? creator.name : "Unknown";
+          // Fetch creator information
+          const creatorResponse = await databases.getDocument(
+            databaseId,
+            userCollectionId,
+            event.createdBy
+          );
 
           return {
             ...event,
             participants: participants,
-            participantCounts: genderCounts,
-            totalParticipants: participants.length,
-            creatorName: creatorName, // Add creator name
+            participantCounts: participantCounts,
+            creatorName: creatorResponse.name || "Unknown",
           };
         })
       );
 
       setEvents(eventsWithParticipants);
-      setLoading(false);
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      setError("Failed to fetch data");
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      setError("Failed to fetch events");
+    } finally {
       setLoading(false);
     }
   };
@@ -244,7 +247,9 @@ export default function EventParticipantLog() {
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="eventDate">Event Date</SelectItem>
                 <SelectItem value="eventName">Event Name</SelectItem>
-                <SelectItem value="participantCount">Participant Count</SelectItem>
+                <SelectItem value="participantCount">
+                  Participant Count
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -264,7 +269,7 @@ export default function EventParticipantLog() {
                 <TableHead>Time</TableHead>
                 <TableHead>Venue</TableHead>
                 <TableHead className="text-center">
-                  Participants (M/F/I)
+                  Participants (M/F)
                 </TableHead>
                 <TableHead>Created By</TableHead> {/* New column */}
                 <TableHead className="text-center">Actions</TableHead>
@@ -285,9 +290,18 @@ export default function EventParticipantLog() {
                   </TableCell>
                   <TableCell>{event.eventVenue}</TableCell>
                   <TableCell className="text-center">
-                    {event.participantCounts.male}/
-                    {event.participantCounts.female}/
-                    {event.participantCounts.intersex}
+                    <div className="flex flex-col items-center">
+                      <div>Total: {event.participantCounts.total}</div>
+                      <div className="text-sm text-muted-foreground">
+                        <span className="text-blue-600">
+                          {event.participantCounts.male}
+                        </span>
+                        /
+                        <span className="text-pink-600">
+                          {event.participantCounts.female}
+                        </span>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

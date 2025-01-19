@@ -36,7 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "react-toastify";
-import { Loader2, HelpCircle, Edit, Trash2 } from "lucide-react";
+import { Loader2, HelpCircle, Edit, Trash2, Plus } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -68,6 +68,8 @@ import {
   handleParticipantTypeChange,
   handleInputChange,
   updateParticipantCounts,
+  isIdComplete,
+  handleAutofillConfirm,
 } from "@/utils/participantUtils";
 import {
   createParticipant,
@@ -89,6 +91,13 @@ import { ID } from "appwrite";
 import DataTable from "../../demographic-analysis/data-table/page";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ParticipantTables from "./participant-tables/page";
+import {
+  saveFormData,
+  loadFormData,
+  clearFormData,
+  STORAGE_KEYS,
+} from "@/utils/formPersistence";
+import { Query } from "appwrite";
 
 export default function ParticipantManagement({
   events,
@@ -121,6 +130,21 @@ export default function ParticipantManagement({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [participantType, setParticipantType] = useState("student");
+  const [activeSection, setActiveSection] = useState(null);
+  const [validationMessages, setValidationMessages] = useState({
+    student: {
+      studentId: "",
+      name: "",
+    },
+    staff: {
+      staffFacultyId: "",
+      name: "",
+    },
+    community: {
+      name: "",
+    },
+  });
+  const [hasDuplicates, setHasDuplicates] = useState(false);
 
   const currentEvent = events.find((e) => e.$id === currentEventId);
   const isEventSelected = !!currentEvent;
@@ -135,27 +159,71 @@ export default function ParticipantManagement({
     );
   }, [participants, currentEventId]);
 
-  const onParticipantTypeChange = (type) => {
-    handleParticipantTypeChange(
-      type,
-      setParticipantType,
-      setParticipantData,
-      setErrors
-    );
+  const handleParticipantTypeChange = (type) => {
+    setParticipantType(type);
+    setParticipantData(getInitialParticipantData(type));
+    setErrors({});
+    setDuplicateErrors({});
+    setNewEntryInfo({});
+    setActiveSection(type);
+
+    // Scroll to the selected section
+    const sectionElement = document.getElementById(`${type}-section`);
+    if (sectionElement) {
+      sectionElement.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   const onInputChange = async (field, value) => {
-    await handleInputChange(
-      field,
-      value,
-      participantData,
-      setParticipantData,
-      currentEventId,
-      setDuplicateErrors,
-      setNewEntryInfo,
-      setAutofillData,
-      setShowAutofillDialog
-    );
+    try {
+      const updatedData = { ...participantData, [field]: value };
+      setParticipantData(updatedData);
+
+      // Determine which identifier to check based on participant type
+      const identifierField =
+        participantType === "student"
+          ? "studentId"
+          : participantType === "staff"
+          ? "staffFacultyId"
+          : "name";
+
+      if (field === identifierField) {
+        // Check if the value is valid for checking
+        const isValid =
+          participantType === "community"
+            ? value.length >= 3
+            : isIdComplete(value, participantType);
+
+        if (!isValid) {
+          setDuplicateErrors({});
+          return;
+        }
+
+        // Check for existing participant
+        const existingParticipant = participants.find(
+          (p) =>
+            p[identifierField]?.toLowerCase() === value.toLowerCase() &&
+            p.eventId !== currentEventId
+        );
+
+        console.log("Checking for existing participant:", {
+          field,
+          value,
+          existingParticipant,
+        });
+
+        if (existingParticipant) {
+          setAutofillData({
+            ...existingParticipant,
+            eventName: existingParticipant.eventName || "another event",
+            participantType,
+          });
+          setShowConfirmDialog(true);
+        }
+      }
+    } catch (error) {
+      console.error("Error in handleInputChange:", error);
+    }
   };
 
   const handleAddParticipant = async (e) => {
@@ -280,6 +348,9 @@ export default function ParticipantManagement({
           } ${cleanedData.name} added successfully`
         );
       }
+
+      // Clear saved form data only after successful submission
+      clearFormData(STORAGE_KEYS.PARTICIPANT);
     } catch (error) {
       console.error("Error adding participant:", error);
       toast.error(`Error adding participant: ${error.message}`);
@@ -404,143 +475,134 @@ export default function ParticipantManagement({
     }
   }, [participantData, participants, currentEventId]);
 
-  const checkDuplicateInCurrentEvent = async (field, value) => {
-    if (!value || !currentEventId) return false;
+  const handleStudentIdChange = async (e) => {
+    const value = formatStudentId(e.target.value);
+    setParticipantData((prev) => ({ ...prev, studentId: value }));
 
-    try {
-      const isDuplicate = await checkDuplicateParticipant(
-        currentEventId,
-        field === "studentId" ? value : "",
-        field === "name" ? value : ""
-      );
+    // Only show validation for student type
+    if (participantType !== "student") return;
 
-      if (isDuplicate) {
-        setDuplicateErrors((prev) => ({
-          ...prev,
-          [field]: `This ${
-            field === "studentId" ? "Student ID" : "Name"
-          } is already registered in this event.`,
-        }));
-        return true;
-      } else {
-        setDuplicateErrors((prev) => ({
-          ...prev,
-          [field]: "",
-        }));
-        return false;
-      }
-    } catch (error) {
-      console.error(`Error checking duplicate ${field}:`, error);
-      toast.error(`Error checking for duplicate ${field}`);
-      return false;
+    // Clear validation message if empty
+    if (!value.trim()) {
+      setValidationMessages((prev) => ({
+        ...prev,
+        student: {
+          ...prev.student,
+          studentId: "",
+        },
+      }));
+      setHasDuplicates(false);
+      return;
+    }
+
+    // Only check for duplicates if we have a complete student ID
+    if (value.length === 10 && value.match(/^\d{2}-\d{2}-\d{4}$/)) {
+      await checkDuplicateInCurrentEvent("studentId", value);
     }
   };
 
-  const handleStudentIdChange = async (e) => {
-    const formattedId = formatStudentId(e.target.value);
-    setParticipantData((prev) => ({ ...prev, studentId: formattedId }));
+  const handleStaffIdChange = async (e) => {
+    const value = formatStaffFacultyId(e.target.value);
+    setParticipantData((prev) => ({ ...prev, staffFacultyId: value }));
 
-    if (isStudentIdComplete(formattedId)) {
-      try {
-        // Check for duplicate in current event first
-        const isDuplicateInEvent = await checkDuplicateInCurrentEvent(
-          "studentId",
-          formattedId
-        );
+    // Only show validation for staff type
+    if (participantType !== "staff") return;
 
-        if (isDuplicateInEvent) {
-          // If duplicate found, don't proceed with autofill
-          return;
-        }
-
-        // Only proceed with autofill if no duplicate found
-        const foundData = await handleAutofill(formattedId, currentEventId);
-        if (foundData) {
-          setAutofillData(foundData);
-          setShowConfirmDialog(true);
-        }
-      } catch (error) {
-        console.error("Error during student ID check:", error);
-        toast.error("Error checking participant data");
-      }
-    } else {
-      // Clear duplicate errors when student ID is incomplete
-      setDuplicateErrors((prev) => ({
+    // Clear validation message if empty
+    if (!value.trim()) {
+      setValidationMessages((prev) => ({
         ...prev,
-        studentId: "",
+        staff: {
+          ...prev.staff,
+          staffFacultyId: "",
+        },
       }));
+      setHasDuplicates(false);
+      return;
+    }
+
+    // Check for duplicates if we have a complete staff ID
+    if (value.length >= 3) {
+      await checkDuplicateInCurrentEvent("staffFacultyId", value);
     }
   };
 
   const handleNameChange = async (e) => {
-    const name = capitalizeWords(e.target.value);
-    setParticipantData((prev) => ({ ...prev, name }));
+    const value = capitalizeWords(e.target.value);
+    setParticipantData((prev) => ({ ...prev, name: value }));
 
-    if (name.length >= 3) {
-      try {
-        // Check for duplicate in current event first
-        const isDuplicateInEvent = await checkDuplicateInCurrentEvent(
-          "name",
-          name
-        );
-
-        if (isDuplicateInEvent) {
-          // If duplicate found, don't proceed with autofill
-          return;
-        }
-
-        // Only proceed with autofill if no duplicate found
-        const foundData = await handleAutofill(name, currentEventId);
-        if (foundData) {
-          setAutofillData(foundData);
-          setShowConfirmDialog(true);
-        }
-      } catch (error) {
-        console.error("Error during name check:", error);
-        toast.error("Error checking participant data");
-      }
-    } else {
-      // Clear duplicate errors when name is too short
-      setDuplicateErrors((prev) => ({
+    // Clear validation message if empty
+    if (!value.trim()) {
+      setValidationMessages((prev) => ({
         ...prev,
-        name: "",
+        [participantType]: {
+          ...prev[participantType],
+          name: "",
+        },
       }));
+      setHasDuplicates(false);
+      return;
+    }
+
+    // Only validate name based on participant type
+    switch (participantType) {
+      case "student":
+        if (value.trim()) {
+          await checkDuplicateInCurrentEvent("name", value);
+        }
+        break;
+      case "staff":
+        if (value.trim()) {
+          await checkDuplicateInCurrentEvent("name", value);
+        }
+        break;
+      case "community":
+        if (value.trim()) {
+          await checkDuplicateInCurrentEvent("name", value);
+        }
+        break;
+      default:
+        break;
     }
   };
 
   const handleInitialConfirm = () => {
+    console.log("Initial confirm clicked, autofill data:", autofillData);
     setShowConfirmDialog(false);
-    setShowDetailsDialog(true); // Show details dialog after initial confirmation
+    setShowDetailsDialog(true);
   };
 
-  const handleAutofillConfirm = () => {
+  const handleAutofillConfirmation = () => {
+    console.log("Autofill confirmation clicked, data:", autofillData);
     if (autofillData) {
-      setParticipantData({
-        studentId: autofillData.studentId,
+      const mappedData = {
         name: autofillData.name,
         sex: autofillData.sex,
         age: autofillData.age,
-        homeAddress: autofillData.homeAddress || "",
-        school: autofillData.school,
-        year: autofillData.year,
-        section: autofillData.section,
+        homeAddress: autofillData.homeAddress || autofillData.address,
         ethnicGroup: autofillData.ethnicGroup,
         otherEthnicGroup: autofillData.otherEthnicGroup || "",
-        school: autofillData.school || "",
-        position: autofillData.position || "",
-      });
+      };
 
-      toast.success(
-        `Data auto-filled from existing participant in ${
-          autofillData.eventName || "another event"
-        }`
-      );
+      // Add type-specific fields
+      if (participantType === "student") {
+        mappedData.studentId = autofillData.studentId;
+        mappedData.school = autofillData.school;
+        mappedData.year = autofillData.year;
+        mappedData.section = autofillData.section;
+      } else if (participantType === "staff") {
+        mappedData.staffFacultyId = autofillData.staffFacultyId;
+      }
+
+      console.log("Setting participant data:", mappedData);
+      setParticipantData(mappedData);
+      setShowDetailsDialog(false);
+      setAutofillData(null);
     }
-    setShowDetailsDialog(false);
-    setAutofillData(null);
   };
 
   const handleCancel = () => {
+    console.log("Cancel clicked");
     setShowConfirmDialog(false);
     setShowDetailsDialog(false);
     setAutofillData(null);
@@ -578,17 +640,22 @@ export default function ParticipantManagement({
       <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="name">Name</Label>
         <Input
-          type="text"
           id="name"
+          value={participantData.name || ""}
+          onChange={handleNameChange}
           placeholder="Enter full name"
-          value={participantData.name}
-          onChange={(e) =>
-            setParticipantData({
-              ...participantData,
-              name: capitalizeWords(e.target.value),
-            })
-          }
         />
+        {validationMessages[participantType].name && (
+          <p
+            className={`text-sm ${
+              validationMessages[participantType].name.includes("already")
+                ? "text-red-500"
+                : "text-green-500"
+            }`}
+          >
+            {validationMessages[participantType].name}
+          </p>
+        )}
       </div>
       <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="sex">Sex at Birth</Label>
@@ -732,18 +799,24 @@ export default function ParticipantManagement({
           <div className="grid w-full items-center gap-1.5">
             <Label htmlFor="studentId">Student ID</Label>
             <Input
-              type="text"
               id="studentId"
-              placeholder="Enter student ID"
-              value={participantData.studentId}
-              onChange={(e) => {
-                const formattedId = formatStudentId(e.target.value);
-                setParticipantData({
-                  ...participantData,
-                  studentId: formattedId,
-                });
-              }}
+              value={participantData.studentId || ""}
+              onChange={handleStudentIdChange}
+              placeholder="XX-XX-XXXX"
             />
+            {validationMessages[participantType].studentId && (
+              <p
+                className={`text-sm ${
+                  validationMessages[participantType].studentId.includes(
+                    "already"
+                  )
+                    ? "text-red-500"
+                    : "text-green-500"
+                }`}
+              >
+                {validationMessages[participantType].studentId}
+              </p>
+            )}
           </div>
         );
 
@@ -752,24 +825,32 @@ export default function ParticipantManagement({
           <div className="grid w-full items-center gap-1.5">
             <Label htmlFor="staffFacultyId">Staff/Faculty ID</Label>
             <Input
-              type="text"
               id="staffFacultyId"
-              placeholder="Enter staff/faculty ID"
-              value={participantData.staffFacultyId}
-              onChange={(e) => {
-                const formattedId = formatStaffFacultyId(e.target.value);
-                setParticipantData({
-                  ...participantData,
-                  staffFacultyId: formattedId,
-                });
-              }}
-              maxLength={3}
+              value={participantData.staffFacultyId || ""}
+              onChange={handleStaffIdChange}
+              placeholder="XXX"
             />
+            {validationMessages[participantType].staffFacultyId && (
+              <p
+                className={`text-sm ${
+                  validationMessages[participantType].staffFacultyId.includes(
+                    "already"
+                  )
+                    ? "text-red-500"
+                    : "text-green-500"
+                }`}
+              >
+                {validationMessages[participantType].staffFacultyId}
+              </p>
+            )}
           </div>
         );
 
       case "community":
         return null; // No additional fields for community members
+
+      default:
+        return null;
     }
   };
 
@@ -984,81 +1065,258 @@ export default function ParticipantManagement({
     setErrors({});
   };
 
+  // Load saved form data on component mount
+  useEffect(() => {
+    const savedData = loadFormData(STORAGE_KEYS.PARTICIPANT);
+    if (savedData) {
+      setParticipantData(savedData.participantData || {});
+      setParticipantType(savedData.participantType || "student");
+      // Load any other relevant saved data
+    }
+  }, []);
+
+  // Save form data on any change
+  useEffect(() => {
+    const formData = {
+      participantData,
+      participantType,
+      // Include any other state that needs to be persisted
+    };
+    saveFormData(STORAGE_KEYS.PARTICIPANT, formData);
+  }, [participantData, participantType]);
+
+  const renderAutofillDialog = () => {
+    return (
+      <>
+        <AlertDialog
+          open={showConfirmDialog}
+          onOpenChange={setShowConfirmDialog}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Existing Participant Found</AlertDialogTitle>
+              <AlertDialogDescription>
+                A {participantType} with this {getIdentifierType()} was found in
+                another event. Would you like to see their details and
+                potentially autofill the form?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleCancel}>
+                No, Keep Empty
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleInitialConfirm}>
+                Yes, Show Details
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={showDetailsDialog}
+          onOpenChange={setShowDetailsDialog}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Participant Details</AlertDialogTitle>
+              <AlertDialogDescription>
+                {autofillData && (
+                  <div className="space-y-4">
+                    <p>Participant data found from {autofillData.eventName}:</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {renderAutofillFields()}
+                    </div>
+                    <p className="mt-2">
+                      Would you like to autofill the form with this data?
+                    </p>
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleCancel}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleAutofillConfirmation}>
+                Yes, Autofill
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  };
+
+  const getIdentifierType = () => {
+    switch (participantType) {
+      case "student":
+        return "Student ID";
+      case "staff":
+        return "Staff/Faculty ID";
+      case "community":
+        return "name";
+      default:
+        return "identifier";
+    }
+  };
+
+  const renderAutofillFields = () => {
+    if (!autofillData) {
+      console.log("No autofill data available");
+      return null;
+    }
+
+    console.log("Rendering autofill fields with data:", autofillData);
+
+    const commonFields = [
+      { label: "Name", value: autofillData.name },
+      { label: "Sex", value: autofillData.sex },
+      { label: "Age", value: autofillData.age },
+      {
+        label: "Address",
+        value: autofillData.homeAddress || autofillData.address,
+      },
+      { label: "Ethnic Group", value: autofillData.ethnicGroup },
+    ];
+
+    const typeSpecificFields =
+      participantType === "student"
+        ? [
+            { label: "Student ID", value: autofillData.studentId },
+            { label: "School", value: autofillData.school },
+            { label: "Year", value: autofillData.year },
+            { label: "Section", value: autofillData.section },
+          ]
+        : participantType === "staff"
+        ? [{ label: "Staff/Faculty ID", value: autofillData.staffFacultyId }]
+        : [];
+
+    const fieldsToRender = [...commonFields, ...typeSpecificFields];
+
+    return fieldsToRender.map(({ label, value }) => (
+      <div key={label} className="flex justify-between">
+        <strong>{label}:</strong>
+        <span>{value || "N/A"}</span>
+      </div>
+    ));
+  };
+
+  // Add these console logs for debugging
+  useEffect(() => {
+    console.log("Participants state updated:", participants);
+  }, [participants]);
+
+  useEffect(() => {
+    console.log("Dialog states updated:", {
+      showConfirmDialog,
+      showDetailsDialog,
+      autofillData,
+    });
+  }, [showConfirmDialog, showDetailsDialog, autofillData]);
+
+  const checkDuplicateInCurrentEvent = async (field, value) => {
+    if (!value || !currentEventId) return false;
+
+    try {
+      let isDuplicate = false;
+      const collectionId =
+        participantType === "student"
+          ? participantCollectionId
+          : participantType === "staff"
+          ? staffFacultyCollectionId
+          : communityCollectionId;
+
+      const query = [Query.equal("eventId", currentEventId)];
+
+      if (field === "studentId") {
+        query.push(Query.equal("studentId", value.toLowerCase()));
+      } else if (field === "staffFacultyId") {
+        query.push(Query.equal("staffFacultyId", value.toLowerCase()));
+      } else if (field === "name") {
+        query.push(Query.equal("name", value.toLowerCase()));
+      }
+
+      const response = await databases.listDocuments(
+        databaseId,
+        collectionId,
+        query
+      );
+
+      isDuplicate = response.documents.length > 0;
+
+      if (isDuplicate) {
+        setValidationMessages((prev) => ({
+          ...prev,
+          [participantType]: {
+            ...prev[participantType],
+            [field]: getValidationMessage(participantType, field, true),
+          },
+        }));
+        setHasDuplicates(true);
+        return true;
+      } else {
+        setValidationMessages((prev) => ({
+          ...prev,
+          [participantType]: {
+            ...prev[participantType],
+            [field]: getValidationMessage(participantType, field, false),
+          },
+        }));
+        setHasDuplicates(false);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error checking duplicate:", error);
+      setValidationMessages((prev) => ({
+        ...prev,
+        [participantType]: {
+          ...prev[participantType],
+          [field]: "Error checking participant information",
+        },
+      }));
+      return false;
+    }
+  };
+
+  // Helper function to get the appropriate validation message
+  const getValidationMessage = (type, field, isDuplicate) => {
+    if (isDuplicate) {
+      switch (type) {
+        case "student":
+          return field === "studentId"
+            ? "This Student ID is already registered in this event"
+            : "This student name is already registered in this event";
+        case "staff":
+          return field === "staffFacultyId"
+            ? "This Staff/Faculty ID is already registered in this event"
+            : "This staff/faculty name is already registered in this event";
+        case "community":
+          return "This community member name is already registered in this event";
+      }
+    } else {
+      switch (type) {
+        case "student":
+          return field === "studentId"
+            ? "This is a new Student ID"
+            : "This is a new student name";
+        case "staff":
+          return field === "staffFacultyId"
+            ? "This is a new Staff/Faculty ID"
+            : "This is a new staff/faculty name";
+        case "community":
+          return "This is a new community member name";
+      }
+    }
+  };
+
+  // Keep the logic but remove the empty state UI
+  if (events.length === 0) {
+    return null; // Return null to let parent handle empty state
+  }
+
   return (
     <>
-      {/* Initial Confirmation Dialog */}
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Existing Participant Found</AlertDialogTitle>
-            <AlertDialogDescription>
-              A participant with this{" "}
-              {autofillData?.studentId ? "Student ID" : "name"} was found in
-              another event. Would you like to see their details and potentially
-              autofill the form?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancel}>
-              No, Keep Empty
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleInitialConfirm}>
-              Yes, Show Details
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Details and Autofill Dialog */}
-      <AlertDialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Participant Details</AlertDialogTitle>
-            <AlertDialogDescription>
-              {autofillData && (
-                <div className="space-y-4">
-                  <p>Participant data found from another event:</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <strong>Name:</strong> {autofillData.name}
-                    </div>
-                    <div>
-                      <strong>Student ID:</strong> {autofillData.studentId}
-                    </div>
-                    <div>
-                      <strong>Sex:</strong> {autofillData.sex}
-                    </div>
-                    <div>
-                      <strong>Age:</strong> {autofillData.age}
-                    </div>
-                    <div>
-                      <strong>School:</strong> {autofillData.school}
-                    </div>
-                    <div>
-                      <strong>Year:</strong> {autofillData.year}
-                    </div>
-                    <div>
-                      <strong>Section:</strong> {autofillData.section}
-                    </div>
-                    <div>
-                      <strong>Ethnic Group:</strong> {autofillData.ethnicGroup}
-                    </div>
-                  </div>
-                  <p className="mt-2">
-                    Would you like to autofill the form with this data?
-                  </p>
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancel}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAutofillConfirm}>
-              Yes, Autofill
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {renderAutofillDialog()}
 
       <Card>
         <CardHeader>

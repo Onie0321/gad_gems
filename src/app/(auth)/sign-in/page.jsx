@@ -23,10 +23,10 @@ import {
   SignIn,
   createGoogleUser,
   logActivity,
-  createNotification, // Add this import
+  createNotification,
 } from "@/lib/appwrite";
 import dynamic from "next/dynamic";
-import { ActivityTypes } from "@/lib/constants";
+import { useAuth } from "@/context/AuthContext";
 
 const MotionDiv = dynamic(
   () => import("framer-motion").then((mod) => mod.motion.div),
@@ -43,6 +43,7 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirected, setIsRedirected] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const { loading } = useAuth();
 
   useEffect(() => {
     setIsMounted(true);
@@ -104,12 +105,7 @@ export default function SignInPage() {
         `${currentUrl}/auth-callback`,
         `${currentUrl}/sign-in`
       );
-
-      // Note: For Google sign-in, you'll need to log the activity after the callback
-      const user = await getCurrentUser();
-      if (user) {
-        await logActivity(user.$id, "google_signin");
-      }
+      // Note: Activity logging will happen in the auth-callback page
     } catch (error) {
       console.error("Google sign-in error:", error);
       toast({
@@ -120,49 +116,58 @@ export default function SignInPage() {
     }
   };
 
-  const handleSignIn = async (e) => {
+  const handleSubmit = async (e) => {   
     e.preventDefault();
     setIsLoading(true);
-  
+
     try {
-      const session = await SignIn(email, password);
-      if (session) {
-        const user = await getCurrentUser();
-        if (user) {
-          // Log the sign-in activity
-          await logActivity(user.$id, "user_signin");
-  
-          // Create notification for admin
-          await createNotification({
-            userId: "admin",
-            type: "account",
-            title: "User Sign In",
-            message: `${user.name} has signed in to the system.`,
-            actionType: "user_signin",
-            status: "new",
-            approvalStatus: "none",
-            read: false
-          });
-  
-          handleUserStatus(user);
-        } else {
-          throw new Error("Failed to fetch user data after sign-in.");
-        }
-  
-        setEmail("");
-        setPassword("");
+      // First create the session
+      const userAccount = await SignIn(email, password);
+
+      // Get user details after session is created
+      const user = await getCurrentUser();
+
+      if (!user) {
+        throw new Error("Failed to get user details");
+      }
+
+      // Log the sign-in activity
+      await logActivity(user.$id, "email_signin");
+
+      // Handle navigation based on user role and approval status
+      if (user.approvalStatus === "approved") {
+        toast({
+          title: "Welcome Back!",
+          description: `You've successfully signed in, ${user.name}.`,
+          variant: "success",
+        });
+
+        // Use router.push instead of window.location for smoother navigation
+        router.push(user.role === "admin" ? "/admin" : "/officer");
+      } else {
+        toast({
+          title: "Access Denied",
+          description:
+            "Your account needs approval. Please wait for admin confirmation.",
+          variant: "destructive",
+        });
+        await account.deleteSession("current"); // Log out if not approved
       }
     } catch (error) {
-      console.error("Sign-in error:", error);
+      console.error("Sign in error:", error);
       toast({
         title: "Error",
-        description: error.message || "Sign-in failed. Please try again.",
+        description: error.message || "Failed to sign in. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (loading) {
+    return null; // Let the layout handle loading state
+  }
 
   if (!isMounted) {
     return null; // or a loading spinner
@@ -219,7 +224,7 @@ export default function SignInPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSignIn} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <Label htmlFor="email">Email Address</Label>
                 <div className="relative">
@@ -266,7 +271,7 @@ export default function SignInPage() {
               <p className="mt-4 text-center text-sm text-gray-600">
                 Forgot your password?{" "}
                 <Link
-                  href="sign-in/forgot-password"
+                  href="/forgot-password"
                   className="font-medium text-[#FF6F61] hover:text-[#E5635B]"
                 >
                   Reset it here

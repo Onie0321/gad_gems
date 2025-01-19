@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -14,12 +15,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { toast } from "react-toastify";
-import EditParticipantDialog from "../../participant-management/edit-participant-dialog/page";
-import AddParticipant from "../add-participant-dialog/page"; // Adjust the path as needed
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Trash2 } from "lucide-react";
+import EditParticipantDialog from "./edit-participant-dialog/page";
+import AddParticipant from "../add-participant-dialog/page";
 
 const EmptyState = ({ message }) => (
   <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -36,11 +35,18 @@ const ViewParticipants = ({
   participants,
   selectedEvent,
   onAddParticipant,
+  onDeleteParticipant,
 }) => {
-  const [editingParticipant, setEditingParticipant] = useState(null);
-
   const filteredParticipants = participants.filter(
     (p) => p.eventId === selectedEvent?.$id
+  );
+
+  const studentParticipants = filteredParticipants.filter((p) => p.studentId);
+  const staffParticipants = filteredParticipants.filter(
+    (p) => p.staffFacultyId
+  );
+  const communityParticipants = filteredParticipants.filter(
+    (p) => !p.studentId && !p.staffFacultyId
   );
 
   const summary = useMemo(() => {
@@ -51,34 +57,8 @@ const ViewParticipants = ({
     const femaleCount = filteredParticipants.filter(
       (p) => p.sex === "Female"
     ).length;
-
     return { total, maleCount, femaleCount };
   }, [filteredParticipants]);
-
-  const onDeleteParticipant = async (participantId) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this participant?"
-    );
-    if (!confirmDelete) return;
-
-    try {
-      await onDeleteParticipant(participantId);
-      toast.success("Participant deleted successfully!");
-      onAddParticipant(null, participantId); // Pass null to indicate deletion
-    } catch (error) {
-      toast.error("Failed to delete participant.");
-    }
-  };
-
-  const handleAddParticipant = (participant) => {
-    onAddParticipant(participant);
-  };
-
-  const studentParticipants = participants.filter((p) => p.studentId);
-  const staffParticipants = participants.filter((p) => p.staffFacultyId);
-  const communityParticipants = participants.filter(
-    (p) => !p.studentId && !p.staffFacultyId
-  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -89,10 +69,37 @@ const ViewParticipants = ({
           </DialogTitle>
         </DialogHeader>
 
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{summary.total}</div>
+              <div className="text-sm text-muted-foreground">
+                Total Participants
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{summary.maleCount}</div>
+              <div className="text-sm text-muted-foreground">
+                Male Participants
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{summary.femaleCount}</div>
+              <div className="text-sm text-muted-foreground">
+                Female Participants
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">Participant List</h3>
           <AddParticipant
-            onAddParticipant={handleAddParticipant}
+            onAddParticipant={onAddParticipant}
             eventId={selectedEvent?.$id}
             isEventSelected={!!selectedEvent}
             currentEvent={selectedEvent}
@@ -108,7 +115,7 @@ const ViewParticipants = ({
               Staff/Faculty ({staffParticipants.length})
             </TabsTrigger>
             <TabsTrigger value="community">
-              Community Members ({communityParticipants.length})
+              Community ({communityParticipants.length})
             </TabsTrigger>
           </TabsList>
 
@@ -122,7 +129,6 @@ const ViewParticipants = ({
                       <TableHead>Name</TableHead>
                       <TableHead>Sex</TableHead>
                       <TableHead>Age</TableHead>
-                      <TableHead>Address</TableHead>
                       <TableHead>School</TableHead>
                       <TableHead>Year</TableHead>
                       <TableHead>Section</TableHead>
@@ -137,7 +143,6 @@ const ViewParticipants = ({
                         <TableCell>{participant.name}</TableCell>
                         <TableCell>{participant.sex}</TableCell>
                         <TableCell>{participant.age}</TableCell>
-                        <TableCell>{participant.homeAddress}</TableCell>
                         <TableCell>{participant.school}</TableCell>
                         <TableCell>{participant.year}</TableCell>
                         <TableCell>{participant.section}</TableCell>
@@ -146,9 +151,7 @@ const ViewParticipants = ({
                           <div className="flex space-x-2">
                             <EditParticipantDialog
                               participant={participant}
-                              onUpdateParticipant={(updatedParticipant) =>
-                                handleAddParticipant(updatedParticipant)
-                              }
+                              onUpdateParticipant={onAddParticipant}
                             />
                             <Button
                               variant="ghost"
@@ -194,18 +197,12 @@ const ViewParticipants = ({
                         <TableCell>{participant.sex}</TableCell>
                         <TableCell>{participant.age}</TableCell>
                         <TableCell>{participant.address}</TableCell>
-                        <TableCell>
-                          {participant.ethnicGroup === "Other"
-                            ? participant.otherEthnicGroup
-                            : participant.ethnicGroup}
-                        </TableCell>
+                        <TableCell>{participant.ethnicGroup}</TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
                             <EditParticipantDialog
                               participant={participant}
-                              onUpdateParticipant={(updatedParticipant) =>
-                                handleAddParticipant(updatedParticipant)
-                              }
+                              onUpdateParticipant={onAddParticipant}
                             />
                             <Button
                               variant="ghost"
@@ -249,18 +246,12 @@ const ViewParticipants = ({
                         <TableCell>{participant.sex}</TableCell>
                         <TableCell>{participant.age}</TableCell>
                         <TableCell>{participant.address}</TableCell>
-                        <TableCell>
-                          {participant.ethnicGroup === "Other"
-                            ? participant.otherEthnicGroup
-                            : participant.ethnicGroup}
-                        </TableCell>
+                        <TableCell>{participant.ethnicGroup}</TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
                             <EditParticipantDialog
                               participant={participant}
-                              onUpdateParticipant={(updatedParticipant) =>
-                                handleAddParticipant(updatedParticipant)
-                              }
+                              onUpdateParticipant={onAddParticipant}
                             />
                             <Button
                               variant="ghost"

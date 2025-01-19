@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useState, useEffect, useContext } from "react";
-import { getAccount, getCurrentUser, signOut } from "@/lib/appwrite";
+import { account, databases, getCurrentUser, SignOut } from "@/lib/appwrite";
 
 const AuthContext = createContext(undefined);
 
@@ -10,47 +10,39 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    checkUser();
-  }, []);
-
   const checkUser = async () => {
     try {
-      const account = await getAccount();
-      if (account) {
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
-      }
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
+      setError(null);
     } catch (error) {
       console.error("Error checking user:", error);
       setError("Failed to authenticate user");
-      setUser(null); // Ensure user is set to null on error
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    checkUser();
+  }, []);
+
   const login = async (email, password) => {
-    // Implement login logic using Appwrite functions
-    // This is a placeholder for the actual implementation
     try {
-      // Assuming you have a signIn function in your Appwrite utility
-      const account = await signIn(email, password);
-      if (account) {
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
-        setError(null);
-      }
+      await account.createEmailSession(email, password);
+      await checkUser(); // Refresh user data after login
+      return true;
     } catch (error) {
       console.error("Login error:", error);
       setError("Failed to log in");
-      setUser(null);
+      return false;
     }
   };
 
   const logout = async () => {
     try {
-      await signOut();
+      await account.deleteSession("current");
       setUser(null);
       setError(null);
     } catch (error) {
@@ -61,7 +53,14 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, login, logout, checkUser }}
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        logout,
+        checkUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

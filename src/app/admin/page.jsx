@@ -13,6 +13,8 @@ import {
   BarChart2,
   Loader2,
   ImageIcon,
+  Clock,
+  Archive,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,7 +36,7 @@ import {
   participantCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import {
   Table,
@@ -45,6 +47,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import HomepageSettings from "./homepage-settings/page";
+import { useToast } from "@/hooks/use-toast";
+import AcademicPeriodManagement from "./academic-period/page";
+import Archives from "./archives/page";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
@@ -60,6 +65,8 @@ export default function AdminDashboard() {
   const [participants, setParticipants] = React.useState([]);
   const [events, setEvents] = React.useState([]);
   const router = useRouter();
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
@@ -68,10 +75,19 @@ export default function AdminDashboard() {
       try {
         const currentUser = await getCurrentUser();
         if (!currentUser || currentUser.role !== "admin") {
-          // Redirect non-users to the login page
           router.push("/sign-in");
         } else {
           setUser(currentUser);
+
+          // Show welcome toast if coming from login
+          if (searchParams.get("login") === "success") {
+            toast({
+              title: "Welcome back, Admin!",
+              description: `Successfully signed in as ${currentUser.name}`,
+              duration: 3000,
+            });
+          }
+
           setShowWelcomeModal(true);
         }
       } catch (err) {
@@ -85,7 +101,7 @@ export default function AdminDashboard() {
     };
 
     checkUserRole();
-  }, [router]);
+  }, []);
 
   const handleActivity = React.useCallback(() => {
     setLastActivity(Date.now());
@@ -176,6 +192,10 @@ export default function AdminDashboard() {
         return <DemographicAnalysis />;
       case "homepage":
         return <HomepageSettings />;
+      case "academic-period":
+        return <AcademicPeriodManagement />;
+      case "archives":
+        return <Archives />;
       default:
         return <DashboardOverview {...props} />;
     }
@@ -261,7 +281,25 @@ export default function AdminDashboard() {
               onClick={() => setActiveSection("homepage")}
             >
               <ImageIcon className="mr-2 h-4 w-4" />
-              Homepage Settings
+              Content Management
+            </Button>
+            <Button
+              variant={
+                activeSection === "academic-period" ? "default" : "ghost"
+              }
+              className="w-full justify-start"
+              onClick={() => setActiveSection("academic-period")}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              Academic Period
+            </Button>
+            <Button
+              variant={activeSection === "archives" ? "default" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => setActiveSection("archives")}
+            >
+              <Archive className="mr-2 h-4 w-4" />
+              Archives
             </Button>
           </nav>
         </div>
