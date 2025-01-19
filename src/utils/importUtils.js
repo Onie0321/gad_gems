@@ -123,48 +123,77 @@ const formatDate = (dateString) => {
   ).toISOString();
 };
 
-export const importEventAndParticipants = async (file) => {
+export const importEventAndParticipants = async (file, academicPeriodId) => {
   try {
+    const data = await readFile(file);
+    const eventMetadata = extractEventMetadata(data);
+    const participants = extractParticipants(data);
+
+    // Validate data before proceeding
+    validateEventMetadata(eventMetadata);
+    validateParticipants(participants);
+
     const currentUser = await getCurrentUser();
     if (!currentUser) {
       throw new Error("You must be logged in to import events");
     }
 
-    const data = await readFile(file);
-    const eventMetadata = extractEventMetadata(data);
-    console.log("Extracted Event Metadata:", eventMetadata);
-    validateEventMetadata(eventMetadata);
+    // Add academic period and archive status to event
+    const eventData = {
+      ...eventMetadata,
+      academicPeriodId,
+      isArchived: false,
+      createdBy: currentUser.$id,
+      createdAt: new Date().toISOString(),
+    };
 
-    const participants = extractParticipants(data);
-    console.log("Extracted Participants:", participants);
-    validateParticipants(participants);
-
-    const isDuplicate = await checkForDuplicateEvent(eventMetadata);
-
-    if (isDuplicate) {
-      return {
-        success: false,
-        message: `Event "${
-          eventMetadata.eventName
-        }" on ${formatDateForErrorMessage(eventMetadata.eventDate)} at ${
-          eventMetadata.eventVenue
-        } already exists in the database. Skipped import.`,
-      };
-    }
-
-    const eventResponse = await saveEventToDatabase(eventMetadata);
-    const participantResponses = await saveParticipantsToDatabase(
-      participants,
-      eventResponse.response.$id
+    // Create the event
+    const event = await databases.createDocument(
+      databaseId,
+      eventCollectionId,
+      "unique()",
+      eventData
     );
+
+    // Add academic period and archive status to participants
+    const participantPromises = participants.map((participant) =>
+      databases.createDocument(
+        databaseId,
+        participantCollectionId,
+        "unique()",
+        {
+          name: participant.name,
+          studentId: participant.studentId,
+          sex: participant.sex,
+          age: participant.age || "",
+          school: participant.school || "",
+          year: participant.year || "",
+          section: participant.section || "",
+          ethnicGroup: participant.ethnicGroup || "",
+          eventId: event.$id,
+          academicPeriodId,
+          isArchived: false,
+          createdBy: currentUser.$id,
+          createdAt: new Date().toISOString(),
+        }
+      )
+    );
+
+    // Wait for all participants to be created
+    const createdParticipants = await Promise.all(participantPromises);
+
+    console.log("Created event:", event);
+    console.log("Created participants:", createdParticipants);
 
     return {
       success: true,
-      message: `Successfully imported ${participantResponses.length} participants for event: ${eventMetadata.eventName}.`,
+      message: `Successfully imported event with ${participants.length} participants`,
+      event,
+      participants: createdParticipants,
     };
   } catch (error) {
-    console.error("Error importing event and participants:", error);
-    throw new Error(error.message || "Failed to import data.");
+    console.error("Import error:", error);
+    throw error;
   }
 };
 
@@ -379,7 +408,7 @@ const validateParticipants = (participants) => {
         `Participant at row ${index + 1} is missing a Student ID.`
       );
     }
-    if (!["Male", "Female", "Intersex"].includes(participant.sex)) {
+    if (!["Male", "Female"].includes(participant.sex)) {
       throw new Error(
         `Participant at row ${index + 1} has an invalid Sex value.`
       );

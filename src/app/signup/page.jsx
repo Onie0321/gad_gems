@@ -18,7 +18,12 @@ import Link from "next/link";
 import { Lock, Mail, Eye, EyeOff, User } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { useToast } from "@/hooks/use-toast";
-import { createUser, account, createNotification } from "@/lib/appwrite";
+import {
+  createUser,
+  account,
+  createNotification,
+  logActivity,
+} from "@/lib/appwrite";
 import dynamic from "next/dynamic";
 
 const MotionDiv = dynamic(
@@ -37,7 +42,7 @@ const calculatePasswordStrength = (password) => {
   return Math.min(score, 100);
 };
 
-export default function SignUpPage() {
+export default function () {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState("");
@@ -119,33 +124,17 @@ export default function SignUpPage() {
         throw new Error("You must agree to the terms and conditions.");
       }
 
+      if (passwordStrength < 50) {
+        throw new Error("Please use a stronger password");
+      }
+
       const newUser = await createUser(email, password, name);
 
       if (newUser) {
-        // Create notification for admin
-        await createNotification({
-          userId: "admin",
-          type: "account",
-          title: "New User Registration",
-          message: `New user ${name} (${email}) has registered and requires approval.`,
-          actionType: "user_registration",
-          read: false,
-        });
-
-        // Create welcome notification for the new user
-        await createNotification({
-          userId: newUser.$id,
-          type: "info",
-          title: "Welcome to GAD Nexus",
-          message: `Welcome ${name}! Your account has been created successfully.`,
-          status: "new",
-          approvalStatus: "none",
-          read: false,
-        });
-
         toast({
           title: "Success",
-          description: "Account created successfully!",
+          description:
+            "Account created successfully! Please wait for admin approval.",
           variant: "success",
         });
         router.push("/sign-in");
@@ -327,7 +316,6 @@ export default function SignUpPage() {
                     <Link
                       href="/signup/terms"
                       className="text-[#FF6F61] hover:text-[#E5635B]"
-                      
                     >
                       Terms and Conditions
                     </Link>{" "}

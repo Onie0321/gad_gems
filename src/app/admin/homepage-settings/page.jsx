@@ -1,51 +1,67 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Loader2, Plus, Trash } from "lucide-react";
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 import {
   databases,
   databaseId,
   eventCollectionId,
   newsCollectionId,
+  getCurrentUser,
 } from "@/lib/appwrite";
 import { ID } from "appwrite";
 
-export default function ContentManagement() {
+// Form schema for news creation
+const newsFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  imageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  date: z.string().min(1, "Date is required"),
+  showOnHomepage: z.boolean().default(false),
+});
+
+function ContentManagementClient() {
   const [events, setEvents] = useState([]);
   const [newsItems, setNewsItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newEvent, setNewEvent] = useState({
-    name: "",
-    description: "",
-    date: "",
-    location: "",
-    attendees: 0,
-    imageUrl: "",
-  });
-  const [newNewsItem, setNewNewsItem] = useState({
-    title: "",
-    description: "",
-    date: "",
-    imageUrl: "",
-    link: "",
-  });
+  const [selectedEvents, setSelectedEvents] = useState([]);
+  const [selectedNews, setSelectedNews] = useState([]);
+  const [isNewsDialogOpen, setIsNewsDialogOpen] = useState(false);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    fetchEvents();
-    fetchNewsItems();
-  }, []);
+  const form = useForm({
+    resolver: zodResolver(newsFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      imageUrl: "",
+      date: new Date().toISOString().split("T")[0],
+      showOnHomepage: false,
+    },
+  });
 
   const fetchEvents = async () => {
     try {
@@ -53,9 +69,23 @@ export default function ContentManagement() {
         databaseId,
         eventCollectionId
       );
-      setEvents(response.documents);
+      const events = response.documents;
+      setEvents(events);
+
+      // Set initially selected events (those with showOnHomepage = true)
+      setSelectedEvents(
+        events.filter((event) => event.showOnHomepage).map((event) => event.$id)
+      );
+
+      return true;
     } catch (error) {
       console.error("Error fetching events:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch events. Please try again.",
+        variant: "destructive",
+      });
+      return false;
     }
   };
 
@@ -66,280 +96,304 @@ export default function ContentManagement() {
         newsCollectionId
       );
       setNewsItems(response.documents);
+
+      // Set initially selected news items
+      setSelectedNews(
+        response.documents
+          .filter((news) => news.showOnHomepage)
+          .map((news) => news.$id)
+      );
+
+      return true;
     } catch (error) {
       console.error("Error fetching news items:", error);
-    }
-  };
-
-  const handleAddEvent = async (e) => {
-    e.preventDefault();
-    try {
-      await databases.createDocument(
-        databaseId,
-        eventCollectionId,
-        ID.unique(),
-        newEvent
-      );
-      setNewEvent({
-        name: "",
-        description: "",
-        date: "",
-        location: "",
-        attendees: 0,
-        imageUrl: "",
+      toast({
+        title: "Error",
+        description: "Failed to fetch news items. Please try again.",
+        variant: "destructive",
       });
-      fetchEvents();
-    } catch (error) {
-      console.error("Error adding event:", error);
+      return false;
     }
   };
 
-  const handleAddNewsItem = async (e) => {
-    e.preventDefault();
+  const handleEventSelection = async (eventId) => {
     try {
+      const newSelectedEvents = selectedEvents.includes(eventId)
+        ? selectedEvents.filter((id) => id !== eventId)
+        : [...selectedEvents, eventId];
+
+      // Update the event in the database
+      await databases.updateDocument(databaseId, eventCollectionId, eventId, {
+        showOnHomepage: !selectedEvents.includes(eventId),
+      });
+
+      setSelectedEvents(newSelectedEvents);
+
+      toast({
+        title: "Success",
+        description: "Homepage events updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating event visibility:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update event visibility",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleNewsSelection = async (newsId) => {
+    try {
+      const newSelectedNews = selectedNews.includes(newsId)
+        ? selectedNews.filter((id) => id !== newsId)
+        : [...selectedNews, newsId];
+
+      // Update the news item in the database
+      await databases.updateDocument(databaseId, newsCollectionId, newsId, {
+        showOnHomepage: !selectedNews.includes(newsId),
+      });
+
+      setSelectedNews(newSelectedNews);
+
+      toast({
+        title: "Success",
+        description: "Homepage news updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating news visibility:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update news visibility",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const onSubmitNews = async (data) => {
+    try {
+      // Remove imageUrl if it's empty
+      const newsData = {
+        ...data,
+        showOnHomepage: true,
+      };
+
+      if (!newsData.imageUrl) {
+        delete newsData.imageUrl; // Remove the imageUrl field if it's empty
+      }
+
       await databases.createDocument(
         databaseId,
         newsCollectionId,
         ID.unique(),
-        newNewsItem
+        newsData
       );
-      setNewNewsItem({
-        title: "",
-        description: "",
-        date: "",
-        imageUrl: "",
-        link: "",
+
+      toast({
+        title: "Success",
+        description: "News item created successfully",
       });
-      fetchNewsItems();
+
+      // Refresh news items
+      await fetchNewsItems();
+      setIsNewsDialogOpen(false);
+      form.reset();
     } catch (error) {
-      console.error("Error adding news item:", error);
+      console.error("Error creating news item:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create news item",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleDeleteEvent = async (id) => {
-    try {
-      await databases.deleteDocument(databaseId, eventCollectionId, id);
-      fetchEvents();
-    } catch (error) {
-      console.error("Error deleting event:", error);
-    }
-  };
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        if (!currentUser) {
+          toast({
+            title: "Authentication Error",
+            description: "Please sign in to access this page",
+            variant: "destructive",
+          });
+          return;
+        }
 
-  const handleDeleteNewsItem = async (id) => {
-    try {
-      await databases.deleteDocument(databaseId, newsCollectionId, id);
-      fetchNewsItems();
-    } catch (error) {
-      console.error("Error deleting news item:", error);
-    }
-  };
+        // Fetch both events and news items
+        await Promise.all([fetchEvents(), fetchNewsItems()]);
+      } catch (error) {
+        console.error("Initialization error:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load content. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false); // Always set loading to false, even if there's an error
+      }
+    };
+
+    initializeData();
+  }, []);
 
   if (loading) {
-    return <Loader2 className="h-8 w-8 animate-spin" />;
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <h2 className="text-2xl font-bold">Content Management</h2>
-      <Tabs defaultValue="events">
-        <TabsList>
-          <TabsTrigger value="events">Recent Events</TabsTrigger>
-          <TabsTrigger value="news">Latest News</TabsTrigger>
-        </TabsList>
-        <TabsContent value="events">
-          <form onSubmit={handleAddEvent} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Event Name</Label>
-                <Input
-                  id="name"
-                  value={newEvent.name}
-                  onChange={(e) =>
-                    setNewEvent({ ...newEvent, name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={newEvent.date}
-                  onChange={(e) =>
-                    setNewEvent({ ...newEvent, date: e.target.value })
-                  }
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={newEvent.description}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, description: e.target.value })
-                }
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={newEvent.location}
-                  onChange={(e) =>
-                    setNewEvent({ ...newEvent, location: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="attendees">Attendees</Label>
-                <Input
-                  id="attendees"
-                  type="number"
-                  value={newEvent.attendees}
-                  onChange={(e) =>
-                    setNewEvent({
-                      ...newEvent,
-                      attendees: parseInt(e.target.value),
-                    })
-                  }
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="imageUrl">Image URL</Label>
-              <Input
-                id="imageUrl"
-                value={newEvent.imageUrl}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, imageUrl: e.target.value })
-                }
-              />
-            </div>
-            <Button type="submit">
-              <Plus className="mr-2 h-4 w-4" /> Add Event
-            </Button>
-          </form>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-6">
+
+      {/* Events Section */}
+      <div className="space-y-4">
+        <h3 className="text-xl font-semibold">
+          Select Events to Show on Homepage
+        </h3>
+        {events.length > 0 ? (
+          <div className="grid gap-4">
             {events.map((event) => (
-              <Card key={event.id}>
-                <CardHeader>
-                  <CardTitle>{event.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p>{event.description}</p>
-                  <p>Date: {event.date}</p>
-                  <p>Location: {event.location}</p>
-                  <p>Attendees: {event.attendees}</p>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleDeleteEvent(event.id)}
-                  >
-                    <Trash className="mr-2 h-4 w-4" /> Delete
-                  </Button>
-                </CardFooter>
-              </Card>
+              <div
+                key={event.$id}
+                className="flex items-center space-x-4 p-4 border rounded"
+              >
+                <Checkbox
+                  checked={selectedEvents.includes(event.$id)}
+                  onCheckedChange={() => handleEventSelection(event.$id)}
+                />
+                <div className="flex-1">
+                  <h4 className="font-semibold">{event.eventName}</h4>
+                  <p className="text-sm text-gray-600">
+                    Date: {event.eventDate}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Venue: {event.eventVenue}
+                  </p>
+                </div>
+              </div>
             ))}
           </div>
-        </TabsContent>
-        <TabsContent value="news">
-          <form onSubmit={handleAddNewsItem} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  value={newNewsItem.title}
-                  onChange={(e) =>
-                    setNewNewsItem({ ...newNewsItem, title: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={newNewsItem.date}
-                  onChange={(e) =>
-                    setNewNewsItem({ ...newNewsItem, date: e.target.value })
-                  }
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={newNewsItem.description}
-                onChange={(e) =>
-                  setNewNewsItem({
-                    ...newNewsItem,
-                    description: e.target.value,
-                  })
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="imageUrl">Image URL</Label>
-              <Input
-                id="imageUrl"
-                value={newNewsItem.imageUrl}
-                onChange={(e) =>
-                  setNewNewsItem({ ...newNewsItem, imageUrl: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="link">Link</Label>
-              <Input
-                id="link"
-                value={newNewsItem.link}
-                onChange={(e) =>
-                  setNewNewsItem({ ...newNewsItem, link: e.target.value })
-                }
-                required
-              />
-            </div>
-            <Button type="submit">
-              <Plus className="mr-2 h-4 w-4" /> Add News Item
-            </Button>
-          </form>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-6">
+        ) : (
+          <p>No events found.</p>
+        )}
+      </div>
+
+      {/* News Items Section */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-xl font-semibold">News Items</h3>
+          <Dialog open={isNewsDialogOpen} onOpenChange={setIsNewsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add News
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create News Item</DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmitNews)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="imageUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Image URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="url"
+                            placeholder="https://example.com/image.jpg"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit">Create News</Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {newsItems.length > 0 ? (
+          <div className="grid gap-4">
             {newsItems.map((item) => (
-              <Card key={item.id}>
-                <CardHeader>
-                  <CardTitle>{item.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p>{item.description}</p>
-                  <p>Date: {item.date}</p>
-                  <p>Link: {item.link}</p>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleDeleteNewsItem(item.id)}
-                  >
-                    <Trash className="mr-2 h-4 w-4" /> Delete
-                  </Button>
-                </CardFooter>
-              </Card>
+              <div
+                key={item.$id}
+                className="flex items-center space-x-4 p-4 border rounded"
+              >
+                <Checkbox
+                  checked={selectedNews.includes(item.$id)}
+                  onCheckedChange={() => handleNewsSelection(item.$id)}
+                />
+                <div className="flex-1">
+                  <h4 className="font-semibold">{item.title}</h4>
+                  <p className="text-sm text-gray-600">{item.description}</p>
+                  <p className="text-sm text-gray-600">Date: {item.date}</p>
+                </div>
+              </div>
             ))}
           </div>
-        </TabsContent>
-      </Tabs>
+        ) : (
+          <p>No news items found.</p>
+        )}
+      </div>
     </div>
   );
+}
+
+// Default export is now a server component that renders the client component
+export default function ContentManagement() {
+  return <ContentManagementClient />;
 }

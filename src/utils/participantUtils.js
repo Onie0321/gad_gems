@@ -5,8 +5,11 @@ import {
 } from "@/lib/appwrite";
 
 export const formatStudentId = (input) => {
-  if (!input) return ""; // Handle null/undefined input
+  if (!input) return "";
+  // Remove non-digits
   const numbers = input.replace(/\D/g, "").slice(0, 8);
+
+  // Format as XX-XX-XXXX
   if (numbers.length <= 2) return numbers;
   if (numbers.length <= 4) return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
   return `${numbers.slice(0, 2)}-${numbers.slice(2, 4)}-${numbers.slice(4)}`;
@@ -40,10 +43,7 @@ export const validateEditParticipantForm = (participant) => {
   }
 
   // Validate Sex
-  if (
-    !participant.sex ||
-    !["Male", "Female", "Intersex"].includes(participant.sex)
-  ) {
+  if (!participant.sex || !["Male", "Female"].includes(participant.sex)) {
     errors.sex = "Sex is required and must be Male or Female.";
   }
 
@@ -172,29 +172,37 @@ export const schoolOptions = [
 ];
 
 export const checkDuplicates = async (field, value, currentEventId) => {
-  // Add validation for required parameters and empty values
   if (!field || !value || !currentEventId || value.trim() === "") {
     return { duplicateError: "", newEntryInfo: "" };
   }
 
   try {
+    const type =
+      field === "studentId"
+        ? "student"
+        : field === "staffFacultyId"
+        ? "staff"
+        : "community";
+
     const isDuplicate = await checkDuplicateParticipant(
       currentEventId,
-      field === "studentId" ? value : "",
-      field === "name" ? value : ""
+      value,
+      type
     );
 
     if (isDuplicate) {
       return {
         duplicateError: `This ${
-          field === "studentId" ? "Student ID" : "Name"
+          field === "studentId"
+            ? "Student ID"
+            : field === "staffFacultyId"
+            ? "Staff/Faculty ID"
+            : "Name"
         } is already added to this event.`,
         newEntryInfo: "",
       };
     }
 
-    const existingData = await fetchParticipantData(value, currentEventId);
-    // Remove the "new entry" message
     return { duplicateError: "", newEntryInfo: "" };
   } catch (error) {
     console.error("Error checking duplicates:", error);
@@ -221,41 +229,122 @@ export const debouncedCheckDuplicates = (...args) =>
     }, 300)();
   });
 
-export const isStudentIdComplete = (studentId) => {
-  if (!studentId) return false; // Handle null/undefined studentId
-  return /^\d{2}-\d{2}-\d{4}$/.test(studentId);
+export const isIdComplete = (id, type) => {
+  if (!id) return false;
+
+  switch (type) {
+    case "student":
+      // Check if student ID matches XX-XX-XXXX format
+      return /^\d{2}-\d{2}-\d{4}$/.test(id);
+    case "staff":
+      // Check if staff ID is 3 digits
+      return /^\d{3}$/.test(id);
+    default:
+      return false;
+  }
 };
-export const handleAutofill = async (studentId, currentEventId) => {
-  if (!studentId || !currentEventId || !isStudentIdComplete(studentId)) {
+
+export const handleAutofill = async (
+  identifier,
+  currentEventId,
+  participantType
+) => {
+  // Return early if required params are missing
+  if (!identifier || !currentEventId || !participantType) {
+    return null;
+  }
+
+  // For student/staff, check if ID format is valid
+  if (
+    (participantType === "student" || participantType === "staff") &&
+    !isIdComplete(identifier, participantType)
+  ) {
+    return null;
+  }
+
+  // For community members, check if name is long enough
+  if (participantType === "community" && identifier.length < 3) {
     return null;
   }
 
   try {
-    const data = await fetchParticipantData(studentId, currentEventId);
+    const data = await fetchParticipantData(
+      identifier,
+      currentEventId,
+      participantType
+    );
     console.log("Fetched participant data:", data);
 
-    // Return participant data if found in another event
-    if (data && data.studentId && data.eventId !== currentEventId) {
-      return {
-        studentId: data.studentId,
-        name: data.name,
-        sex: data.sex,
-        age: data.age,
-        homeAddress: data.homeAddress || "",
-        school: data.school,
-        year: data.year,
-        section: data.section,
-        ethnicGroup: data.ethnicGroup,
-        otherEthnicGroup: data.otherEthnicGroup || "",
+    if (data && data.eventId !== currentEventId) {
+      // Map the data based on participant type
+      const mappedData = {
+        ...data,
         foundInEvent: true,
         eventName: data.eventName,
+        participantType: participantType,
       };
+
+      // Add specific fields based on participant type
+      switch (participantType) {
+        case "student":
+          mappedData.studentId = data.studentId;
+          mappedData.school = data.school;
+          mappedData.year = data.year;
+          mappedData.section = data.section;
+          break;
+        case "staff":
+          mappedData.staffFacultyId = data.staffFacultyId;
+          break;
+        case "community":
+          // Community members only need the base fields
+          break;
+      }
+
+      // Ensure common fields are mapped correctly
+      mappedData.name = data.name;
+      mappedData.sex = data.sex;
+      mappedData.age = data.age;
+      mappedData.homeAddress = data.homeAddress || data.address;
+      mappedData.ethnicGroup = data.ethnicGroup;
+      mappedData.otherEthnicGroup = data.otherEthnicGroup;
+
+      return mappedData;
     }
     return null;
   } catch (error) {
     console.error("Error in handleAutofill:", error);
     throw new Error("Error fetching participant data");
   }
+};
+
+// Add a new function to handle the autofill confirmation
+export const handleAutofillConfirm = (autofillData, setParticipantData) => {
+  const mappedData = {
+    name: autofillData.name,
+    sex: autofillData.sex,
+    age: autofillData.age,
+    homeAddress: autofillData.homeAddress || autofillData.address,
+    ethnicGroup: autofillData.ethnicGroup,
+    otherEthnicGroup: autofillData.otherEthnicGroup || "",
+  };
+
+  // Add type-specific fields
+  switch (autofillData.participantType) {
+    case "student":
+      mappedData.studentId = autofillData.studentId;
+      mappedData.school = autofillData.school;
+      mappedData.year = autofillData.year;
+      mappedData.section = autofillData.section;
+      break;
+    case "staff":
+      mappedData.staffFacultyId = autofillData.staffFacultyId;
+      break;
+    case "community":
+      // No additional fields needed
+      break;
+  }
+
+  setParticipantData(mappedData);
 };
 
 export const formatStaffFacultyId = (input) => {
@@ -363,41 +452,165 @@ export const handleInputChange = async (
   setDuplicateErrors,
   setNewEntryInfo,
   setAutofillData,
-  setShowAutofillDialog
+  setShowAutofillDialog,
+  participantType
 ) => {
   try {
     const updatedData = { ...participantData, [field]: value };
     setParticipantData(updatedData);
 
-    if (field === "studentId" || field === "name") {
-      if (field === "studentId" && !isStudentIdComplete(value)) {
-        setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
-        setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-        return;
-      }
+    // Show specific error messages when fields are empty
+    if (!value.trim()) {
+      setDuplicateErrors((prev) => ({
+        ...prev,
+        [field]: `Please enter ${getFieldLabel(field).toLowerCase()}`,
+      }));
+      setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
+      return;
+    }
 
-      const result = await debouncedCheckDuplicates(
-        field,
+    // Check if we should validate this field
+    const shouldCheck =
+      (participantType === "student" &&
+        (field === "studentId" || field === "name")) ||
+      (participantType === "staff" &&
+        (field === "staffFacultyId" || field === "name")) ||
+      (participantType === "community" && field === "name");
+
+    if (!shouldCheck) return;
+
+    // Check for duplicates in the current event first (case-insensitive)
+    const duplicateInEvent = await checkDuplicateInCurrentEvent(
+      currentEventId,
+      field,
+      value.toLowerCase(),
+      participantType
+    );
+
+    if (duplicateInEvent) {
+      const message = getParticipantTypeMessage(participantType, "duplicate");
+      setDuplicateErrors((prev) => ({
+        ...prev,
+        [field]: message,
+      }));
+      setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
+      return;
+    }
+
+    // Then check for duplicates in other events (case-insensitive)
+    const result = await debouncedCheckDuplicates(
+      field,
+      value.toLowerCase(),
+      currentEventId
+    );
+
+    if (result.duplicateError) {
+      setDuplicateErrors((prev) => ({
+        ...prev,
+        [field]: result.duplicateError,
+      }));
+      setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
+
+      // Check for autofill data
+      const autofillData = await handleAutofill(
         value,
-        currentEventId
+        currentEventId,
+        participantType
       );
-      if (result) {
-        const { duplicateError, newEntryInfo } = result;
-        setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
-        setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
+      if (autofillData) {
+        setAutofillData(autofillData);
+        setShowAutofillDialog(true);
       }
-
-      if (value && field === "studentId") {
-        const autofillData = await handleAutofill(value, currentEventId);
-        if (autofillData) {
-          setAutofillData(autofillData);
-          setShowAutofillDialog(true);
-        }
-      }
+    } else {
+      setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
+      const message = getParticipantTypeMessage(participantType, "new");
+      setNewEntryInfo((prev) => ({
+        ...prev,
+        [field]: message,
+      }));
     }
   } catch (error) {
     console.error("Error in handleInputChange:", error);
-    toast.error("An error occurred while processing your input.");
+    setDuplicateErrors((prev) => ({
+      ...prev,
+      [field]: "Error checking participant information",
+    }));
+  }
+};
+
+const getParticipantTypeMessage = (type, status) => {
+  switch (type) {
+    case "student":
+      return status === "duplicate"
+        ? "This student is already added to the current event."
+        : "This is a new student.";
+    case "staff":
+      return status === "duplicate"
+        ? "This staff/faculty member is already added to the current event."
+        : "This is a new staff/faculty member.";
+    case "community":
+      return status === "duplicate"
+        ? "This community member is already added to the current event."
+        : "This is a new community member.";
+    default:
+      return "";
+  }
+};
+
+// Add this new function to check duplicates in current event
+export const checkDuplicateInCurrentEvent = async (
+  eventId,
+  field,
+  value,
+  participantType
+) => {
+  try {
+    let query = [Query.equal("eventId", eventId)];
+
+    switch (participantType) {
+      case "student":
+        if (field === "studentId") {
+          query.push(Query.equal("studentId", value));
+        } else if (field === "name") {
+          query.push(Query.equal("name", value));
+        }
+        break;
+      case "staff":
+        if (field === "staffFacultyId") {
+          query.push(Query.equal("staffFacultyId", value));
+        } else if (field === "name") {
+          query.push(Query.equal("name", value));
+        }
+        break;
+      case "community":
+        query.push(Query.equal("name", value));
+        break;
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      participantCollectionId,
+      query
+    );
+
+    return response.documents.length > 0;
+  } catch (error) {
+    console.error("Error checking duplicate in current event:", error);
+    return false;
+  }
+};
+
+// Helper function to get field label
+const getFieldLabel = (field) => {
+  switch (field) {
+    case "studentId":
+      return "Student ID";
+    case "staffFacultyId":
+      return "Staff/Faculty ID";
+    case "name":
+      return "Name";
+    default:
+      return field;
   }
 };
 
@@ -421,3 +634,31 @@ export const updateParticipantCounts = (
 };
 
 // Add more utility functions as needed
+
+export const checkDuplicateParticipantInEvent = async (
+  eventId,
+  identifier,
+  type
+) => {
+  if (!eventId || !identifier) return null;
+
+  try {
+    const participants = await databases.listDocuments(
+      databaseId,
+      participantCollectionId,
+      [
+        Query.notEqual("eventId", eventId),
+        type === "student"
+          ? Query.equal("studentId", identifier)
+          : type === "staff"
+          ? Query.equal("staffFacultyId", identifier)
+          : Query.equal("name", identifier),
+      ]
+    );
+
+    return participants.documents.length > 0 ? participants.documents[0] : null;
+  } catch (error) {
+    console.error("Error checking duplicate participant:", error);
+    return null;
+  }
+};

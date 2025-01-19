@@ -31,6 +31,7 @@ import {
   fetchTotals,
   eventCollectionId,
   participantCollectionId,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 
 export default function DashboardOverview() {
@@ -53,11 +54,23 @@ export default function DashboardOverview() {
 
   const fetchData = async () => {
     try {
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+      }
+
       // Fetch events with participants and creator information
       const eventsResponse = await databases.listDocuments(
         databaseId,
         eventCollectionId,
-        [Query.orderDesc("$createdAt"), Query.limit(3)]
+        [
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+          Query.orderDesc("$createdAt"),
+          Query.limit(3),
+        ]
       );
 
       const events = eventsResponse.documents;
@@ -68,7 +81,11 @@ export default function DashboardOverview() {
           const participantsResponse = await databases.listDocuments(
             databaseId,
             participantCollectionId,
-            [Query.equal("eventId", event.$id)]
+            [
+              Query.equal("eventId", event.$id),
+              Query.equal("isArchived", false),
+              Query.equal("academicPeriodId", currentPeriod.$id),
+            ]
           );
 
           // Fetch creator information
@@ -88,7 +105,7 @@ export default function DashboardOverview() {
 
       setEvents(eventsWithParticipants);
 
-      // Calculate other statistics
+      // Calculate other statistics for non-archived data only
       const {
         totalEvents,
         academicEvents,
@@ -97,7 +114,7 @@ export default function DashboardOverview() {
         sexDistribution,
         ageDistribution,
         locationDistribution,
-      } = await fetchTotals();
+      } = await fetchTotals(currentPeriod.$id);
 
       setTotalEvents(totalEvents);
       setAcademicEvents(academicEvents);

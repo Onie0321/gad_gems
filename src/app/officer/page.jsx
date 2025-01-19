@@ -9,9 +9,10 @@ import DemographicAnalysis from "./demographic-analysis/page";
 import { Notifications } from "./notifications/page";
 import UserMenu from "./user-menu/page";
 import { getCurrentUser } from "@/lib/appwrite";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import WelcomeModal from "@/components/modals/welcome";
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
+import { useToast } from "@/hooks/use-toast";
 
 // Note: Update chart colors in respective components to use a mix of Blue (#2D89EF), Teal (#4DB6AC), Coral (#FF6F61), and Violet for visual clarity.
 
@@ -23,6 +24,8 @@ export default function OfficerDashboard() {
   const [error, setError] = useState(null);
   const router = useRouter();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
 
   const primaryButton = "bg-[#2D89EF] text-white hover:bg-[#2D89EF]/90";
   const secondaryButton = "bg-[#4DB6AC] text-white hover:bg-[#4DB6AC]/90";
@@ -48,6 +51,17 @@ export default function OfficerDashboard() {
           currentUser.role === "user"
         ) {
           setUser(currentUser);
+
+          // Show welcome toast if coming from login
+          if (searchParams.get("login") === "success") {
+            toast({
+              title: "Welcome back!",
+              description: `Successfully signed in as ${currentUser.name}`,
+              duration: 3000,
+            });
+          }
+
+          // Show first-time login modal if applicable
           if (
             currentUser.role === "user" &&
             currentUser.isFirstLogin === true

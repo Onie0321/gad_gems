@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "react-toastify";
+import { checkNetworkStatus } from "@/utils/networkUtils";
 
 export default function DemographicAnalysis() {
   const [events, setEvents] = useState([]);
@@ -92,6 +93,11 @@ export default function DemographicAnalysis() {
   const [showFilters, setShowFilters] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [filteredParticipants, setFilteredParticipants] = useState([]);
+  const [networkStatus, setNetworkStatus] = useState({
+    isOnline: true,
+    isLow: false,
+    message: "",
+  });
 
   useEffect(() => {
     const initializeData = async () => {
@@ -104,7 +110,9 @@ export default function DemographicAnalysis() {
         }
 
         setCurrentUser(user);
-        const fetchedEvents = await getEvents();
+        
+        // Fetch only events created by the current user
+        const fetchedEvents = await getEvents(user.$id); // Add user ID parameter
         setEvents(fetchedEvents);
 
         // Set initial event selection
@@ -128,68 +136,141 @@ export default function DemographicAnalysis() {
     }
   }, [selectedEvents, currentUser]);
 
+  useEffect(() => {
+    const checkNetwork = async () => {
+      const status = await checkNetworkStatus();
+      setNetworkStatus(status);
+    };
+
+    // Check initially
+    checkNetwork();
+
+    // Set up listeners for network changes
+    const handleOnline = () => {
+      setNetworkStatus((prev) => ({ ...prev, isOnline: true, message: "" }));
+      // Refresh data if needed
+      if (currentUser) {
+        fetchDemographicData(selectedEvents);
+      }
+    };
+
+    const handleOffline = () => {
+      setNetworkStatus({
+        isOnline: false,
+        message:
+          "No internet connection detected. Please check your network connection.",
+      });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Set up periodic network checks
+    const networkCheckInterval = setInterval(checkNetwork, 30000); // Check every 30 seconds
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      clearInterval(networkCheckInterval);
+    };
+  }, [currentUser, selectedEvents]);
+
   const fetchDemographicData = async (eventIds) => {
     if (!currentUser) return;
 
     try {
       setIsLoading(true);
+      setLoadingMessage("Checking network status...");
+
+      const networkStatus = await checkNetworkStatus();
+      setNetworkStatus(networkStatus);
+
+      if (!networkStatus.isOnline) {
+        toast.error(networkStatus.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (networkStatus.isLow) {
+        toast.warning(networkStatus.message);
+      }
+
       setLoadingMessage("Fetching demographic data...");
 
-      // Update selected event names
-      if (!eventIds.includes("all")) {
-        const selectedEventObjs = events.filter((event) =>
-          eventIds.includes(event.$id)
-        );
-        setSelectedEventNames(
-          selectedEventObjs.map((event) => event.eventName)
-        );
-      } else {
-        setSelectedEventNames(["All Events"]);
-      }
+      // Add user filtering to the query
+      const [participantsData, eventNames] = await Promise.all([
+        eventIds.includes("all")
+          ? getParticipants(null, currentUser.$id) // Add user ID parameter
+          : Promise.all(
+              eventIds.map((eventId) => getParticipants(eventId, currentUser.$id)) // Add user ID parameter
+            ).then((arrays) => arrays.flat()),
+        eventIds.includes("all")
+          ? Promise.resolve(["All Events"])
+          : Promise.resolve(
+              events
+                .filter((event) => eventIds.includes(event.$id) && event.createdBy === currentUser.$id) // Filter events by user
+                .map((event) => event.eventName)
+            ),
+      ]);
 
-      // Fetch participants for selected events
-      let fetchedParticipants = [];
-      if (eventIds.includes("all")) {
-        fetchedParticipants = await getParticipants();
-      } else {
-        // Fetch and combine participants from all selected events
-        const participantPromises = eventIds.map((eventId) =>
-          getParticipants(eventId)
-        );
-        const participantArrays = await Promise.all(participantPromises);
-        fetchedParticipants = participantArrays.flat();
-      }
+      setSelectedEventNames(eventNames);
+      setParticipants(participantsData);
+      setFilteredParticipants(participantsData);
 
-      setParticipants(fetchedParticipants);
-      setFilteredParticipants(fetchedParticipants);
+      if (participantsData?.length > 0) {
+        // Process data in chunks to avoid blocking the main thread
+        const processDataInChunks = async (data) => {
+          const chunkSize = 100;
+          const chunks = [];
 
-      if (fetchedParticipants && fetchedParticipants.length > 0) {
-        const processedData = {
-          genderData: processGenderData(fetchedParticipants),
-          ageData: processAgeData(fetchedParticipants),
-          educationData: processEducationData(fetchedParticipants),
-          ethnicData: processEthnicData(fetchedParticipants),
-          schoolData: processSchoolData(fetchedParticipants),
-          sectionData: processSectionData(fetchedParticipants),
+          for (let i = 0; i < data.length; i += chunkSize) {
+            chunks.push(data.slice(i, i + chunkSize));
+          }
+
+          const processedData = {
+            genderData: [],
+            ageData: [],
+            educationData: [],
+            ethnicData: [],
+            schoolData: [],
+            sectionData: [],
+          };
+
+          for (const chunk of chunks) {
+            await new Promise((resolve) => setTimeout(resolve, 0)); // Allow UI updates
+            processedData.genderData.push(...processGenderData(chunk));
+            processedData.ageData.push(...processAgeData(chunk));
+            processedData.educationData.push(...processEducationData(chunk));
+            processedData.ethnicData.push(...processEthnicData(chunk));
+            processedData.schoolData.push(...processSchoolData(chunk));
+            processedData.sectionData.push(...processSectionData(chunk));
+          }
+
+          return processedData;
         };
 
+        const processedData = await processDataInChunks(participantsData);
         setDemographicData(processedData);
-      } else {
-        setDemographicData({
-          genderData: [],
-          ageData: [],
-          educationData: [],
-          ethnicData: [],
-          schoolData: [],
-          sectionData: [],
-        });
+
+        // Cache the results
+        sessionStorage.setItem(
+          `demographic-data-${eventIds.join("-")}`,
+          JSON.stringify({
+            data: processedData,
+            timestamp: Date.now(),
+          })
+        );
       }
 
       setIsLoading(false);
     } catch (error) {
       console.error("Error fetching demographic data:", error);
       setIsLoading(false);
-      setLoadingMessage("Error fetching demographic data. Please try again.");
+      toast.error(
+        networkStatus.isOnline
+          ? "Error processing data. Please try again."
+          : networkStatus.message
+      );
     }
   };
 
@@ -455,7 +536,13 @@ export default function DemographicAnalysis() {
   return (
     <div className="space-y-4 p-4 bg-[#F5F5F5]">
       {isLoading ? (
-        <GADConnectSimpleLoader />
+        <div className="flex flex-col items-center justify-center min-h-screen">
+          <GADConnectSimpleLoader />
+          <p className="mt-4 text-gray-600">{loadingMessage}</p>
+          {networkStatus.isLow && (
+            <p className="mt-2 text-yellow-600">{networkStatus.message}</p>
+          )}
+        </div>
       ) : (
         <Tabs value={activeSection} onValueChange={setActiveSection}>
           <TabsList className="bg-white">

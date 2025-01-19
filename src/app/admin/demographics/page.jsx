@@ -39,6 +39,7 @@ import {
   databaseId,
   eventCollectionId,
   participantCollectionId,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { Loader2 } from "lucide-react";
@@ -51,6 +52,7 @@ export default function DemographicAnalysis() {
   const [ethnicityData, setEthnicityData] = useState([]);
   const [schoolData, setSchoolData] = useState([]);
   const [sectionData, setSectionData] = useState([]);
+  const [hasParticipants, setHasParticipants] = useState(true);
 
   useEffect(() => {
     fetchDemographicData();
@@ -59,18 +61,33 @@ export default function DemographicAnalysis() {
   const fetchDemographicData = async () => {
     try {
       setLoading(true);
+      setHasParticipants(true);
       console.log("Fetching demographic data...");
+
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+      }
 
       // Fetch all events first
       const eventsResponse = await databases.listDocuments(
         databaseId,
-        eventCollectionId
+        eventCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+        ]
       );
 
       // Fetch all participants
       const participantsResponse = await databases.listDocuments(
         databaseId,
-        participantCollectionId
+        participantCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+        ]
       );
 
       console.log("Participants response:", participantsResponse);
@@ -78,14 +95,14 @@ export default function DemographicAnalysis() {
       const allParticipants = participantsResponse.documents;
 
       if (allParticipants.length === 0) {
-        console.log("No participants found");
+        setHasParticipants(false);
         setLoading(false);
         return;
       }
 
       // Process gender data
       const genderCounts = allParticipants.reduce((acc, participant) => {
-        const gender = participant.sex ;
+        const gender = participant.sex;
         acc[gender] = (acc[gender] || 0) + 1;
         return acc;
       }, {});
@@ -122,7 +139,7 @@ export default function DemographicAnalysis() {
 
       // Process education data
       const educationCounts = allParticipants.reduce((acc, participant) => {
-        const education = participant.educationLevel ;
+        const education = participant.educationLevel;
         acc[education] = (acc[education] || 0) + 1;
         return acc;
       }, {});
@@ -137,7 +154,7 @@ export default function DemographicAnalysis() {
 
       // Process ethnicity data
       const ethnicityCounts = allParticipants.reduce((acc, participant) => {
-        const ethnicity = participant.ethnicity ;
+        const ethnicity = participant.ethnicity;
         acc[ethnicity] = (acc[ethnicity] || 0) + 1;
         return acc;
       }, {});
@@ -175,6 +192,7 @@ export default function DemographicAnalysis() {
       );
     } catch (error) {
       console.error("Error fetching demographic data:", error);
+      setHasParticipants(false);
       console.log("Error details:", {
         message: error.message,
         code: error.code,
@@ -202,7 +220,6 @@ export default function DemographicAnalysis() {
   const genderColors = {
     Male: "#2196F3", // Blue
     Female: "#E91E63", // Pink
-    Intersex: "#FFC107", // Yellow
   };
 
   const ageColors = [
@@ -233,9 +250,18 @@ export default function DemographicAnalysis() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading demographic data...</span>
+      </div>
+    );
+  }
+
+  if (!hasParticipants) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center text-gray-500">
+        <p className="text-lg">
+          No participants found for the current academic period
+        </p>
       </div>
     );
   }
