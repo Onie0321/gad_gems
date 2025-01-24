@@ -350,7 +350,7 @@ export default function EventsManagement() {
                 <Button onClick={() => setActiveTab("createEvent")}>
                   <Plus className="mr-2 h-4 w-4" /> Create Your First Event
                 </Button>
-                {/* ... rest of empty state UI */}
+
               </CardContent>
             </Card>
           </div>
