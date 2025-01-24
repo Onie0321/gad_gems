@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +12,7 @@ import {
   subscribeToRealTimeUpdates,
   getCurrentUser,
   fetchOfficerEvents,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
 import { useTabContext, TabProvider } from "@/context/TabContext";
@@ -37,6 +40,7 @@ export default function EventsManagement() {
     isLow: false,
     message: "",
   });
+  const [currentAcademicPeriod, setCurrentAcademicPeriod] = useState(null);
   const router = useRouter();
   const userIdRef = useRef(null);
   const eventsCache = useRef(new Map());
@@ -83,6 +87,23 @@ export default function EventsManagement() {
     };
   }, []);
 
+  // Add useEffect for fetching academic period
+  useEffect(() => {
+    const fetchAcademicPeriod = async () => {
+      try {
+        console.log("Fetching academic period...");
+        const period = await getCurrentAcademicPeriod();
+        console.log("Fetched academic period:", period);
+        setCurrentAcademicPeriod(period);
+      } catch (error) {
+        console.error("Error fetching academic period:", error);
+        toast.error("Failed to fetch academic period");
+      }
+    };
+
+    fetchAcademicPeriod();
+  }, []);
+
   const fetchEvents = useCallback(
     async (accountId) => {
       if (!accountId) {
@@ -109,7 +130,13 @@ export default function EventsManagement() {
           return;
         }
 
-        const { events: fetchedEvents } = await fetchOfficerEvents(accountId);
+        const { events: fetchedEvents, currentPeriod } =
+          await fetchOfficerEvents(accountId);
+
+        // Update the academic period if it's returned
+        if (currentPeriod) {
+          setCurrentAcademicPeriod(currentPeriod);
+        }
 
         // Cache the results
         eventsCache.current.set(cacheKey, {
@@ -210,7 +237,7 @@ export default function EventsManagement() {
         // Show appropriate welcome message
         toast.success(
           isImported
-            ? "Event imported successfully! You can now view the participant log."
+            ? "Event imported successfully! You can now view the events."
             : "Event created successfully! You can now add participants to your event.",
           {
             autoClose: 5000,
@@ -333,7 +360,7 @@ export default function EventsManagement() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="createEvent">Create Event</TabsTrigger>
           <TabsTrigger value="participants">Participant Management</TabsTrigger>
-          <TabsTrigger value="log">Participant Log</TabsTrigger>
+          <TabsTrigger value="log">Events</TabsTrigger>
         </TabsList>
 
         {events.length === 0 && activeTab !== "createEvent" ? (
@@ -363,6 +390,7 @@ export default function EventsManagement() {
                 setCurrentEventId={setCurrentEventId}
                 user={user}
                 networkStatus={networkStatus}
+                currentAcademicPeriod={currentAcademicPeriod}
               />
             </TabsContent>
             <TabsContent value="createEvent">
@@ -370,6 +398,7 @@ export default function EventsManagement() {
                 onEventCreated={handleEventCreated}
                 user={user}
                 networkStatus={networkStatus}
+                currentAcademicPeriod={currentAcademicPeriod}
               />
             </TabsContent>
             <TabsContent value="participants">

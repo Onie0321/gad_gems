@@ -1660,13 +1660,28 @@ const calculateAgeDistribution = (participants) => {
 };
 
 const calculateLocationDistribution = (participants) => {
+  // Calculate location distribution with proper formatting
   const locations = {};
+
   participants.forEach((participant) => {
-    const location = participant.location || "Unknown";
-    locations[location] = (locations[location] || 0) + 1;
+    const location = participant.homeAddress || "Not Specified";
+    // Clean up the location string and capitalize first letter of each word
+    const formattedLocation = location
+      .split(',')[0]  // Take only the first part before comma if exists
+      .trim()
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+      
+    locations[formattedLocation] = (locations[formattedLocation] || 0) + 1;
   });
 
-  return Object.entries(locations).map(([name, value]) => ({ name, value }));
+  // Convert to array format and sort by count
+  return Object.entries(locations)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value) // Sort by count in descending order
+    .slice(0, 10); // Only take top 10 locations
 };
 
 export const fetchTotals = async (academicPeriodId) => {
@@ -1677,6 +1692,7 @@ export const fetchTotals = async (academicPeriodId) => {
       eventCollectionId,
       [
         Query.equal("academicPeriodId", academicPeriodId),
+        Query.equal("isArchived", false),
         Query.orderDesc("createdAt"),
       ]
     );
@@ -1690,7 +1706,10 @@ export const fetchTotals = async (academicPeriodId) => {
       const participantsResponse = await databases.listDocuments(
         databaseId,
         participantCollectionId,
-        [Query.equal("eventId", eventIds)]
+        [
+          Query.equal("eventId", eventIds),
+          Query.equal("isArchived", false),
+        ]
       );
       participants = participantsResponse.documents;
     }
@@ -2000,19 +2019,84 @@ export const archiveCurrentPeriod = async (periodId) => {
 
 export const getCurrentAcademicPeriod = async () => {
   try {
+    // First, validate that we have the required IDs
+    if (!databaseId || !academicPeriodCollectionId) {
+      console.error("Configuration error: Missing database or collection ID");
+      throw new Error("Database or Collection ID not configured");
+    }
+
+    console.log("Fetching academic period with:", {
+      databaseId,
+      academicPeriodCollectionId
+    });
+
+    // Query for active academic period
     const response = await databases.listDocuments(
       databaseId,
       academicPeriodCollectionId,
       [
         Query.equal("isActive", true),
         Query.orderDesc("createdAt"),
-        Query.limit(1),
+        Query.limit(1)
       ]
     );
-    return response.documents[0];
+
+    console.log("Academic period response:", response);
+
+    // Validate response
+    if (!response || !response.documents || response.documents.length === 0) {
+      console.warn("No active academic period found in database");
+      return null;
+    }
+
+    const currentPeriod = response.documents[0];
+    console.log("Found current period:", currentPeriod);
+
+    // Validate the period dates
+    const now = new Date();
+    const startDate = new Date(currentPeriod.startDate);
+    const endDate = new Date(currentPeriod.endDate);
+
+    console.log("Date validation:", {
+      now: now.toISOString(),
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      isBeforeStart: now < startDate,
+      isAfterEnd: now > endDate
+    });
+
+    // Check if we're within the period dates
+    if (now < startDate) {
+      console.log("Current date is before the period start date");
+      return currentPeriod; // Still return the period as it's the upcoming active period
+    }
+
+    if (now > endDate) {
+      console.warn("Current academic period has expired");
+      // Auto-archive expired period
+      try {
+        await databases.updateDocument(
+          databaseId,
+          academicPeriodCollectionId,
+          currentPeriod.$id,
+          {
+            isActive: false,
+            archivedAt: new Date().toISOString()
+          }
+        );
+        console.log("Successfully archived expired period");
+      } catch (archiveError) {
+        console.error("Failed to archive expired period:", archiveError);
+      }
+      return null;
+    }
+
+    // Period is valid and active
+    console.log("Returning valid academic period");
+    return currentPeriod;
   } catch (error) {
-    console.error("Error getting current period:", error);
-    throw error;
+    console.error("Error getting current academic period:", error);
+    throw new Error("Failed to retrieve academic period: " + error.message);
   }
 };
 
@@ -2128,9 +2212,17 @@ export const fetchOfficerEvents = async (accountId) => {
   try {
     // Get current academic period
     const currentPeriod = await getCurrentAcademicPeriod();
+    console.log("fetchOfficerEvents - currentPeriod:", currentPeriod);
+
     if (!currentPeriod) {
-      throw new Error("No active academic period found");
+      console.log("No active academic period found in fetchOfficerEvents");
+      return {
+        events: [],
+        currentPeriod: null
+      };
     }
+
+    console.log("Fetching events with period:", currentPeriod.$id);
 
     const eventsResponse = await databases.listDocuments(
       databaseId,
@@ -2142,6 +2234,8 @@ export const fetchOfficerEvents = async (accountId) => {
         Query.orderDesc("$createdAt"),
       ]
     );
+
+    console.log("Events response:", eventsResponse);
 
     return {
       events: eventsResponse.documents,

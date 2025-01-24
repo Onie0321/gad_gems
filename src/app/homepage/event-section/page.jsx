@@ -61,7 +61,6 @@ export default function RecentEvents() {
           date: event.eventDate,
           location: event.eventVenue,
           attendees: event.participants?.length || 0,
-          imageUrl: event.imageUrl || "/placeholder.svg?height=200&width=300",
         }));
 
         setEvents(formattedEvents);
