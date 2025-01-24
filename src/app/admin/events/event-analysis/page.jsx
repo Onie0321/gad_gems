@@ -71,139 +71,137 @@ export default function EventAnalysis() {
     "#E74C3C",
   ];
 
-  useEffect(() => {
-    const fetchEventStats = async () => {
-      try {
-        setLoading(true);
-        // Get current academic period
-        const period = await getCurrentAcademicPeriod();
-        if (!period) {
-          throw new Error("No active academic period found");
-        }
-        setCurrentPeriod(period);
+  const fetchEventStats = async () => {
+    try {
+      setLoading(true);
+      // Get current academic period
+      const period = await getCurrentAcademicPeriod();
+      if (!period) {
+        throw new Error("No active academic period found");
+      }
+      setCurrentPeriod(period);
 
-        // Fetch events for current period
-        const eventsResponse = await databases.listDocuments(
-          databaseId,
-          eventCollectionId,
-          [
-            Query.equal("isArchived", false),
-            Query.equal("academicPeriodId", period.$id),
-          ]
-        );
+      // First fetch all events for current period
+      const eventsResponse = await databases.listDocuments(
+        databaseId,
+        eventCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", period.$id),
+        ]
+      );
 
-        // Fetch participants for each event
-        const events = await Promise.all(
-          eventsResponse.documents.map(async (event) => {
-            const participantsResponse = await databases.listDocuments(
-              databaseId,
-              participantCollectionId,
-              [
-                Query.equal("eventId", event.$id),
-                Query.equal("isArchived", false),
-                Query.equal("academicPeriodId", period.$id),
-              ]
-            );
-            return {
-              ...event,
-              participants: participantsResponse.documents,
-            };
-          })
-        );
+      // Get all event IDs
+      const eventIds = eventsResponse.documents.map(event => event.$id);
 
-        // Calculate gender counts across all events
-        const genderStats = events.reduce(
-          (acc, event) => {
-            event.participants?.forEach((participant) => {
-              const gender = participant.sex.toLowerCase();
-              acc[gender] = (acc[gender] || 0) + 1;
-            });
+      // Fetch all participants in one query
+      const participantsResponse = await databases.listDocuments(
+        databaseId,
+        participantCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("eventId", eventIds),
+        ]
+      );
+
+      // Map participants to their respective events
+      const events = eventsResponse.documents.map(event => ({
+        ...event,
+        participants: participantsResponse.documents.filter(
+          p => p.eventId === event.$id
+        ),
+      }));
+
+      // Calculate gender counts across all events
+      const genderStats = participantsResponse.documents.reduce(
+        (acc, participant) => {
+          const gender = participant.sex.toLowerCase();
+          acc[gender] = (acc[gender] || 0) + 1;
+          return acc;
+        },
+        { male: 0, female: 0 }
+      );
+
+      // Calculate basic stats
+      const totalEvents = events.length;
+      const totalParticipants = participantsResponse.documents.length;
+      const averageParticipants = totalEvents > 0 
+        ? (totalParticipants / totalEvents).toFixed(1) 
+        : 0;
+
+      // Process participants by event with gender breakdown
+      const participantsByEvent = events.map((event) => {
+        const eventParticipants = event.participants || [];
+        const genderCounts = eventParticipants.reduce(
+          (acc, participant) => {
+            const gender = participant.sex.toLowerCase();
+            acc[gender] = (acc[gender] || 0) + 1;
             return acc;
           },
           { male: 0, female: 0 }
         );
 
-        // Calculate basic stats
-        const totalEvents = events.length;
-        const totalParticipants = events.reduce(
-          (sum, event) => sum + (event.participants?.length || 0),
-          0
-        );
-        const averageParticipants =
-          totalEvents > 0 ? (totalParticipants / totalEvents).toFixed(1) : 0;
+        return {
+          name: event.eventName,
+          male: genderCounts.male,
+          female: genderCounts.female,
+          total: eventParticipants.length,
+        };
+      });
 
-        // Process participants by event with gender breakdown
-        const participantsByEvent = events.map((event) => {
-          const genderCounts = event.participants?.reduce(
-            (acc, participant) => {
-              const gender = participant.sex.toLowerCase();
-              acc[gender] = (acc[gender] || 0) + 1;
-              return acc;
-            },
-            { male: 0, female: 0 }
-          ) || { male: 0, female: 0 };
+      // Process participants by school with gender breakdown
+      const schoolData = participantsResponse.documents.reduce((acc, participant) => {
+        const school = participant.school || 'Not Specified';
+        const gender = participant.sex.toLowerCase();
 
-          return {
-            name: event.eventName,
-            male: genderCounts.male,
-            female: genderCounts.female,
-            total: event.participants?.length || 0,
-          };
-        });
+        if (!acc[school]) {
+          acc[school] = { male: 0, female: 0, total: 0 };
+        }
+        acc[school][gender]++;
+        acc[school].total++;
+        return acc;
+      }, {});
 
-        // Process participants by school with gender breakdown
-        const schoolData = events.reduce((acc, event) => {
-          event.participants?.forEach((participant) => {
-            const school = participant.school;
-            const gender = participant.sex.toLowerCase();
+      const participantsBySchool = Object.entries(schoolData)
+        .map(([name, counts]) => ({
+          name,
+          male: counts.male,
+          female: counts.female,
+          total: counts.total,
+        }))
+        .sort((a, b) => b.total - a.total);
 
-            if (!acc[school]) {
-              acc[school] = { male: 0, female: 0, total: 0 };
-            }
-            acc[school][gender]++;
-            acc[school].total++;
-          });
-          return acc;
-        }, {});
+      // Process event types
+      const eventTypeCount = events.reduce((acc, event) => {
+        const type = event.eventType || 'Not Specified';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {});
 
-        const participantsBySchool = Object.entries(schoolData)
-          .map(([name, counts]) => ({
-            name,
-            male: counts.male,
-            female: counts.female,
-            total: counts.total,
-          }))
-          .sort((a, b) => b.total - a.total); // Sort by total participants
+      const eventTypes = Object.entries(eventTypeCount)
+        .map(([name, value]) => ({
+          name,
+          value,
+        }))
+        .sort((a, b) => b.value - a.value);
 
-        // Process event types
-        const eventTypeCount = events.reduce((acc, event) => {
-          acc[event.eventType] = (acc[event.eventType] || 0) + 1;
-          return acc;
-        }, {});
+      setStats({
+        totalParticipants,
+        averageParticipants,
+        totalEvents,
+        genderStats,
+        eventTypes,
+        participantsByEvent,
+        participantsBySchool,
+      });
+    } catch (error) {
+      console.error("Error fetching event statistics:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        const eventTypes = Object.entries(eventTypeCount).map(
-          ([name, value]) => ({
-            name,
-            value,
-          })
-        );
-
-        setStats({
-          totalParticipants,
-          averageParticipants,
-          totalEvents,
-          genderStats,
-          eventTypes,
-          participantsByEvent,
-          participantsBySchool,
-        });
-      } catch (error) {
-        console.error("Error fetching event statistics:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchEventStats();
   }, []);
 

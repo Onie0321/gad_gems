@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getEvents, getParticipants, getCurrentUser } from "@/lib/appwrite";
+import { getEvents, getParticipants, getCurrentUser, getCurrentAcademicPeriod } from "@/lib/appwrite";
 import GenderBreakdown from "./gender-breakdown/page";
 import AgeDistribution from "./age-distribution/page";
 import EducationLevel from "./educational-level/page";
@@ -31,7 +31,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Filter } from "lucide-react";
+import { ChevronDown, Filter, Calendar } from "lucide-react";
 import { schoolOptions } from "@/utils/participantUtils";
 import {
   Dialog,
@@ -45,6 +45,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "react-toastify";
 import { checkNetworkStatus } from "@/utils/networkUtils";
+import { format } from "date-fns";
 
 export default function DemographicAnalysis() {
   const [events, setEvents] = useState([]);
@@ -64,6 +65,7 @@ export default function DemographicAnalysis() {
     "Loading data, please wait..."
   );
   const [currentUser, setCurrentUser] = useState(null);
+  const [currentAcademicPeriod, setCurrentAcademicPeriod] = useState(null);
   const [filters, setFilters] = useState({
     gender: [],
     ageGroups: [],
@@ -103,16 +105,31 @@ export default function DemographicAnalysis() {
     const initializeData = async () => {
       try {
         setIsLoading(true);
-        const user = await getCurrentUser();
+        setLoadingMessage("Checking user and academic period...");
+        
+        // Get current user and academic period in parallel
+        const [user, academicPeriod] = await Promise.all([
+          getCurrentUser(),
+          getCurrentAcademicPeriod()
+        ]);
+
         if (!user) {
           setIsLoading(false);
           return;
         }
 
+        if (!academicPeriod) {
+          toast.error("No active academic period found");
+          setIsLoading(false);
+          return;
+        }
+
         setCurrentUser(user);
+        setCurrentAcademicPeriod(academicPeriod);
         
-        // Fetch only events created by the current user
-        const fetchedEvents = await getEvents(user.$id); // Add user ID parameter
+        setLoadingMessage("Fetching events...");
+        // Fetch only events created by the current user AND in the current academic period
+        const fetchedEvents = await getEvents(user.$id, academicPeriod.$id);
         setEvents(fetchedEvents);
 
         // Set initial event selection
@@ -543,6 +560,27 @@ export default function DemographicAnalysis() {
             <p className="mt-2 text-yellow-600">{networkStatus.message}</p>
           )}
         </div>
+      ) : !currentAcademicPeriod ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Demographic Analysis</CardTitle>
+            <CardDescription>View demographic data for your events</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <div className="mb-4">
+                <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">
+                No Active Academic Period
+              </h3>
+              <p className="text-muted-foreground">
+                Demographic analysis is only available during an active academic period.
+                Please contact an administrator to set up the current academic period.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <Tabs value={activeSection} onValueChange={setActiveSection}>
           <TabsList className="bg-white">
@@ -555,9 +593,18 @@ export default function DemographicAnalysis() {
           </TabsList>
           <TabsContent value="demographic">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-[#37474F]">
-                {selectedEventNames.join(", ")}
-              </h2>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-[#37474F]">
+                  {selectedEventNames.join(", ")}
+                </h2>
+                {currentAcademicPeriod && (
+                  <div className="text-sm text-muted-foreground">
+                    Academic Period: {currentAcademicPeriod.schoolYear} - {currentAcademicPeriod.periodType}
+                    <br />
+                    {format(new Date(currentAcademicPeriod.startDate), "MMM d, yyyy")} - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
+                  </div>
+                )}
+              </div>
               <div className="flex gap-2">
                 <Dialog
                   open={showEventSelector}

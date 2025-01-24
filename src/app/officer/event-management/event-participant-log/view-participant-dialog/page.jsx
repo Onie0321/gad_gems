@@ -33,9 +33,14 @@ const ViewParticipants = ({
   isOpen,
   onClose,
   participants,
+  staffFaculty,
+  community,
   selectedEvent,
-  onAddParticipant,
+  onEditParticipant,
   onDeleteParticipant,
+  onAddParticipant,
+  editingParticipant,
+  onSaveEdit,
 }) => {
   const filteredParticipants = participants.filter(
     (p) => p.eventId === selectedEvent?.$id

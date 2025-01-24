@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +55,13 @@ export default function EventParticipantLog() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [editingParticipant, setEditingParticipant] = useState(null);
+  const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [newParticipant, setNewParticipant] = useState({
+    name: "",
+    studentId: "",
+    eventId: "",
+  });
 
   const fetchData = async () => {
     try {
@@ -85,7 +94,7 @@ export default function EventParticipantLog() {
   }
 
   if (loading) {
-    return <LoadingAnimation message="Loading participant logs..." />;
+    return <LoadingAnimation message="Loading Events..." />;
   }
 
   if (error) {
@@ -199,17 +208,19 @@ export default function EventParticipantLog() {
   };
 
   const handleSaveParticipantEdit = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !editingParticipant) return;
     try {
       await updateParticipant(editingParticipant.$id, {
         ...editingParticipant,
-        updatedBy: currentUser.id,
+        updatedBy: currentUser.$id,
       });
-      setParticipants(
-        participants.map((p) =>
+
+      setParticipants((prevParticipants) =>
+        prevParticipants.map((p) =>
           p.$id === editingParticipant.$id ? editingParticipant : p
         )
       );
+
       setEditingParticipant(null);
       toast.success("Participant updated successfully");
     } catch (error) {
@@ -261,7 +272,7 @@ export default function EventParticipantLog() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Event Participant Log</CardTitle>
+        <CardTitle>Events </CardTitle>
         <CardDescription>View and manage event participants</CardDescription>
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-primary text-primary-foreground p-4 rounded-lg">
@@ -396,7 +407,10 @@ export default function EventParticipantLog() {
       {showParticipants && (
         <ViewParticipants
           isOpen={showParticipants}
-          onClose={() => setShowParticipants(false)}
+          onClose={() => {
+            setShowParticipants(false);
+            setEditingParticipant(null);
+          }}
           participants={participants}
           staffFaculty={staffFaculty}
           community={community}
@@ -404,6 +418,8 @@ export default function EventParticipantLog() {
           onEditParticipant={setEditingParticipant}
           onDeleteParticipant={handleDeleteParticipant}
           onAddParticipant={handleAddParticipant}
+          editingParticipant={editingParticipant}
+          onSaveEdit={handleSaveParticipantEdit}
         />
       )}
     </Card>

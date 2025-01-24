@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useState } from "react";
 import {
   Bar,
@@ -47,21 +49,25 @@ export default function DashboardOverview() {
   const [locationDistribution, setLocationDistribution] = useState([]);
   const [academicEvents, setAcademicEvents] = useState(0);
   const [nonAcademicEvents, setNonAcademicEvents] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchData();
+    fetchDashboardData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchDashboardData = async () => {
     try {
+      setIsLoading(true);
+      setError(null);
+
       // Get current academic period
       const currentPeriod = await getCurrentAcademicPeriod();
-
       if (!currentPeriod) {
         throw new Error("No active academic period found");
       }
 
-      // Fetch events with participants and creator information
+      // Fetch events first
       const eventsResponse = await databases.listDocuments(
         databaseId,
         eventCollectionId,
@@ -69,43 +75,59 @@ export default function DashboardOverview() {
           Query.equal("isArchived", false),
           Query.equal("academicPeriodId", currentPeriod.$id),
           Query.orderDesc("$createdAt"),
-          Query.limit(3),
+          Query.limit(10),
         ]
       );
 
-      const events = eventsResponse.documents;
+      // Get all event IDs from the current period
+      const eventIds = eventsResponse.documents.map((event) => event.$id);
 
-      // Fetch participants for each event
-      const eventsWithParticipants = await Promise.all(
-        events.map(async (event) => {
-          const participantsResponse = await databases.listDocuments(
-            databaseId,
-            participantCollectionId,
-            [
-              Query.equal("eventId", event.$id),
-              Query.equal("isArchived", false),
-              Query.equal("academicPeriodId", currentPeriod.$id),
-            ]
-          );
+      // Fetch participants for these specific events
+      const participantsResponse = await databases.listDocuments(
+        databaseId,
+        participantCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("eventId", eventIds), // This will get participants for all current period events
+        ]
+      );
 
-          // Fetch creator information
-          const creatorResponse = await databases.getDocument(
-            databaseId,
-            userCollectionId,
-            event.createdBy
-          );
+      // Get creator information for each event
+      const eventsWithDetails = await Promise.all(
+        eventsResponse.documents.map(async (event) => {
+          try {
+            // Get creator info
+            const creator = await databases.getDocument(
+              databaseId,
+              userCollectionId,
+              event.createdBy
+            );
 
-          return {
-            ...event,
-            participants: participantsResponse.documents,
-            createdByName: creatorResponse.name || "Unknown",
-          };
+            // Filter participants for this specific event
+            const eventParticipants = participantsResponse.documents.filter(
+              (p) => p.eventId === event.$id
+            );
+
+            return {
+              ...event,
+              createdByName: creator.name || "Unknown",
+              participants: eventParticipants,
+            };
+          } catch (error) {
+            console.error(
+              `Error fetching details for event ${event.$id}:`,
+              error
+            );
+            return {
+              ...event,
+              createdByName: "Unknown",
+              participants: [],
+            };
+          }
         })
       );
 
-      setEvents(eventsWithParticipants);
-
-      // Calculate other statistics for non-archived data only
+      // Calculate statistics
       const {
         totalEvents,
         academicEvents,
@@ -116,6 +138,26 @@ export default function DashboardOverview() {
         locationDistribution,
       } = await fetchTotals(currentPeriod.$id);
 
+      // Fetch user statistics
+      const usersResponse = await databases.listDocuments(
+        databaseId,
+        userCollectionId
+      );
+
+      const pendingCount = usersResponse.documents.filter(
+        (user) => user.approvalStatus === "pending"
+      ).length;
+
+      const approvedCount = usersResponse.documents.filter(
+        (user) => user.approvalStatus === "approved"
+      ).length;
+
+      // Update all states
+      setEvents(eventsWithDetails);
+      setParticipants(participantsResponse.documents);
+      setTotalUsers(usersResponse.total);
+      setPendingUsers(pendingCount);
+      setApprovedUsers(approvedCount);
       setTotalEvents(totalEvents);
       setAcademicEvents(academicEvents);
       setNonAcademicEvents(nonAcademicEvents);
@@ -124,39 +166,39 @@ export default function DashboardOverview() {
       setAgeDistribution(ageDistribution);
       setLocationDistribution(locationDistribution);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching dashboard data:", error);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    const fetchTotalUsers = async () => {
-      try {
-        const response = await databases.listDocuments(
-          databaseId,
-          userCollectionId
-        );
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
 
-        // Count total users
-        setTotalUsers(response.total);
-
-        // Count users by approval status
-        const pendingCount = response.documents.filter(
-          (user) => user.approvalStatus === "pending"
-        ).length;
-
-        const approvedCount = response.documents.filter(
-          (user) => user.approvalStatus === "approved"
-        ).length;
-
-        setPendingUsers(pendingCount);
-        setApprovedUsers(approvedCount);
-      } catch (error) {
-        console.error("Error fetching total users:", error);
-      }
-    };
-
-    fetchTotalUsers();
-  }, []);
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center text-red-600">
+          <p>Error loading dashboard: {error}</p>
+          <button
+            onClick={fetchDashboardData}
+            className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -285,29 +327,26 @@ export default function DashboardOverview() {
                 <TableRow>
                   <TableHead>Event Name</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead className="text-center">
-                    Participants (M/F)
-                  </TableHead>
+                  <TableHead className="text-center">Participants</TableHead>
                   <TableHead>Created By</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {events.map((event) => {
-                  // Calculate gender counts for this event
-                  const participants = event.participants || [];
-                  const maleCount = participants.filter(
+                  const maleCount = event.participants.filter(
                     (p) => p.sex === "Male"
                   ).length;
-                  const femaleCount = participants.filter(
+                  const femaleCount = event.participants.filter(
                     (p) => p.sex === "Female"
                   ).length;
 
-                  const totalParticipants = maleCount + femaleCount;
-
                   return (
                     <TableRow key={event.$id}>
-                      <TableCell>{event.eventName}</TableCell>
+                      <TableCell className="font-medium">
+                        {event.eventName}
+                      </TableCell>
                       <TableCell>
                         {new Date(event.eventDate).toLocaleDateString("en-US", {
                           year: "numeric",
@@ -315,12 +354,24 @@ export default function DashboardOverview() {
                           day: "numeric",
                         })}
                       </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            event.eventType === "Academic"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          {event.eventType}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{event.eventVenue}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center">
                           <div>Total: {maleCount + femaleCount}</div>
                           <div className="text-sm text-muted-foreground">
-                            <span className="text-blue-600">{maleCount}</span>/
+                            <span className="text-blue-600">{maleCount}</span>
+                            {" / "}
                             <span className="text-pink-600">{femaleCount}</span>
                           </div>
                         </div>
@@ -341,23 +392,29 @@ export default function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="age">
-              <TabsList>
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="age">Age Distribution</TabsTrigger>
-                <TabsTrigger value="location">Location</TabsTrigger>
+                <TabsTrigger value="location">
+                  Location Distribution
+                </TabsTrigger>
               </TabsList>
-              <TabsContent value="age">
+              <TabsContent value="age" className="space-y-4">
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={ageDistribution}>
-                      <XAxis dataKey="age" />
+                      <XAxis dataKey="name" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="count" fill="#8884d8" />
+                      <Bar
+                        dataKey="value"
+                        fill="#8884d8"
+                        label={{ position: "top" }}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </TabsContent>
-              <TabsContent value="location">
+              <TabsContent value="location" className="space-y-4">
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -367,19 +424,58 @@ export default function DashboardOverview() {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
-                        label={({ name, value }) => `${name}: ${value}`}
+                        outerRadius={100}
+                        label={({ name, value, percent }) => 
+                          `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
+                        }
+                        labelLine={true}
                       >
                         {locationDistribution.map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
-                            fill={`hsl(${index * 45}, 70%, 60%)`}
+                            fill={`hsl(${index * (360 / locationDistribution.length)}, 70%, 60%)`}
                           />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip 
+                        formatter={(value, name, props) => [
+                          `${value} participants (${((value / participants.length) * 100).toFixed(1)}%)`,
+                          `Location: ${props.payload.name}`
+                        ]}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
+                </div>
+                <div className="mt-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Count</TableHead>
+                        <TableHead>Percentage</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {locationDistribution.map((item, index) => {
+                        const percentage = ((item.value / participants.length) * 100).toFixed(1);
+                        return (
+                          <TableRow key={item.name}>
+                            <TableCell className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: `hsl(${index * (360 / locationDistribution.length)}, 70%, 60%)`
+                                }}
+                              />
+                              {item.name}
+                            </TableCell>
+                            <TableCell>{item.value}</TableCell>
+                            <TableCell>{percentage}%</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
               </TabsContent>
             </Tabs>
