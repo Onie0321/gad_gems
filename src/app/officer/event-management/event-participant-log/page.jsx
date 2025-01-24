@@ -41,8 +41,6 @@ import EditEvent from "./edit-event-dialog/page";
 import ViewParticipants from "./view-participant-dialog/page";
 import ExportEventsButton from "./export-event/page";
 import GenerateReportButton from "./import-event/page";
-import ImportEventData from "./import-event/page";
-import { useTabContext } from "@/context/TabContext";
 
 export default function EventParticipantLog() {
   const [loading, setLoading] = useState(true);
@@ -57,7 +55,13 @@ export default function EventParticipantLog() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const { setActiveTab } = useTabContext();
+  const [editingParticipant, setEditingParticipant] = useState(null);
+  const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [newParticipant, setNewParticipant] = useState({
+    name: "",
+    studentId: "",
+    eventId: "",
+  });
 
   const fetchData = async () => {
     try {
@@ -85,32 +89,12 @@ export default function EventParticipantLog() {
     fetchData();
   }, []);
 
-  const renderEmptyState = () => {
-    return (
-      <Card className="w-full">
-        <CardHeader className="text-center">
-          <CardTitle>No Events Available</CardTitle>
-          <CardDescription>
-            There are no events in the current academic period
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center gap-4">
-          <Button onClick={() => setActiveTab("createEvent")}>
-            <Plus className="mr-2 h-4 w-4" /> Create Your First Event
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="h-px w-16 bg-gray-300" />
-            <span className="text-sm text-gray-500">or</span>
-            <div className="h-px w-16 bg-gray-300" />
-          </div>
-          <ImportEventData />
-        </CardContent>
-      </Card>
-    );
-  };
+  if (events.length === 0) {
+    return null;
+  }
 
   if (loading) {
-    return <LoadingAnimation message="Loading participant logs..." />;
+    return <LoadingAnimation message="Loading Events..." />;
   }
 
   if (error) {
@@ -122,10 +106,6 @@ export default function EventParticipantLog() {
         </Button>
       </div>
     );
-  }
-
-  if (events.length === 0) {
-    return renderEmptyState();
   }
 
   const getParticipantCounts = (eventId) => {
@@ -228,17 +208,19 @@ export default function EventParticipantLog() {
   };
 
   const handleSaveParticipantEdit = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !editingParticipant) return;
     try {
       await updateParticipant(editingParticipant.$id, {
         ...editingParticipant,
-        updatedBy: currentUser.id,
+        updatedBy: currentUser.$id,
       });
-      setParticipants(
-        participants.map((p) =>
+
+      setParticipants((prevParticipants) =>
+        prevParticipants.map((p) =>
           p.$id === editingParticipant.$id ? editingParticipant : p
         )
       );
+
       setEditingParticipant(null);
       toast.success("Participant updated successfully");
     } catch (error) {
@@ -290,16 +272,24 @@ export default function EventParticipantLog() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Event Participant Log</CardTitle>
-            <CardDescription>
-              Import or export event participant data
-            </CardDescription>
+        <CardTitle>Events </CardTitle>
+        <CardDescription>View and manage event participants</CardDescription>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-primary text-primary-foreground p-4 rounded-lg">
+            <h3 className="text-lg font-semibold">Total Events</h3>
+            <p className="text-3xl font-bold">{events.length}</p>
           </div>
-          <div className="flex gap-2">
-            <ImportEventData />
-            <ExportEventsButton />
+          <div className="bg-green-600 text-primary-foreground p-4 rounded-lg">
+            <h3 className="text-lg font-semibold">Academic Events</h3>
+            <p className="text-3xl font-bold">
+              {events.filter((e) => e.eventType === "Academic").length}
+            </p>
+          </div>
+          <div className="bg-blue-600 text-primary-foreground p-4 rounded-lg">
+            <h3 className="text-lg font-semibold">Non-Academic Events</h3>
+            <p className="text-3xl font-bold">
+              {events.filter((e) => e.eventType === "Non-Academic").length}
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -344,6 +334,7 @@ export default function EventParticipantLog() {
               </Select>
             </div>
             <div className="flex space-x-2">
+              <ExportEventsButton />
               <GenerateReportButton />
             </div>
           </div>
@@ -416,7 +407,10 @@ export default function EventParticipantLog() {
       {showParticipants && (
         <ViewParticipants
           isOpen={showParticipants}
-          onClose={() => setShowParticipants(false)}
+          onClose={() => {
+            setShowParticipants(false);
+            setEditingParticipant(null);
+          }}
           participants={participants}
           staffFaculty={staffFaculty}
           community={community}
@@ -424,6 +418,8 @@ export default function EventParticipantLog() {
           onEditParticipant={setEditingParticipant}
           onDeleteParticipant={handleDeleteParticipant}
           onAddParticipant={handleAddParticipant}
+          editingParticipant={editingParticipant}
+          onSaveEdit={handleSaveParticipantEdit}
         />
       )}
     </Card>

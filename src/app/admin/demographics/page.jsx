@@ -70,7 +70,7 @@ export default function DemographicAnalysis() {
         throw new Error("No active academic period found");
       }
 
-      // Fetch all events first
+      // Fetch events first
       const eventsResponse = await databases.listDocuments(
         databaseId,
         eventCollectionId,
@@ -80,13 +80,16 @@ export default function DemographicAnalysis() {
         ]
       );
 
-      // Fetch all participants
+      // Get all event IDs from the current period
+      const eventIds = eventsResponse.documents.map((event) => event.$id);
+
+      // Fetch participants for these specific events
       const participantsResponse = await databases.listDocuments(
         databaseId,
         participantCollectionId,
         [
           Query.equal("isArchived", false),
-          Query.equal("academicPeriodId", currentPeriod.$id),
+          Query.equal("eventId", eventIds), // This will get participants for all current period events
         ]
       );
 
@@ -102,7 +105,7 @@ export default function DemographicAnalysis() {
 
       // Process gender data
       const genderCounts = allParticipants.reduce((acc, participant) => {
-        const gender = participant.sex;
+        const gender = participant.sex || "Not Specified";
         acc[gender] = (acc[gender] || 0) + 1;
         return acc;
       }, {});
@@ -112,7 +115,7 @@ export default function DemographicAnalysis() {
         Object.entries(genderCounts).map(([name, value]) => ({ name, value }))
       );
 
-      // Process age data
+      // Process age data with better error handling
       const ageRanges = {
         "18-24": 0,
         "25-34": 0,
@@ -137,9 +140,9 @@ export default function DemographicAnalysis() {
         Object.entries(ageRanges).map(([age, count]) => ({ age, count }))
       );
 
-      // Process education data
+      // Process education data with null checks
       const educationCounts = allParticipants.reduce((acc, participant) => {
-        const education = participant.educationLevel;
+        const education = participant.educationLevel || "Not Specified";
         acc[education] = (acc[education] || 0) + 1;
         return acc;
       }, {});
@@ -152,9 +155,9 @@ export default function DemographicAnalysis() {
         }))
       );
 
-      // Process ethnicity data
+      // Process ethnicity data with null checks
       const ethnicityCounts = allParticipants.reduce((acc, participant) => {
-        const ethnicity = participant.ethnicity;
+        const ethnicity = participant.ethnicity || "Not Specified";
         acc[ethnicity] = (acc[ethnicity] || 0) + 1;
         return acc;
       }, {});
@@ -167,9 +170,9 @@ export default function DemographicAnalysis() {
         }))
       );
 
-      // Process school data
+      // Process school data with null checks
       const schoolCounts = allParticipants.reduce((acc, participant) => {
-        const school = participant.school;
+        const school = participant.school || "Not Specified";
         acc[school] = (acc[school] || 0) + 1;
         return acc;
       }, {});
@@ -179,9 +182,9 @@ export default function DemographicAnalysis() {
         Object.entries(schoolCounts).map(([name, count]) => ({ name, count }))
       );
 
-      // Process section data
+      // Process section data with null checks
       const sectionCounts = allParticipants.reduce((acc, participant) => {
-        const section = participant.section;
+        const section = participant.section || "Not Specified";
         acc[section] = (acc[section] || 0) + 1;
         return acc;
       }, {});
@@ -190,6 +193,7 @@ export default function DemographicAnalysis() {
       setSectionData(
         Object.entries(sectionCounts).map(([name, count]) => ({ name, count }))
       );
+
     } catch (error) {
       console.error("Error fetching demographic data:", error);
       setHasParticipants(false);

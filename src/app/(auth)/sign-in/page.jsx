@@ -116,7 +116,7 @@ export default function SignInPage() {
     }
   };
 
-  const handleSubmit = async (e) => {   
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 

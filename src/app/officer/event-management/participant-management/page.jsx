@@ -98,8 +98,6 @@ import {
   STORAGE_KEYS,
 } from "@/utils/formPersistence";
 import { Query } from "appwrite";
-import ImportEventData from "../event-participant-log/import-event/page";
-import { LoadingAnimation } from "@/components/loading/loading-animation";
 
 export default function ParticipantManagement({
   events,
@@ -1311,49 +1309,9 @@ export default function ParticipantManagement({
     }
   };
 
-  // Add this function before the main return statement
-  const renderEmptyState = () => {
-    return (
-      <Card className="w-full">
-        <CardHeader className="text-center">
-          <CardTitle>No Events Available</CardTitle>
-          <CardDescription>
-            There are no events in the current academic period
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center gap-4">
-          <Button onClick={() => setActiveTab("createEvent")}>
-            <Plus className="mr-2 h-4 w-4" /> Create Your First Event
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="h-px w-16 bg-gray-300" />
-            <span className="text-sm text-gray-500">or</span>
-            <div className="h-px w-16 bg-gray-300" />
-          </div>
-          <ImportEventData />
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // Update the empty state check
-  if (loading) {
-    return <LoadingAnimation message="Loading participants..." />;
-  }
-
-  if (error) {
-    return (
-      <div className="text-center text-red-500">
-        <p>{error}</p>
-        <Button onClick={() => fetchData()} className="mt-4">
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
+  // Keep the logic but remove the empty state UI
   if (events.length === 0) {
-    return renderEmptyState();
+    return null; // Return null to let parent handle empty state
   }
 
   return (
