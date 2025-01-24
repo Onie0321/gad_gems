@@ -232,16 +232,32 @@ export const debouncedCheckDuplicates = (...args) =>
 export const isIdComplete = (id, type) => {
   if (!id) return false;
 
-  switch (type) {
-    case "student":
-      // Check if student ID matches XX-XX-XXXX format
-      return /^\d{2}-\d{2}-\d{4}$/.test(id);
-    case "staff":
-      // Check if staff ID is 3 digits
-      return /^\d{3}$/.test(id);
-    default:
-      return false;
+  // Remove any non-digit characters
+  const cleanId = id.replace(/\D/g, '');
+
+  // For student IDs, we expect 8 digits (XX-XX-XXXX format)
+  if (type === 'student') {
+    return cleanId.length === 8;
   }
+
+  // For staff IDs, we expect 6 digits (XX-XXXX format)
+  if (type === 'staff') {
+    return cleanId.length === 6;
+  }
+
+  return false;
+};
+
+export const isStudentIdComplete = (studentId) => {
+  if (!studentId) return false;
+  const cleanId = studentId.replace(/\D/g, '');
+  return cleanId.length === 8;
+};
+
+export const isStaffIdComplete = (staffId) => {
+  if (!staffId) return false;
+  const cleanId = staffId.replace(/\D/g, '');
+  return cleanId.length === 6;
 };
 
 export const handleAutofill = async (

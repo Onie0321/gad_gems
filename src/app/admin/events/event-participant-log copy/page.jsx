@@ -93,48 +93,71 @@ export default function EventParticipantLog() {
         throw new Error("No active academic period found");
       }
 
+      // Fetch events first
       const response = await databases.listDocuments(
         databaseId,
         eventCollectionId,
         [
+          Query.equal("isArchived", false),
           Query.equal("academicPeriodId", currentPeriod.$id),
           Query.orderDesc("createdAt"),
         ]
       );
 
-      // Fetch participants for each event
+      // Get all event IDs from the current period
+      const eventIds = response.documents.map((event) => event.$id);
+
+      // Fetch all participants for these events in one query
+      const allParticipantsResponse = await databases.listDocuments(
+        databaseId,
+        participantCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("eventId", eventIds),
+        ]
+      );
+
+      // Get creator information and combine with event data
       const eventsWithParticipants = await Promise.all(
         response.documents.map(async (event) => {
-          const participantsResponse = await databases.listDocuments(
-            databaseId,
-            participantCollectionId,
-            [
-              Query.equal("eventId", event.$id),
-              Query.equal("academicPeriodId", currentPeriod.$id),
-            ]
-          );
+          try {
+            // Filter participants for this specific event
+            const eventParticipants = allParticipantsResponse.documents.filter(
+              (p) => p.eventId === event.$id
+            );
 
-          // Calculate participant counts
-          const participants = participantsResponse.documents;
-          const participantCounts = {
-            total: participants.length,
-            male: participants.filter((p) => p.sex === "Male").length,
-            female: participants.filter((p) => p.sex === "Female").length,
-          };
+            // Calculate participant counts
+            const participantCounts = {
+              total: eventParticipants.length,
+              male: eventParticipants.filter((p) => p.sex === "Male").length,
+              female: eventParticipants.filter((p) => p.sex === "Female").length,
+            };
 
-          // Fetch creator information
-          const creatorResponse = await databases.getDocument(
-            databaseId,
-            userCollectionId,
-            event.createdBy
-          );
+            // Fetch creator information
+            const creatorResponse = await databases.getDocument(
+              databaseId,
+              userCollectionId,
+              event.createdBy
+            );
 
-          return {
-            ...event,
-            participants: participants,
-            participantCounts: participantCounts,
-            creatorName: creatorResponse.name || "Unknown",
-          };
+            return {
+              ...event,
+              participants: eventParticipants,
+              participantCounts: participantCounts,
+              creatorName: creatorResponse.name || "Unknown",
+            };
+          } catch (error) {
+            console.error(
+              `Error fetching details for event ${event.$id}:`,
+              error
+            );
+            return {
+              ...event,
+              participants: [],
+              participantCounts: { total: 0, male: 0, female: 0 },
+              creatorName: "Unknown",
+            };
+          }
         })
       );
 
@@ -218,7 +241,7 @@ export default function EventParticipantLog() {
           <div className="bg-green-600 text-primary-foreground p-4 rounded-lg">
             <h3 className="text-lg font-semibold">Total Participants</h3>
             <p className="text-3xl font-bold">
-              {events.reduce((sum, event) => sum + event.totalParticipants, 0)}
+              {events.reduce((sum, event) => sum + (event.participantCounts?.total || 0), 0)}
             </p>
           </div>
           <div className="bg-blue-600 text-primary-foreground p-4 rounded-lg">

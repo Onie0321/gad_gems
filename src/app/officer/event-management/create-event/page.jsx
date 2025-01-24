@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,11 +40,6 @@ import {
   createEvent,
   checkDuplicateEvent,
   checkTimeConflict,
-  createNotification,
-  notifyEventCreation,
-  databases,
-  databaseId,
-  eventCollectionId,
   getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { schoolOptions, getNonAcademicCategories } from "@/utils/eventUtils";
@@ -69,7 +66,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ID } from "appwrite";
 import {
   saveFormData,
   loadFormData,
@@ -78,7 +74,59 @@ import {
 } from "@/utils/formPersistence";
 import { importEventAndParticipants } from "@/utils/importUtils";
 
-export default function CreateEvent({ onEventCreated, user }) {
+export default function CreateEvent({
+  onEventCreated,
+  user,
+  currentAcademicPeriod,
+}) {
+  // Add debug logging
+  console.log(
+    "CreateEvent component - currentAcademicPeriod:",
+    currentAcademicPeriod
+  );
+
+  // Update the validation to properly check the period
+  if (!currentAcademicPeriod || !currentAcademicPeriod.$id) {
+    console.log("No valid academic period provided to CreateEvent component");
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Event</CardTitle>
+          <CardDescription>Create and manage your events</CardDescription>
+          {currentAcademicPeriod && (
+            <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-primary">Current Academic Period</h4>
+                  <p className="text-sm text-muted-foreground">{currentAcademicPeriod.schoolYear} - {currentAcademicPeriod.periodType}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(currentAcademicPeriod.startDate), "MMM d, yyyy")} - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <div className="mb-4">
+              <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">
+              No Active Academic Period
+            </h3>
+            <p className="text-muted-foreground">
+              Events cannot be created until an administrator sets up the
+              current academic period.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState(null);
   const [eventTimeFrom, setEventTimeFrom] = useState("");
@@ -115,7 +163,6 @@ export default function CreateEvent({ onEventCreated, user }) {
   const [isRangePopoverOpen, setIsRangePopoverOpen] = useState(false);
   const [selectAllNonAcademic, setSelectAllNonAcademic] = useState(false);
   const [selectAllAcademic, setSelectAllAcademic] = useState(false);
-  const [currentAcademicPeriod, setCurrentAcademicPeriod] = useState(null);
 
   const academicCategories = schoolOptions.map((school) => school.name);
   const nonAcademicCategories = getNonAcademicCategories();
@@ -221,27 +268,6 @@ export default function CreateEvent({ onEventCreated, user }) {
     first.getFullYear() === second.getFullYear() &&
     first.getMonth() === second.getMonth() &&
     first.getDate() === second.getDate();
-
-  // Add useEffect to fetch current academic period
-  useEffect(() => {
-    const fetchAcademicPeriod = async () => {
-      try {
-        const period = await getCurrentAcademicPeriod();
-        if (!period) {
-          toast.error(
-            "No active academic period found. Please set up an academic period first."
-          );
-          return;
-        }
-        setCurrentAcademicPeriod(period);
-      } catch (error) {
-        console.error("Error fetching academic period:", error);
-        toast.error("Failed to fetch academic period");
-      }
-    };
-
-    fetchAcademicPeriod();
-  }, []);
 
   // Main function to handle event creation
   const handleCreateEvent = async (e) => {
@@ -522,11 +548,46 @@ export default function CreateEvent({ onEventCreated, user }) {
     }
   };
 
+  // Add console.log to debug
+  useEffect(() => {
+    const checkAcademicPeriod = async () => {
+      try {
+        console.log("Checking academic period...");
+        const period = await getCurrentAcademicPeriod();
+        console.log("Retrieved academic period:", period);
+        if (!period) {
+          console.log("No active academic period found");
+          // You might want to show a toast here
+          toast.error("No active academic period found");
+        }
+      } catch (error) {
+        console.error("Error checking academic period:", error);
+      }
+    };
+
+    checkAcademicPeriod();
+  }, []);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Create New Event</CardTitle>
         <CardDescription>Enter the details for your new event.</CardDescription>
+        {currentAcademicPeriod && (
+          <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-semibold text-primary">Current Academic Period</h4>
+                <p className="text-sm text-muted-foreground">{currentAcademicPeriod.schoolYear} - {currentAcademicPeriod.periodType}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(currentAcademicPeriod.startDate), "MMM d, yyyy")} - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </CardHeader>
       <form onSubmit={handleCreateEvent}>
         <CardContent className="space-y-4">
