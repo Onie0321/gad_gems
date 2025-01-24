@@ -51,6 +51,7 @@ import { useRouter } from "next/navigation";
 import { useTabContext, TabProvider } from "@/context/TabContext";
 import { Query } from "appwrite";
 import { LoadingAnimation } from "@/components/loading/loading-animation";
+import ImportEventData from "../event-participant-log/import-event/page";
 
 export default function EventOverView() {
   const [events, setEvents] = useState([]);
@@ -283,6 +284,30 @@ export default function EventOverView() {
     setActiveTab("createEvent");
   };
 
+  const renderEmptyState = () => {
+    return (
+      <Card className="w-full">
+        <CardHeader className="text-center">
+          <CardTitle>No Events Available</CardTitle>
+          <CardDescription>
+            There are no events in the current academic period
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-4">
+          <Button onClick={() => setActiveTab("createEvent")}>
+            <Plus className="mr-2 h-4 w-4" /> Create Your First Event
+          </Button>
+          <div className="flex items-center gap-2">
+            <div className="h-px w-16 bg-gray-300" />
+            <span className="text-sm text-gray-500">or</span>
+            <div className="h-px w-16 bg-gray-300" />
+          </div>
+          <ImportEventData />
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (loading) {
     return <LoadingAnimation message="Loading events..." />;
   }
@@ -298,23 +323,8 @@ export default function EventOverView() {
     );
   }
 
-  // If there are no events, show empty state
   if (events.length === 0) {
-    return (
-      <Card className="w-full">
-        <CardHeader className="text-center">
-          <CardTitle>No Events Available</CardTitle>
-          <CardDescription>
-            There are no events in the current academic period
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center">
-          <Button onClick={() => setActiveTab("createEvent")}>
-            <Plus className="mr-2 h-4 w-4" /> Create Your First Event
-          </Button>
-        </CardContent>
-      </Card>
-    );
+    return renderEmptyState();
   }
 
   if (filteredEvents.length === 0) {

@@ -469,10 +469,31 @@ export default function CreateEvent({ onEventCreated, user }) {
   const handleImportEvent = async (file) => {
     try {
       setLoading(true);
-      const result = await importEventAndParticipants(file);
+
+      // Validate file type
+      const fileType = file.name.split(".").pop().toLowerCase();
+      if (!["xlsx", "xls", "csv"].includes(fileType)) {
+        toast.error("Please upload a valid Excel or CSV file");
+        return;
+      }
+
+      // Add validation for current academic period
+      if (!currentAcademicPeriod) {
+        toast.error(
+          "No active academic period found. Please set up an academic period first."
+        );
+        return;
+      }
+
+      const result = await importEventAndParticipants(
+        file,
+        currentAcademicPeriod.$id
+      );
 
       if (result.success) {
         toast.success(result.message);
+        // Clear form data after successful import
+        clearFormData(STORAGE_KEYS.CREATE_EVENT);
         // Pass the imported event to the parent handler
         onEventCreated(result.event);
       } else {
@@ -480,7 +501,11 @@ export default function CreateEvent({ onEventCreated, user }) {
       }
     } catch (error) {
       console.error("Error importing event:", error);
-      toast.error("Failed to import event. Please try again.");
+      // Provide more specific error message based on the error type
+      const errorMessage = error.message.includes("duration")
+        ? "Invalid time format in the imported file. Please ensure start and end times are in correct format (HH:mm)."
+        : "Failed to import event. Please check the file format and try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
