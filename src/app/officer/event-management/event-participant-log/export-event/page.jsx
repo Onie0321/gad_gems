@@ -194,26 +194,28 @@ export default function ExportEventsButton() {
                 </p>
                 {previewData.map((event, index) => (
                   <div key={index} className="mb-4 p-4 border rounded-md">
-                    <h4 className="font-semibold">{event.eventName}</h4>
-                    <p>Date: {formatDate(event.eventDate)}</p>
+                    <h4  className="font-semibold"><strong>Event Name :</strong>{event.eventName}</h4>
                     <p>
-                      Time: {formatTime(event.eventTimeFrom)} -{" "}
-                      {formatTime(event.eventTimeTo)}
+                      <strong>School Year:</strong> {event.schoolYear || "2023-2024"}
                     </p>
-                    <p>Duration: {event.duration}</p>
-                    <p>Venue: {event.eventVenue}</p>
-                    <p>Event Type: {event.eventType}</p>
-                    <p>Event Category: {event.eventCategory}</p>
+                    <p>
+                      <strong>Period Type:</strong> {event.periodType || "First Semester"}
+                    </p>
+                    <p><strong>Date:</strong> {formatDate(event.eventDate)}</p>
+                    <p>
+                      <strong>Time:</strong> {formatTime(event.eventTimeFrom)} - {formatTime(event.eventTimeTo)}
+                    </p>
+                    <p><strong>Duration:</strong> {event.duration}</p>
+                    <p><strong>Venue:</strong> {event.eventVenue}</p>
+                    <p><strong>Event Type:</strong> {event.eventType}</p>
+                    <p><strong>Event Category:</strong> {event.eventCategory}</p>
                     <div className="mt-2">
-                      <p>Total Participants: {event.totalParticipants}</p>
+                      <p><strong>Total Participants:</strong> {event.totalParticipants}</p>
                       <p>
-                        Male: {event.maleParticipants} | Female:{" "}
-                        {event.femaleParticipants}
+                        <strong>Male:</strong> {event.maleParticipants} | <strong>Female:</strong> {event.femaleParticipants}
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Students: {event.studentCount} | Staff/Faculty:{" "}
-                        {event.staffFacultyCount} | Community:{" "}
-                        {event.communityCount}
+                        <strong>Students:</strong> {event.studentCount} | <strong>Staff/Faculty:</strong> {event.staffFacultyCount} | <strong>Community:</strong> {event.communityCount}
                       </p>
                     </div>
                   </div>
@@ -297,6 +299,8 @@ async function generatePreviewData(selectedEventIds) {
         studentCount: participants.length,
         staffFacultyCount: staffFaculty.length,
         communityCount: community.length,
+        schoolYear: event.schoolYear || "2023-2024",
+        periodType: event.periodType || "First Semester",
       };
     })
   );

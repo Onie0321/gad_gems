@@ -39,7 +39,7 @@ export const employeesSurveyCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_EMPLOYEESURVEY_COLLECTION_ID;
 export const notificationsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID;
-export const activityLogsCollectionId =
+export const activityLogsCollectionId = 
   process.env.NEXT_PUBLIC_APPWRITE_ACTIVITYLOGS_COLLECTION_ID;
 export const newsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_NEWS_COLLECTION_ID;
