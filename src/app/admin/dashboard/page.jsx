@@ -14,7 +14,6 @@ import {
 } from "recharts";
 import { Calendar, Users, PieChartIcon, Users2 } from "lucide-react";
 import { Query } from "appwrite";
-
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -407,9 +406,32 @@ export default function DashboardOverview() {
                       <Tooltip />
                       <Bar
                         dataKey="value"
-                        fill="#8884d8"
-                        label={{ position: "top" }}
-                      />
+                        label={{
+                          position: "center",
+                          content: ({ x, y, width, height, value }) => (
+                            <text
+                              x={x + width / 2}
+                              y={y + height / 2}
+                              fill="#000"
+                              fontSize={50}
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                            >
+                              {value}
+                            </text>
+                          ),
+                        }}
+                      >
+                        {ageDistribution.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={`hsl(${
+                              index * (360 / ageDistribution.length)
+                            }, 70%, 60%)`}
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -425,7 +447,7 @@ export default function DashboardOverview() {
                         cx="50%"
                         cy="50%"
                         outerRadius={100}
-                        label={({ name, value, percent }) => 
+                        label={({ name, value, percent }) =>
                           `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
                         }
                         labelLine={true}
@@ -433,14 +455,19 @@ export default function DashboardOverview() {
                         {locationDistribution.map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
-                            fill={`hsl(${index * (360 / locationDistribution.length)}, 70%, 60%)`}
+                            fill={`hsl(${
+                              index * (360 / locationDistribution.length)
+                            }, 70%, 60%)`}
                           />
                         ))}
                       </Pie>
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name, props) => [
-                          `${value} participants (${((value / participants.length) * 100).toFixed(1)}%)`,
-                          `Location: ${props.payload.name}`
+                          `${value} participants (${(
+                            (value / participants.length) *
+                            100
+                          ).toFixed(1)}%)`,
+                          `Location: ${props.payload.name}`,
                         ]}
                       />
                     </PieChart>
@@ -457,14 +484,19 @@ export default function DashboardOverview() {
                     </TableHeader>
                     <TableBody>
                       {locationDistribution.map((item, index) => {
-                        const percentage = ((item.value / participants.length) * 100).toFixed(1);
+                        const percentage = (
+                          (item.value / participants.length) *
+                          100
+                        ).toFixed(1);
                         return (
                           <TableRow key={item.name}>
                             <TableCell className="flex items-center gap-2">
                               <div
                                 className="w-3 h-3 rounded-full"
                                 style={{
-                                  backgroundColor: `hsl(${index * (360 / locationDistribution.length)}, 70%, 60%)`
+                                  backgroundColor: `hsl(${
+                                    index * (360 / locationDistribution.length)
+                                  }, 70%, 60%)`,
                                 }}
                               />
                               {item.name}

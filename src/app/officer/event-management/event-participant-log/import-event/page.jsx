@@ -5,18 +5,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "react-toastify";
-import {
-  importEventAndParticipants,
-  extractEventMetadata,
-  extractParticipants,
-  readFile,
-  formatDateForDisplay,
-  formatDurationForDisplay,
-  calculateDuration,
-} from "@/utils/importUtils";
+import * as importUtils from "@/utils/importUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Accordion,
@@ -24,6 +17,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { getCurrentAcademicPeriod } from "@/lib/appwrite";
 
 export default function ImportEventData() {
   const [file, setFile] = useState(null);
@@ -32,30 +26,22 @@ export default function ImportEventData() {
   const [previewData, setPreviewData] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleFileChange = async (event) => {
-    if (event.target.files && event.target.files[0]) {
-      const selectedFile = event.target.files[0];
-      setFile(selectedFile);
-      setError(null);
-      try {
-        const data = await readFile(selectedFile);
-        console.log("File data:", data);
-        const eventMetadata = extractEventMetadata(data);
-        console.log("Extracted event metadata:", eventMetadata);
-        const participants = extractParticipants(data);
-        console.log("Extracted participants:", participants);
-        setPreviewData({
-          eventMetadata,
-          participants,
-        });
-      } catch (error) {
-        console.error("Error parsing file:", error);
-        setError(`Error parsing file: ${error.message || String(error)}`);
-        setPreviewData(null);
-      }
-    } else {
-      setFile(null);
-      setPreviewData(null);
+  const handleFileChange = async (e) => {
+    if (!e.target.files || e.target.files.length === 0) {
+      return;
+    }
+
+    const file = e.target.files[0];
+    setFile(file);
+    setError(null);
+
+    try {
+      validateFileType(file);
+      const data = await importUtils.handleFileChange(file);
+      setPreviewData(data);
+    } catch (error) {
+      setError(error.message);
+      console.error("Error parsing file:", error);
     }
   };
 
@@ -77,20 +63,31 @@ export default function ImportEventData() {
     setError(null);
 
     try {
+      const currentPeriod = await getCurrentAcademicPeriod();
+      if (!currentPeriod) {
+        throw new Error("No active academic period found. Please set up an academic period first.");
+      }
+
       validateFileType(file);
-      const result = await importEventAndParticipants(file);
+
+      const result = await importUtils.importEventAndParticipants(
+        file,
+        currentPeriod.$id
+      );
+
       toast.success(result.message);
+      
       setFile(null);
       setPreviewData(null);
       setIsDialogOpen(false);
+
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     } catch (error) {
       let errorMessage = "Failed to import data.";
       if (error instanceof Error) {
         errorMessage = error.message;
-        if (error.message.includes("Invalid document structure")) {
-          errorMessage =
-            "Invalid data format. Please check the file contents and try again.";
-        }
       }
       setError(errorMessage);
       toast.error(errorMessage);
@@ -101,16 +98,8 @@ export default function ImportEventData() {
   };
 
   const EventPreview = ({ data }) => {
-    const totalParticipants = data.participants.length;
-    const maleParticipants = data.participants.filter(
-      (p) => p.sex === "Male"
-    ).length;
-    const femaleParticipants = data.participants.filter(
-      (p) => p.sex === "Female"
-    ).length;
-
-    const duration = calculateDuration(data.eventMetadata.eventTimeFrom, data.eventMetadata.eventTimeTo);
-
+    const previewData = importUtils.formatEventPreview(data);
+    
     return (
       <Card className="mt-4">
         <CardHeader>
@@ -118,53 +107,45 @@ export default function ImportEventData() {
         </CardHeader>
         <CardContent className="pt-6">
           <p>
-            <strong>Event Name:</strong> {data.eventMetadata.eventName}
+            <strong>School Year:</strong> {previewData.schoolYear}
           </p>
           <p>
-            <strong>Event Date:</strong>{" "}
-            {formatDateForDisplay(data.eventMetadata.eventDate)}
+            <strong>Period Type:</strong> {previewData.periodType}
           </p>
           <p>
-            <strong>Event Time:</strong> {data.eventMetadata.eventTimeFrom} -{" "}
-            {data.eventMetadata.eventTimeTo}
+            <strong>Event Name:</strong> {previewData.eventName}
           </p>
           <p>
-            <strong>Duration:</strong>{" "}
-            {formatDurationForDisplay(duration)}
+            <strong>Event Date:</strong> {previewData.eventDate}
           </p>
           <p>
-            <strong>Event Venue:</strong> {data.eventMetadata.eventVenue}
+            <strong>Event Time:</strong> {previewData.eventTime}
           </p>
           <p>
-            <strong>Event Type:</strong> {data.eventMetadata.eventType}
+            <strong>Duration:</strong> {previewData.duration}
           </p>
           <p>
-            <strong>Event Category:</strong> {data.eventMetadata.eventCategory}
+            <strong>Event Venue:</strong> {previewData.eventVenue}
           </p>
           <p>
-            <strong>Total Participants:</strong> {totalParticipants}
+            <strong>Event Type:</strong> {previewData.eventType}
           </p>
           <p>
-            <strong>Male Participants:</strong> {maleParticipants}
+            <strong>Event Category:</strong> {previewData.eventCategory}
           </p>
-          <p>
-            <strong>Female Participants:</strong> {femaleParticipants}
-          </p>
-          <Accordion type="single" collapsible>
-            <AccordionItem value="participants">
-              <AccordionTrigger>View Participants</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc pl-5">
-                  {data.participants.map((participant, index) => (
-                    <li key={index}>
-                      {participant.name} - {participant.studentId} (
-                      {participant.sex})
-                    </li>
-                  ))}
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+          <div className="mt-4">
+            <p>
+              <strong>Total Participants:</strong> {previewData.totalParticipants}
+            </p>
+            <p>
+              <strong>Gender Distribution:</strong> Male: {previewData.participantDetails.male} | Female: {previewData.participantDetails.female}
+            </p>
+            <p className="text-sm mt-1">
+              <strong>Students:</strong> {previewData.participantDetails.students} | 
+              <strong> Staff/Faculty:</strong> {previewData.participantDetails.staffFaculty} | 
+              <strong> Community:</strong> {previewData.participantDetails.community}
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -178,6 +159,9 @@ export default function ImportEventData() {
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Import Event Data</DialogTitle>
+          <DialogDescription>
+            Upload an Excel file containing event and participant information.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <input
