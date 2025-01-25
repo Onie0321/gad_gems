@@ -13,6 +13,7 @@ import {
 import { CalendarIcon } from "lucide-react";
 import { databases, databaseId, newsCollectionId } from "@/lib/appwrite";
 import { Query } from "appwrite";
+import { motion } from "framer-motion";
 
 export default function NewsSection() {
   const [mounted, setMounted] = useState(false);
@@ -45,73 +46,75 @@ export default function NewsSection() {
   const renderContent = () => {
     if (!mounted) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="flex flex-col h-full">
-              <div className="h-48 bg-gray-100 rounded-t-lg animate-pulse" />
-              <CardHeader>
-                <div className="h-6 w-3/4 bg-gray-100 rounded animate-pulse" />
-                <div className="h-4 w-1/2 bg-gray-100 rounded animate-pulse mt-2" />
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <div className="h-20 bg-gray-100 rounded animate-pulse" />
-              </CardContent>
-              <CardFooter>
-                <div className="h-10 w-full bg-gray-100 rounded animate-pulse" />
-              </CardFooter>
-            </Card>
+            <div
+              key={i}
+              className="h-[500px] bg-gray-100 rounded-2xl animate-pulse"
+            />
           ))}
         </div>
       );
     }
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {news.slice(0, visibleNews).map((item) => (
-          <Card key={item.id} className="flex flex-col h-full">
-            {item.imageUrl && (
-              <div className="relative w-full h-48">
-                <Image
-                  src={item.imageUrl}
-                  alt={item.title || "News image"}
-                  fill
-                  className="object-cover rounded-t-lg"
-                />
-              </div>
-            )}
-            <CardHeader>
-              {item.title && <CardTitle>{item.title}</CardTitle>}
-              {item.date && (
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  <span>{item.date}</span>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent className="flex-grow">
-              {item.description && (
-                <p className="text-muted-foreground">{item.description}</p>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="w-full" asChild>
-                <a href={item.link}>Read More</a>
-              </Button>
-            </CardFooter>
-          </Card>
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card className="group h-full flex flex-col hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-0 ring-1 ring-gray-200/50">
+              <CardHeader className="flex-none">
+                <CardTitle className="text-xl font-semibold line-clamp-2 min-h-[3.5rem]">
+                  {item.title || "Untitled"}
+                </CardTitle>
+                {item.date && (
+                  <div className="flex items-center text-sm text-violet-600">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <span>{item.date}</span>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="flex-grow">
+                {item.description && (
+                  <p className="text-gray-600 line-clamp-3 min-h-[4.5rem]">
+                    {item.description}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
       </div>
     );
   };
 
   return (
-    <section className="py-12 bg-white">
+    <section
+      id="news"
+      className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30"
+    >
       <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-8">Latest News</h2>
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600 mb-4">
+            Latest News
+          </h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Stay updated with our latest announcements and developments
+          </p>
+        </div>
         {renderContent()}
         {mounted && visibleNews < news.length && (
-          <div className="mt-8 text-center">
-            <Button onClick={loadMore}>See More</Button>
+          <div className="mt-12 text-center">
+            <Button
+              onClick={loadMore}
+              className="bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white px-8 py-2"
+            >
+              Load More
+            </Button>
           </div>
         )}
       </div>
