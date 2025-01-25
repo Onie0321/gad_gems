@@ -35,14 +35,16 @@ import {
   getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 
-export default function DashboardOverview() {
-  const [events, setEvents] = useState([]);
-  const [participants, setParticipants] = useState([]);
+export default function DashboardOverview({
+  users,
+  participants,
+  events,
+  participantTotals,
+}) {
   const [totalUsers, setTotalUsers] = useState(0);
   const [pendingUsers, setPendingUsers] = useState(0);
   const [approvedUsers, setApprovedUsers] = useState(0);
   const [totalEvents, setTotalEvents] = useState(0);
-  const [totalParticipants, setTotalParticipants] = useState(0);
   const [sexDistribution, setSexDistribution] = useState([]);
   const [ageDistribution, setAgeDistribution] = useState([]);
   const [locationDistribution, setLocationDistribution] = useState([]);
@@ -50,10 +52,77 @@ export default function DashboardOverview() {
   const [nonAcademicEvents, setNonAcademicEvents] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [participantTypeCounts, setParticipantTypeCounts] = useState({
+    students: 0,
+    staffFaculty: 0,
+    communityMembers: 0,
+  });
+  const [eventsWithCreators, setEventsWithCreators] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  useEffect(() => {
+    const counts = {
+      students: participants.filter((p) => p.participantType === "Student")
+        .length,
+      staffFaculty: participants.filter(
+        (p) => p.participantType === "Staff/Faculty"
+      ).length,
+      communityMembers: participants.filter(
+        (p) => p.participantType === "Community Member"
+      ).length,
+    };
+    setParticipantTypeCounts(counts);
+  }, [participants]);
+
+  useEffect(() => {
+    const fetchEventCreators = async () => {
+      try {
+        const eventsWithDetails = await Promise.all(
+          events.map(async (event) => {
+            try {
+              // Get creator info from users array first
+              let creator = users.find((user) => user.$id === event.createdBy);
+
+              // If not found in users array, fetch from database
+              if (!creator && event.createdBy) {
+                const response = await databases.getDocument(
+                  databaseId,
+                  userCollectionId,
+                  event.createdBy
+                );
+                creator = response;
+              }
+
+              return {
+                ...event,
+                createdByName: creator?.name || "Unknown User",
+              };
+            } catch (error) {
+              console.error(
+                `Error fetching creator for event ${event.$id}:`,
+                error
+              );
+              return {
+                ...event,
+                createdByName: "Unknown User",
+              };
+            }
+          })
+        );
+
+        setEventsWithCreators(eventsWithDetails);
+      } catch (error) {
+        console.error("Error fetching event creators:", error);
+      }
+    };
+
+    if (events.length > 0) {
+      fetchEventCreators();
+    }
+  }, [events, users]);
 
   const fetchDashboardData = async () => {
     try {
@@ -66,72 +135,11 @@ export default function DashboardOverview() {
         throw new Error("No active academic period found");
       }
 
-      // Fetch events first
-      const eventsResponse = await databases.listDocuments(
-        databaseId,
-        eventCollectionId,
-        [
-          Query.equal("isArchived", false),
-          Query.equal("academicPeriodId", currentPeriod.$id),
-          Query.orderDesc("$createdAt"),
-          Query.limit(10),
-        ]
-      );
-
-      // Get all event IDs from the current period
-      const eventIds = eventsResponse.documents.map((event) => event.$id);
-
-      // Fetch participants for these specific events
-      const participantsResponse = await databases.listDocuments(
-        databaseId,
-        participantCollectionId,
-        [
-          Query.equal("isArchived", false),
-          Query.equal("eventId", eventIds), // This will get participants for all current period events
-        ]
-      );
-
-      // Get creator information for each event
-      const eventsWithDetails = await Promise.all(
-        eventsResponse.documents.map(async (event) => {
-          try {
-            // Get creator info
-            const creator = await databases.getDocument(
-              databaseId,
-              userCollectionId,
-              event.createdBy
-            );
-
-            // Filter participants for this specific event
-            const eventParticipants = participantsResponse.documents.filter(
-              (p) => p.eventId === event.$id
-            );
-
-            return {
-              ...event,
-              createdByName: creator.name || "Unknown",
-              participants: eventParticipants,
-            };
-          } catch (error) {
-            console.error(
-              `Error fetching details for event ${event.$id}:`,
-              error
-            );
-            return {
-              ...event,
-              createdByName: "Unknown",
-              participants: [],
-            };
-          }
-        })
-      );
-
       // Calculate statistics
       const {
         totalEvents,
         academicEvents,
         nonAcademicEvents,
-        totalParticipants,
         sexDistribution,
         ageDistribution,
         locationDistribution,
@@ -151,16 +159,13 @@ export default function DashboardOverview() {
         (user) => user.approvalStatus === "approved"
       ).length;
 
-      // Update all states
-      setEvents(eventsWithDetails);
-      setParticipants(participantsResponse.documents);
+      // Update states
       setTotalUsers(usersResponse.total);
       setPendingUsers(pendingCount);
       setApprovedUsers(approvedCount);
       setTotalEvents(totalEvents);
       setAcademicEvents(academicEvents);
       setNonAcademicEvents(nonAcademicEvents);
-      setTotalParticipants(totalParticipants);
       setSexDistribution(sexDistribution);
       setAgeDistribution(ageDistribution);
       setLocationDistribution(locationDistribution);
@@ -202,66 +207,104 @@ export default function DashboardOverview() {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-300 to-blue-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Events</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-black">
+              Total Events
+            </CardTitle>
+            <Calendar className="h-4 w-4 text-black" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalEvents}</div>
-            <div className="flex flex-col space-y-1 text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-black">{totalEvents}</div>
+            <div className="flex flex-col space-y-1 text-xs text-black">
               <div className="flex items-center justify-between">
                 <span>Academic:</span>
-                <Badge variant="default">{academicEvents}</Badge>
+                <Badge
+                  variant="default"
+                  className="bg-black/10 text-black hover:bg-black/20"
+                >
+                  {academicEvents}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span>Non-Academic:</span>
-                <Badge variant="outline">{nonAcademicEvents}</Badge>
+                <Badge variant="outline" className="border-black/20 text-black">
+                  {nonAcademicEvents}
+                </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-gradient-to-br from-purple-300 to-purple-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-medium text-black">
               Total Participants
             </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-black" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalParticipants}</div>
-            <p className="text-xs text-muted-foreground">
-              {totalParticipants > 0
-                ? `${totalParticipants} participants recorded`
-                : "No participants yet"}
-            </p>
+            <div className="text-2xl font-bold text-black">
+              {participants.length}
+            </div>
+            <div className="text-xs text-black mt-2">
+              <div className="flex justify-between">
+                <span>Students:</span>
+                <span className="font-medium">
+                  {participantTypeCounts.students}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Staff/Faculty:</span>
+                <span className="font-medium">
+                  {participantTypeCounts.staffFaculty}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Community Members:</span>
+                <span className="font-medium">
+                  {participantTypeCounts.communityMembers}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-gradient-to-br from-green-300 to-green-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users2 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-black">
+              Total Users
+            </CardTitle>
+            <Users2 className="h-4 w-4 text-black" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}</div>
-            <div className="flex flex-col space-y-1 text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-black">{totalUsers}</div>
+            <div className="flex flex-col space-y-1 text-xs text-black">
               <div className="flex items-center justify-between">
                 <span>Approved:</span>
-                <Badge variant="success">{approvedUsers}</Badge>
+                <Badge
+                  variant="success"
+                  className="bg-black/10 text-black hover:bg-black/20"
+                >
+                  {approvedUsers}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span>Pending:</span>
-                <Badge variant="warning">{pendingUsers}</Badge>
+                <Badge
+                  variant="warning"
+                  className="bg-black/10 text-black hover:bg-black/20"
+                >
+                  {pendingUsers}
+                </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-gradient-to-br from-pink-300 to-pink-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-medium text-black">
               Sex Distribution
             </CardTitle>
-            <PieChartIcon className="h-4 w-4 text-muted-foreground" />
+            <PieChartIcon className="h-4 w-4 text-black" />
           </CardHeader>
           <CardContent>
             <div className="h-[80px]">
@@ -284,7 +327,7 @@ export default function DashboardOverview() {
                             ? "#2196F3"
                             : entry.name === "Female"
                             ? "#E91E63"
-                            : "#FFC107"
+                            : "#9E9E9E"
                         }
                       />
                     ))}
@@ -303,10 +346,10 @@ export default function DashboardOverview() {
                           ? "#2196F3"
                           : entry.name === "Female"
                           ? "#E91E63"
-                          : "#FFC107",
+                          : "#9E9E9E",
                     }}
                   ></div>
-                  <span className="text-xs">
+                  <span className="text-xs text-black">
                     {entry.name}: {entry.value}
                   </span>
                 </div>
@@ -324,20 +367,32 @@ export default function DashboardOverview() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Event Name</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-center">Participants</TableHead>
-                  <TableHead>Created By</TableHead>
+                  <TableHead className="font-bold text-black">
+                    Event Name
+                  </TableHead>
+
+                  <TableHead className="font-bold text-black">Date</TableHead>
+                  <TableHead className="font-bold text-black">Type</TableHead>
+                  <TableHead className="font-bold text-black">
+                    Location
+                  </TableHead>
+                  <TableHead className="text-center font-bold text-black">
+                    Participants
+                  </TableHead>
+                  <TableHead className="font-bold text-black">
+                    Created By
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((event) => {
-                  const maleCount = event.participants.filter(
+                {eventsWithCreators.map((event) => {
+                  const eventParticipants = participants.filter(
+                    (p) => p.eventId === event.$id
+                  );
+                  const maleCount = eventParticipants.filter(
                     (p) => p.sex === "Male"
                   ).length;
-                  const femaleCount = event.participants.filter(
+                  const femaleCount = eventParticipants.filter(
                     (p) => p.sex === "Female"
                   ).length;
 

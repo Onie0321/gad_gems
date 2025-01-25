@@ -70,33 +70,18 @@ export default function () {
         `${currentUrl}/signup`
       );
 
-      // If successful, create notifications
-      if (session) {
-        const userDetails = await account.get();
-
-        // Create notification for admin
-        await createNotification({
-          userId: "admin",
-          type: "account",
-          title: "New Google Account Registration",
-          message: `New user ${userDetails.name} has registered via Google.`,
-          actionType: "user_registration",
-          status: "pending",
-          approvalStatus: "pending",
-          read: false,
-        });
-
-        // Create welcome notification for the new user
-        await createNotification({
-          userId: userDetails.$id,
-          type: "info",
-          title: "Welcome to GAD Nexus",
-          message: `Welcome ${userDetails.name}! Your Google account has been connected successfully.`,
-          status: "new",
-          approvalStatus: "none",
-          read: false,
-        });
-      }
+      // Create notification for admin
+      const userDetails = await account.get();
+      await createNotification({
+        userId: "admin",
+        type: "account",
+        title: "New Google Account Registration",
+        message: `New user ${userDetails.name} has registered via Google.`,
+        actionType: "user_registration",
+        status: "pending",
+        approvalStatus: "pending",
+        read: false,
+      });
     } catch (error) {
       console.error("Google signup error:", error);
       toast({
@@ -131,6 +116,18 @@ export default function () {
       const newUser = await createUser(email, password, name);
 
       if (newUser) {
+        // Create notification for admin
+        await createNotification({
+          userId: "admin",
+          type: "account",
+          title: "New User Registration",
+          message: `New user ${name} has registered and is pending approval.`,
+          actionType: "user_registration",
+          status: "pending",
+          approvalStatus: "pending",
+          read: false,
+        });
+
         toast({
           title: "Success",
           description:

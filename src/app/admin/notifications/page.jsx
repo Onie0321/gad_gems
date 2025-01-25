@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, X } from "lucide-react";
+import { Bell, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -92,21 +92,42 @@ export default function Notifications() {
   }, [user]);
 
   const handleNotificationClick = async (notification) => {
-    // Mark as read if unread
-    if (!notification.read) {
-      await markAsRead(notification.$id);
-    }
+    try {
+      // Mark as read if unread
+      if (!notification.read) {
+        await markAsRead(notification.$id);
+      }
 
-    // Handle navigation based on notification type and data
-    if (notification.type === "event" && notification.eventId) {
-      router.push(`/admin/events/${notification.eventId}`);
-    } else if (notification.type === "account" && notification.userId) {
-      router.push(`/admin/users/${notification.userId}`);
-    }
+      // Handle navigation based on notification type and action
+      switch (notification.actionType) {
+        case "user_signin":
+        case "user_signout":
+        case "user_registration":
+        case "password_reset_request":
+        case "password_reset_complete":
+          // Navigate directly to the activity logs page
+          router.push("/admin/user-management/activity-logs");
+          break;
+        case "event_creation":
+        case "event_import":
+          router.push(`/admin/events/event-participant-log`);
+          break;
+        default:
+          // For other types, just show the modal
+          break;
+      }
 
-    // Show modal with full details
-    setSelectedNotification(notification);
-    setIsModalOpen(true);
+      // Show modal with full details
+      setSelectedNotification(notification);
+      setIsModalOpen(true);
+    } catch (error) {
+      console.error("Error handling notification click:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process notification",
+        variant: "destructive",
+      });
+    }
   };
 
   const markAsRead = async (notificationId) => {
@@ -126,6 +147,11 @@ export default function Notifications() {
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
       console.error("Error marking notification as read:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark notification as read",
+        variant: "destructive",
+      });
     }
   };
 
@@ -145,35 +171,44 @@ export default function Notifications() {
       );
       setNotifications(notifications.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
+      toast({
+        title: "Success",
+        description: "All notifications marked as read",
+      });
     } catch (error) {
       console.error("Error marking all as read:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark all notifications as read",
+        variant: "destructive",
+      });
     }
   };
 
-  const getNotificationIcon = (type) => {
-    switch (type?.toLowerCase()) {
-      case "account":
+  const getNotificationIcon = (type, actionType) => {
+    switch (actionType) {
+      case "user_signin":
+      case "user_signout":
+      case "user_registration":
         return "👤";
-      case "event":
+      case "event_creation":
+      case "event_import":
         return "📅";
-      case "info":
-        return "ℹ️";
+      case "password_reset_request":
+      case "password_reset_complete":
+        return "🔑";
       default:
-        return "📩";
+        return type === "account" ? "👤" : type === "event" ? "📅" : "ℹ️";
     }
   };
 
-  const getNotificationColor = (type) => {
-    switch (type?.toLowerCase()) {
-      case "account":
-        return "bg-blue-50 border-blue-200";
-      case "event":
-        return "bg-green-50 border-green-200";
-      case "info":
-        return "bg-yellow-50 border-yellow-200";
-      default:
-        return "bg-gray-50 border-gray-200";
-    }
+  const getNotificationColor = (type, read) => {
+    const baseColor =
+      type === "account" ? "blue" : type === "event" ? "green" : "yellow";
+
+    return read
+      ? `bg-${baseColor}-50/50 border-${baseColor}-100`
+      : `bg-${baseColor}-50 border-${baseColor}-200`;
   };
 
   return (
@@ -208,17 +243,19 @@ export default function Notifications() {
               <DropdownMenuItem
                 key={notification.$id}
                 className={`flex items-start p-3 cursor-pointer hover:bg-gray-100 border-l-4 ${getNotificationColor(
-                  notification.type
-                )} ${notification.read ? "opacity-60" : ""}`}
+                  notification.type,
+                  notification.read
+                )} ${notification.read ? "opacity-60" : "font-medium"}`}
                 onClick={() => handleNotificationClick(notification)}
               >
                 <span className="mr-2 text-lg">
-                  {getNotificationIcon(notification.type)}
+                  {getNotificationIcon(
+                    notification.type,
+                    notification.actionType
+                  )}
                 </span>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-sm">
-                    {notification.title}
-                  </h4>
+                  <h4 className="text-sm">{notification.title}</h4>
                   <p className="text-sm text-gray-600 line-clamp-2">
                     {notification.message}
                   </p>
@@ -226,6 +263,19 @@ export default function Notifications() {
                     {format(new Date(notification.$createdAt), "PPp")}
                   </p>
                 </div>
+                {!notification.read && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markAsRead(notification.$id);
+                    }}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                )}
               </DropdownMenuItem>
             ))
           ) : (
@@ -242,7 +292,12 @@ export default function Notifications() {
             <DialogTitle className="flex items-center gap-2">
               {selectedNotification && (
                 <>
-                  <span>{getNotificationIcon(selectedNotification.type)}</span>
+                  <span>
+                    {getNotificationIcon(
+                      selectedNotification.type,
+                      selectedNotification.actionType
+                    )}
+                  </span>
                   {selectedNotification.title}
                 </>
               )}
@@ -274,13 +329,6 @@ export default function Notifications() {
                 <Button variant="outline" onClick={() => setIsModalOpen(false)}>
                   Close
                 </Button>
-                {selectedNotification.actionUrl && (
-                  <Button
-                    onClick={() => router.push(selectedNotification.actionUrl)}
-                  >
-                    View Details
-                  </Button>
-                )}
               </DialogFooter>
             </>
           )}
