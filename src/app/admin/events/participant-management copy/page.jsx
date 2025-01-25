@@ -66,6 +66,7 @@ import {
 import { createParticipant } from "@/lib/appwrite";
 import EditParticipantDialog from "./edit-participant-dialog/page";
 import DeleteParticipantDialog from "./delete-participant-dialog/page";
+import ViewParticipants from "../event-participant-log copy/view-participant-dialog/page";
 import { debounce } from "lodash";
 
 export default function ParticipantManagement({
@@ -81,7 +82,7 @@ export default function ParticipantManagement({
     name: "",
     sex: "",
     age: "",
-    homeAddress:"",
+    homeAddress: "",
     school: "",
     year: "",
     section: "",
@@ -442,7 +443,6 @@ export default function ParticipantManagement({
                 <SelectContent>
                   <SelectItem value="Male">Male</SelectItem>
                   <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Intersex">Intersex</SelectItem>
                 </SelectContent>
               </Select>
               {errors.sex && (
@@ -505,7 +505,6 @@ export default function ParticipantManagement({
               {errors.homeAddress && (
                 <p className="text-sm text-red-500">{errors.homeAddress}</p>
               )}
-             
             </div>
             <div className="space-y-2">
               <Label htmlFor="school">School</Label>
@@ -724,6 +723,13 @@ export default function ParticipantManagement({
                 <DeleteParticipantDialog
                   participant={participant}
                   onDeleteParticipant={handleDeleteParticipant}
+                />
+                <ViewParticipants
+                  isOpen={showParticipants}
+                  onClose={() => setShowParticipants(false)}
+                  participants={participants}
+                  selectedEvent={selectedEvent}
+                  onAddParticipant={handleAddParticipant}
                 />
               </TableCell>
             </TableRow>

@@ -11,6 +11,10 @@ import {
   FileQuestion,
   UserPlus,
   BarChart2,
+  Loader2,
+  ImageIcon,
+  Clock,
+  Archive,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -18,31 +22,37 @@ import UserMenu from "./user-menu/page";
 import NotificationButton from "./notifications/page";
 import DashboardOverview from "./dashboard/page";
 import EventsSection from "./events/page";
-import DemographicsSection from "./demographics/page";
-import SettingsSection from "./settings/page";
-import { UserManagement } from "./user-management/page";
+import DemographicAnalysis from "./demographics/page";
+import UserManagement from "./user-management/page";
 import InactivityLock from "@/components/loading/InactivityLock";
 import DataImportAnalytics from "./data-import/page";
-import { SchoolsSection } from "./schools/page";
 import {
   getCurrentUser,
   getAccount,
-  fetchNotifications,
-  getEvents,
-  getStudents,
-  getAllEmployeeData,
-  fetchQuestions,
-  listResponses,
   databaseId,
   databases,
-  appwriteConfig,
   userCollectionId,
   eventCollectionId,
   participantCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
-import { Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { format } from "date-fns";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import HomepageSettings from "./homepage-settings/page";
+import { useToast } from "@/hooks/use-toast";
+import AcademicPeriodManagement from "./academic-period/page";
+import Archives from "./archives/page";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
@@ -58,17 +68,29 @@ export default function AdminDashboard() {
   const [participants, setParticipants] = React.useState([]);
   const [events, setEvents] = React.useState([]);
   const router = useRouter();
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   useEffect(() => {
     const checkUserRole = async () => {
       try {
         const currentUser = await getCurrentUser();
         if (!currentUser || currentUser.role !== "admin") {
-          // Redirect non-users to the login page
           router.push("/sign-in");
         } else {
           setUser(currentUser);
+
+          // Show welcome toast if coming from login
+          if (searchParams.get("login") === "success") {
+            toast({
+              title: "Welcome back, Admin!",
+              description: `Successfully signed in as ${currentUser.name}`,
+              duration: 3000,
+            });
+          }
+
           setShowWelcomeModal(true);
         }
       } catch (err) {
@@ -82,7 +104,7 @@ export default function AdminDashboard() {
     };
 
     checkUserRole();
-  }, [router]);
+  }, []);
 
   const handleActivity = React.useCallback(() => {
     setLastActivity(Date.now());
@@ -121,22 +143,59 @@ export default function AdminDashboard() {
         if (user && account) {
           setCurrentUser({ ...user, ...account });
 
+          // Get current academic period
+          const currentPeriod = await getCurrentAcademicPeriod();
+          if (!currentPeriod) {
+            throw new Error("No active academic period found");
+          }
+
           // Fetch all data in parallel
-          const [fetchedUsers, fetchedParticipants, fetchedEvents] =
-            await Promise.all([
-              databases.listDocuments(databaseId, userCollectionId, [
-                Query.limit(100),
-              ]),
-              databases.listDocuments(databaseId, participantCollectionId, [
-                Query.limit(100),
-              ]),
-              databases.listDocuments(databaseId, eventCollectionId, [
-                Query.limit(100),
-              ]),
-            ]);
+          const [
+            fetchedUsers,
+            fetchedStudents,
+            fetchedStaffFaculty,
+            fetchedCommunity,
+            fetchedEvents,
+          ] = await Promise.all([
+            databases.listDocuments(databaseId, userCollectionId, [
+              Query.limit(100),
+            ]),
+            // Fetch students
+            databases.listDocuments(databaseId, participantCollectionId, [
+              Query.limit(100),
+            ]),
+            // Fetch staff/faculty
+            databases.listDocuments(databaseId, staffFacultyCollectionId, [
+              Query.limit(100),
+            ]),
+            // Fetch community members
+            databases.listDocuments(databaseId, communityCollectionId, [
+              Query.limit(100),
+            ]),
+            // Fetch events
+            databases.listDocuments(databaseId, eventCollectionId, [
+              Query.limit(100),
+            ]),
+          ]);
+
+          // Combine all participants with their respective types
+          const allParticipants = [
+            ...fetchedStudents.documents.map((p) => ({
+              ...p,
+              participantType: "Student",
+            })),
+            ...fetchedStaffFaculty.documents.map((p) => ({
+              ...p,
+              participantType: "Staff/Faculty",
+            })),
+            ...fetchedCommunity.documents.map((p) => ({
+              ...p,
+              participantType: "Community Member",
+            })),
+          ];
 
           setUsers(fetchedUsers.documents);
-          setParticipants(fetchedParticipants.documents);
+          setParticipants(allParticipants);
           setEvents(fetchedEvents.documents);
         }
       } catch (err) {
@@ -156,11 +215,24 @@ export default function AdminDashboard() {
   };
 
   const renderActiveSection = () => {
+    // Calculate participant type totals
+    const participantTotals = {
+      students: participants.filter((p) => p.participantType === "Student")
+        .length,
+      staffFaculty: participants.filter(
+        (p) => p.participantType === "Staff/Faculty"
+      ).length,
+      communityMembers: participants.filter(
+        (p) => p.participantType === "Community Member"
+      ).length,
+    };
+
     const props = {
       currentUser,
       users,
       participants,
       events,
+      participantTotals,
     };
 
     switch (activeSection) {
@@ -168,12 +240,14 @@ export default function AdminDashboard() {
         return <UserManagement {...props} />;
       case "events":
         return <EventsSection {...props} />;
-      case "schools":
-        return <SchoolsSection {...props} />;
-      case "settings":
-        return <SettingsSection {...props} />;
-      case "data-import":
-        return <DataImportAnalytics {...props} />;
+      case "demographics":
+        return <DemographicAnalysis />;
+      case "homepage":
+        return <HomepageSettings />;
+      case "academic-period":
+        return <AcademicPeriodManagement />;
+      case "archives":
+        return <Archives />;
       default:
         return <DashboardOverview {...props} />;
     }
@@ -199,10 +273,7 @@ export default function AdminDashboard() {
   if (!currentUser) {
     return (
       <div className="flex h-screen flex-col items-center justify-center">
-        <h1 className="text-2xl font-bold text-gray-800">Access Denied</h1>
-        <p className="mt-2 text-gray-600">
-          Please log in to access the admin dashboard.
-        </p>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -246,31 +317,41 @@ export default function AdminDashboard() {
               onClick={() => setActiveSection("events")}
             >
               <Calendar className="mr-2 h-4 w-4" />
-              Events
+              Event Management
             </Button>
             <Button
-              variant={activeSection === "data-import" ? "default" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => setActiveSection("data-import")}
+              variant={activeSection === "demographics" ? "default" : "ghost"}
+              className="w-full justify-start mb-2"
+              onClick={() => setActiveSection("demographics")}
             >
-              <BarChart2 className="mr-2 h-4 w-4" />
-              Data Import & Analytics
+              <Users className="mr-2 h-4 w-4" />
+              Demographics
             </Button>
             <Button
-              variant={activeSection === "schools" ? "default" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => setActiveSection("schools")}
+              variant={activeSection === "homepage" ? "default" : "ghost"}
+              className="w-full justify-start mb-2"
+              onClick={() => setActiveSection("homepage")}
             >
-              <BarChart2 className="mr-2 h-4 w-4" />
-              Schools
+              <ImageIcon className="mr-2 h-4 w-4" />
+              Content Management
             </Button>
             <Button
-              variant={activeSection === "settings" ? "default" : "ghost"}
+              variant={
+                activeSection === "academic-period" ? "default" : "ghost"
+              }
               className="w-full justify-start"
-              onClick={() => setActiveSection("settings")}
+              onClick={() => setActiveSection("academic-period")}
             >
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
+              <Clock className="mr-2 h-4 w-4" />
+              Academic Period
+            </Button>
+            <Button
+              variant={activeSection === "archives" ? "default" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => setActiveSection("archives")}
+            >
+              <Archive className="mr-2 h-4 w-4" />
+              Archives
             </Button>
           </nav>
         </div>

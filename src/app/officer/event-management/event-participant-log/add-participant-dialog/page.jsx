@@ -68,6 +68,7 @@ const AddParticipant = ({
     section: "",
     ethnicGroup: "",
     otherEthnicGroup: "",
+    homeAddress: "",
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -124,6 +125,7 @@ const AddParticipant = ({
     if (!participantData.school) newErrors.school = "School is required.";
     if (!participantData.year) newErrors.year = "Year is required.";
     if (!participantData.section) newErrors.section = "Section is required.";
+    if (!participantData.homeAddress) newErrors.homeAddress = "Home address is required.";
     if (!participantData.ethnicGroup)
       newErrors.ethnicGroup = "Ethnic Group is required.";
     if (
@@ -197,6 +199,7 @@ const AddParticipant = ({
         section: "",
         ethnicGroup: "",
         otherEthnicGroup: "",
+        homeAddress: "",
       });
       setErrors({});
     } catch (error) {
@@ -493,6 +496,24 @@ const AddParticipant = ({
               />
               {errors.section && (
                 <p className="text-sm text-red-500">{errors.section}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="homeAddress">Home Address</Label>
+              <Input
+                id="homeAddress"
+                value={participantData.homeAddress}
+                onChange={(e) =>
+                  setParticipantData({
+                    ...participantData,
+                    homeAddress: capitalizeWords(e.target.value),
+                  })
+                }
+                placeholder="Enter home address"
+                disabled={!isEventSelected}
+              />
+              {errors.homeAddress && (
+                <p className="text-sm text-red-500">{errors.homeAddress}</p>
               )}
             </div>
             <div className="space-y-2">

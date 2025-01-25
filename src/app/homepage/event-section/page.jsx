@@ -1,100 +1,244 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
-import { getEvents } from "@/lib/appwrite";
+import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { CalendarIcon, MapPinIcon, UsersIcon } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { databases, databaseId, eventCollectionId } from "@/lib/appwrite";
+import { Query } from "appwrite";
+import { motion } from "framer-motion";
 
-export default function Events() {
+export default function RecentEvents() {
+  const [mounted, setMounted] = useState(false);
   const [events, setEvents] = useState([]);
-  const [sortBy, setSortBy] = useState("date");
+  const [visibleEvents, setVisibleEvents] = useState(3);
 
   useEffect(() => {
-    async function fetchEvents() {
+    const fetchEvents = async () => {
       try {
-        const fetchedEvents = [
-          {
-            eventName: "Gender Equality Workshop",
-            eventDate: "2024-05-15",
-            eventCategory: "Workshop",
-            eventVenue: "Main Hall",
-          },
-          {
-            eventName: "Women in Tech Conference",
-            eventDate: "2024-06-02",
-            eventCategory: "Conference",
-            eventVenue: "Tech Center",
-          },
-          {
-            eventName: "LGBTQ+ Rights Seminar",
-            eventDate: "2024-06-20",
-            eventCategory: "Seminar",
-            eventVenue: "Community Center",
-          },
-        ];
-        setEvents(fetchedEvents);
+        const response = await databases.listDocuments(
+          databaseId,
+          eventCollectionId,
+          [Query.equal("showOnHomepage", true), Query.orderDesc("eventDate")]
+        );
+
+        // Transform the data to match your component's expectations
+        const formattedEvents = response.documents.map((event) => ({
+          id: event.$id,
+          name: event.eventName,
+          description: event.eventDescription || "",
+          date: event.eventDate,
+          location: event.eventVenue,
+          attendees: event.participants?.length || 0,
+        }));
+
+        setEvents(formattedEvents);
       } catch (error) {
         console.error("Error fetching events:", error);
       }
-    }
+    };
+
+    setMounted(true);
     fetchEvents();
   }, []);
 
-  const sortedEvents = [...events].sort((a, b) => {
-    if (sortBy === "date") return new Date(a.eventDate) - new Date(b.eventDate);
-    if (sortBy === "location") return a.eventVenue.localeCompare(b.eventVenue);
-    if (sortBy === "category")
-      return a.eventCategory.localeCompare(b.eventCategory);
-    return 0;
-  });
+  const loadMore = () => {
+    setVisibleEvents((prevVisible) => prevVisible + 3);
+  };
 
-  return (
-    <section id="events" className="py-12">
-      <div className="container mx-auto px-6">
-        <h2 className="text-3xl font-bold text-center mb-8">Upcoming Events</h2>
-        <div className="mb-4">
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder={sortBy} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date">Sort by Date</SelectItem>
-              <SelectItem value="location">Sort by Location</SelectItem>
-              <SelectItem value="category">Sort by Category</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedEvents.map((event, index) => (
-            <EventCard key={index} {...event} />
+  if (!mounted) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="animate-pulse space-y-8 w-full max-w-6xl">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-gray-200 h-48 rounded-xl"></div>
           ))}
         </div>
       </div>
-    </section>
-  );
-}
+    );
+  }
 
-function EventCard({ eventName, eventDate, eventCategory, eventVenue, t }) {
+  const NoEventsDisplay = () => (
+    <div className="min-h-[400px] flex flex-col items-center justify-center p-8 bg-gradient-to-br from-violet-50 to-blue-50 rounded-2xl">
+      <div className="relative w-24 h-24 mb-6">
+        <Image
+          src="/logo/gad.png"
+          alt="GAD Logo"
+          fill
+          className="object-contain opacity-50"
+        />
+      </div>
+      <h3 className="text-2xl font-semibold text-gray-700 mb-2">No Events Currently</h3>
+      <p className="text-gray-500 text-center max-w-md">
+        Stay tuned! New events will be posted here soon. Check back later for upcoming activities and programs.
+      </p>
+    </div>
+  );
+
   return (
-    <Card className="p-4 rounded-lg shadow-lg transition-transform duration-300 hover:scale-105">
-      <CardContent>
-        <div className="text-sm font-semibold uppercase mb-2">
-          {eventCategory}
+    <section className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30" id="events">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600 mb-4">
+            Recent Events
+          </h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Discover our latest activities and programs promoting gender equality and inclusive development.
+          </p>
         </div>
-        <h3 className="text-lg font-bold mb-1">{eventName}</h3>
-        <p className="text-sm mb-3">{eventDate}</p>
-        <p className="text-sm">{eventVenue}</p>
-        <Button className="mt-4" variant="outline">
-          RSVP
-        </Button>
-      </CardContent>
-    </Card>
+
+        {events.length === 0 ? (
+          <NoEventsDisplay />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {events.slice(0, visibleEvents).map((event) => (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Card className="group h-full hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-0 ring-1 ring-gray-200/50">
+                    {event.imageUrl && (
+                      <div className="relative h-48 overflow-hidden rounded-t-xl">
+                        <Image
+                          src={event.imageUrl}
+                          alt={event.name}
+                          fill
+                          className="object-cover transform group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+                    )}
+                    <CardHeader>
+                      <CardTitle className="text-xl font-semibold line-clamp-2">
+                        {event.name}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-gray-600 line-clamp-3">{event.description}</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center text-violet-600">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          <span className="text-sm">{event.date}</span>
+                        </div>
+                        <div className="flex items-center text-blue-600">
+                          <MapPinIcon className="mr-2 h-4 w-4" />
+                          <span className="text-sm">{event.location}</span>
+                        </div>
+                        <div className="flex items-center text-emerald-600">
+                          <UsersIcon className="mr-2 h-4 w-4" />
+                          <span className="text-sm">{event.attendees} attendees</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="w-full bg-gradient-to-r from-violet-50 to-blue-50 hover:from-violet-100 hover:to-blue-100 border-violet-200"
+                          >
+                            View Details
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl">
+                          <DialogHeader>
+                            <DialogTitle>{event.name} - Details</DialogTitle>
+                          </DialogHeader>
+                          <Tabs defaultValue="table" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                              <TabsTrigger value="table">Table</TabsTrigger>
+                              <TabsTrigger value="graph">Graph</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="table">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Event Name</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Location</TableHead>
+                                    <TableHead>Attendees</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  <TableRow>
+                                    <TableCell className="font-medium">
+                                      {event.name}
+                                    </TableCell>
+                                    <TableCell>{event.date}</TableCell>
+                                    <TableCell>{event.location}</TableCell>
+                                    <TableCell>{event.attendees}</TableCell>
+                                  </TableRow>
+                                </TableBody>
+                              </Table>
+                            </TabsContent>
+                            <TabsContent value="graph">
+                              <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={[event]}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Bar dataKey="attendees" fill="#8884d8" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </TabsContent>
+                          </Tabs>
+                        </DialogContent>
+                      </Dialog>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+            {visibleEvents < events.length && (
+              <div className="mt-12 text-center">
+                <Button
+                  onClick={loadMore}
+                  className="bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white px-8 py-2"
+                >
+                  Load More Events
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </section>
   );
 }

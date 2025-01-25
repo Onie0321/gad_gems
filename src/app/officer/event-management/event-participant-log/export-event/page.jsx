@@ -16,7 +16,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Users } from "lucide-react";
 import { toast } from "react-toastify";
-import { getEvents, getParticipants } from "@/lib/appwrite";
+import {
+  getEvents,
+  getParticipants,
+  getStaffFaculty,
+  getCommunityMembers,
+} from "@/lib/appwrite";
 import { exportEventsToExcel } from "@/utils/exportUtils";
 
 const formatDate = (dateString) => {
@@ -98,7 +103,7 @@ export default function ExportEventsButton() {
   const handleExport = async () => {
     try {
       setIsLoading(true);
-      await exportEventsToExcel(selectedEvents, "events.xlsx");
+      await exportEventsToExcel(selectedEvents, fileName);
       toast.success("Events exported successfully to Excel");
     } catch (error) {
       toast.error("Export failed. Please try again.");
@@ -106,7 +111,6 @@ export default function ExportEventsButton() {
       setIsLoading(false);
     }
   };
-  
 
   const filteredEvents = events.filter((event) =>
     event.eventName.toLowerCase().includes(searchTerm.toLowerCase())
@@ -190,18 +194,28 @@ export default function ExportEventsButton() {
                 </p>
                 {previewData.map((event, index) => (
                   <div key={index} className="mb-4 p-4 border rounded-md">
-                    <h4 className="font-semibold">{event.eventName}</h4>
-                    <p>Date: {formatDate(event.eventDate)}</p>
-                    <p>Time: {formatTime(event.eventTimeFrom)} - {formatTime(event.eventTimeTo)}</p>
-                    <p>Duration: {event.duration}</p>
-                    <p>Venue: {event.eventVenue}</p>
-                    <p>Event Type: {event.eventType}</p>
-                    <p>Event Category: {event.eventCategory}</p>
+                    <h4  className="font-semibold"><strong>Event Name :</strong>{event.eventName}</h4>
+                    <p>
+                      <strong>School Year:</strong> {event.schoolYear || "2023-2024"}
+                    </p>
+                    <p>
+                      <strong>Period Type:</strong> {event.periodType || "First Semester"}
+                    </p>
+                    <p><strong>Date:</strong> {formatDate(event.eventDate)}</p>
+                    <p>
+                      <strong>Time:</strong> {formatTime(event.eventTimeFrom)} - {formatTime(event.eventTimeTo)}
+                    </p>
+                    <p><strong>Duration:</strong> {event.duration}</p>
+                    <p><strong>Venue:</strong> {event.eventVenue}</p>
+                    <p><strong>Event Type:</strong> {event.eventType}</p>
+                    <p><strong>Event Category:</strong> {event.eventCategory}</p>
                     <div className="mt-2">
-                      <p>Total Participants: {event.totalParticipants}</p>
+                      <p><strong>Total Participants:</strong> {event.totalParticipants}</p>
                       <p>
-                        Male: {event.maleParticipants} | Female:{" "}
-                        {event.femaleParticipants}
+                        <strong>Male:</strong> {event.maleParticipants} | <strong>Female:</strong> {event.femaleParticipants}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        <strong>Students:</strong> {event.studentCount} | <strong>Staff/Faculty:</strong> {event.staffFacultyCount} | <strong>Community:</strong> {event.communityCount}
                       </p>
                     </div>
                   </div>
@@ -249,14 +263,26 @@ async function generatePreviewData(selectedEventIds) {
 
   const previewData = await Promise.all(
     selectedEvents.map(async (event) => {
-      const participants = await getParticipants(event.$id);
-      const totalParticipants = participants.length;
-      const maleParticipants = participants.filter(
-        (p) => p.sex === "Male"
-      ).length;
-      const femaleParticipants = participants.filter(
-        (p) => p.sex === "Female"
-      ).length;
+      const [participants, staffFaculty, community] = await Promise.all([
+        getParticipants(event.$id),
+        getStaffFaculty(event.$id),
+        getCommunityMembers(event.$id),
+      ]);
+
+      const totalParticipants =
+        participants.length + staffFaculty.length + community.length;
+
+      const totalMale = [
+        ...participants.filter((p) => p.sex === "Male"),
+        ...staffFaculty.filter((p) => p.sex === "Male"),
+        ...community.filter((p) => p.sex === "Male"),
+      ].length;
+
+      const totalFemale = [
+        ...participants.filter((p) => p.sex === "Female"),
+        ...staffFaculty.filter((p) => p.sex === "Female"),
+        ...community.filter((p) => p.sex === "Female"),
+      ].length;
 
       return {
         eventName: event.eventName,
@@ -268,8 +294,13 @@ async function generatePreviewData(selectedEventIds) {
         eventType: event.eventType,
         eventCategory: event.eventCategory,
         totalParticipants,
-        maleParticipants,
-        femaleParticipants,
+        maleParticipants: totalMale,
+        femaleParticipants: totalFemale,
+        studentCount: participants.length,
+        staffFacultyCount: staffFaculty.length,
+        communityCount: community.length,
+        schoolYear: event.schoolYear || "2023-2024",
+        periodType: event.periodType || "First Semester",
       };
     })
   );

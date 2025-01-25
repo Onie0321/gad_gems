@@ -1,7 +1,19 @@
-import React, { useEffect, useState } from "react";
-import { Bar, BarChart, Pie, PieChart, ResponsiveContainer, Cell, XAxis, YAxis, Tooltip } from "recharts";
-import { Calendar, Users, PieChartIcon, Users2 } from 'lucide-react';
+"use client";
 
+import React, { useEffect, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from "recharts";
+import { Calendar, Users, PieChartIcon, Users2 } from "lucide-react";
+import { Query } from "appwrite";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -14,156 +26,292 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  getEvents,
-  getParticipants,
-  subscribeToRealTimeUpdates, userCollectionId, databaseId, databases  
+  userCollectionId,
+  databaseId,
+  databases,
+  fetchTotals,
+  eventCollectionId,
+  participantCollectionId,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 
-export default function DashboardOverview() {
-  const [events, setEvents] = useState([]);
-  const [participants, setParticipants] = useState([]);
-  const [genderDistribution, setGenderDistribution] = useState([]);
+export default function DashboardOverview({
+  users,
+  participants,
+  events,
+  participantTotals,
+}) {
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [pendingUsers, setPendingUsers] = useState(0);
+  const [approvedUsers, setApprovedUsers] = useState(0);
+  const [totalEvents, setTotalEvents] = useState(0);
+  const [sexDistribution, setSexDistribution] = useState([]);
   const [ageDistribution, setAgeDistribution] = useState([]);
   const [locationDistribution, setLocationDistribution] = useState([]);
-  const [totalUsers, setTotalUsers] = useState(0);
+  const [academicEvents, setAcademicEvents] = useState(0);
+  const [nonAcademicEvents, setNonAcademicEvents] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [participantTypeCounts, setParticipantTypeCounts] = useState({
+    students: 0,
+    staffFaculty: 0,
+    communityMembers: 0,
+  });
+  const [eventsWithCreators, setEventsWithCreators] = useState([]);
 
   useEffect(() => {
-    fetchData();
-
-    const unsubscribeEvents = subscribeToRealTimeUpdates("events", fetchData);
-    const unsubscribeParticipants = subscribeToRealTimeUpdates(
-      "participants",
-      fetchData
-    );
-
-    return () => {
-      unsubscribeEvents();
-      unsubscribeParticipants();
-    };
+    fetchDashboardData();
   }, []);
 
-  const fetchData = async () => {
-    try {
-      const eventsData = await getEvents();
-      setEvents(eventsData);
+  useEffect(() => {
+    const counts = {
+      students: participants.filter((p) => p.participantType === "Student")
+        .length,
+      staffFaculty: participants.filter(
+        (p) => p.participantType === "Staff/Faculty"
+      ).length,
+      communityMembers: participants.filter(
+        (p) => p.participantType === "Community Member"
+      ).length,
+    };
+    setParticipantTypeCounts(counts);
+  }, [participants]);
 
-      let allParticipants = [];
-      for (const event of eventsData) {
-        const eventParticipants = await getParticipants(event.$id);
-        allParticipants = [...allParticipants, ...eventParticipants];
+  useEffect(() => {
+    const fetchEventCreators = async () => {
+      try {
+        const eventsWithDetails = await Promise.all(
+          events.map(async (event) => {
+            try {
+              // Get creator info from users array first
+              let creator = users.find((user) => user.$id === event.createdBy);
+
+              // If not found in users array, fetch from database
+              if (!creator && event.createdBy) {
+                const response = await databases.getDocument(
+                  databaseId,
+                  userCollectionId,
+                  event.createdBy
+                );
+                creator = response;
+              }
+
+              return {
+                ...event,
+                createdByName: creator?.name || "Unknown User",
+              };
+            } catch (error) {
+              console.error(
+                `Error fetching creator for event ${event.$id}:`,
+                error
+              );
+              return {
+                ...event,
+                createdByName: "Unknown User",
+              };
+            }
+          })
+        );
+
+        setEventsWithCreators(eventsWithDetails);
+      } catch (error) {
+        console.error("Error fetching event creators:", error);
       }
-      setParticipants(allParticipants);
+    };
 
-      processData(allParticipants);
+    if (events.length > 0) {
+      fetchEventCreators();
+    }
+  }, [events, users]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+      }
+
+      // Calculate statistics
+      const {
+        totalEvents,
+        academicEvents,
+        nonAcademicEvents,
+        sexDistribution,
+        ageDistribution,
+        locationDistribution,
+      } = await fetchTotals(currentPeriod.$id);
+
+      // Fetch user statistics
+      const usersResponse = await databases.listDocuments(
+        databaseId,
+        userCollectionId
+      );
+
+      const pendingCount = usersResponse.documents.filter(
+        (user) => user.approvalStatus === "pending"
+      ).length;
+
+      const approvedCount = usersResponse.documents.filter(
+        (user) => user.approvalStatus === "approved"
+      ).length;
+
+      // Update states
+      setTotalUsers(usersResponse.total);
+      setPendingUsers(pendingCount);
+      setApprovedUsers(approvedCount);
+      setTotalEvents(totalEvents);
+      setAcademicEvents(academicEvents);
+      setNonAcademicEvents(nonAcademicEvents);
+      setSexDistribution(sexDistribution);
+      setAgeDistribution(ageDistribution);
+      setLocationDistribution(locationDistribution);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching dashboard data:", error);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    const fetchTotalUsers = async () => {
-      try {
-        const response = await databases.listDocuments(databaseId, userCollectionId);
-        setTotalUsers(response.total);
-      } catch (error) {
-        console.error("Error fetching total users:", error);
-      }
-    };
-
-    fetchTotalUsers();
-  }, []);
-
-  const processData = (participantsData) => {
-    // Process gender distribution
-    const genderCount = participantsData.reduce((acc, p) => {
-      acc[p.sex] = (acc[p.sex] || 0) + 1;
-      return acc;
-    }, {});
-    setGenderDistribution(
-      Object.entries(genderCount).map(([name, value]) => ({ name, value }))
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4">Loading dashboard data...</p>
+        </div>
+      </div>
     );
+  }
 
-    // Process age distribution
-    const ageGroups = {
-      "Under 18": 0,
-      "18-24": 0,
-      "25-34": 0,
-      "35-44": 0,
-      "45-54": 0,
-      "55+": 0,
-    };
-    participantsData.forEach((p) => {
-      const age = parseInt(p.age);
-      if (age < 18) ageGroups["Under 18"]++;
-      else if (age <= 24) ageGroups["18-24"]++;
-      else if (age <= 34) ageGroups["25-34"]++;
-      else if (age <= 44) ageGroups["35-44"]++;
-      else if (age <= 54) ageGroups["45-54"]++;
-      else ageGroups["55+"]++;
-    });
-    setAgeDistribution(
-      Object.entries(ageGroups).map(([age, count]) => ({ age, count }))
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center text-red-600">
+          <p>Error loading dashboard: {error}</p>
+          <button
+            onClick={fetchDashboardData}
+            className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
     );
-
-    // Process location distribution
-    const locationCount = participantsData.reduce((acc, p) => {
-      const event = events.find(e => e.$id === p.eventId);
-      if (event) {
-        acc[event.eventVenue] = (acc[event.eventVenue] || 0) + 1;
-      }
-      return acc;
-    }, {});
-    setLocationDistribution(
-      Object.entries(locationCount).map(([name, value]) => ({ name, value }))
-    );
-  };
+  }
 
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-300 to-blue-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Events</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-black">
+              Total Events
+            </CardTitle>
+            <Calendar className="h-4 w-4 text-black" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{events.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {events.length > 0
-                ? `+${events.length} from last month`
-                : "No events yet"}
-            </p>
+            <div className="text-2xl font-bold text-black">{totalEvents}</div>
+            <div className="flex flex-col space-y-1 text-xs text-black">
+              <div className="flex items-center justify-between">
+                <span>Academic:</span>
+                <Badge
+                  variant="default"
+                  className="bg-black/10 text-black hover:bg-black/20"
+                >
+                  {academicEvents}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Non-Academic:</span>
+                <Badge variant="outline" className="border-black/20 text-black">
+                  {nonAcademicEvents}
+                </Badge>
+              </div>
+            </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-gradient-to-br from-purple-300 to-purple-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-medium text-black">
               Total Participants
             </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-black" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{participants.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {participants.length > 0
-                ? `+15% from last month`
-                : "No participants yet"}
-            </p>
+            <div className="text-2xl font-bold text-black">
+              {participants.length}
+            </div>
+            <div className="text-xs text-black mt-2">
+              <div className="flex justify-between">
+                <span>Students:</span>
+                <span className="font-medium">
+                  {participantTypeCounts.students}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Staff/Faculty:</span>
+                <span className="font-medium">
+                  {participantTypeCounts.staffFaculty}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Community Members:</span>
+                <span className="font-medium">
+                  {participantTypeCounts.communityMembers}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-gradient-to-br from-green-300 to-green-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Gender Distribution
+            <CardTitle className="text-sm font-medium text-black">
+              Total Users
             </CardTitle>
-            <PieChartIcon className="h-4 w-4 text-muted-foreground" />
+            <Users2 className="h-4 w-4 text-black" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-black">{totalUsers}</div>
+            <div className="flex flex-col space-y-1 text-xs text-black">
+              <div className="flex items-center justify-between">
+                <span>Approved:</span>
+                <Badge
+                  variant="success"
+                  className="bg-black/10 text-black hover:bg-black/20"
+                >
+                  {approvedUsers}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Pending:</span>
+                <Badge
+                  variant="warning"
+                  className="bg-black/10 text-black hover:bg-black/20"
+                >
+                  {pendingUsers}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-pink-300 to-pink-400">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-black">
+              Sex Distribution
+            </CardTitle>
+            <PieChartIcon className="h-4 w-4 text-black" />
           </CardHeader>
           <CardContent>
             <div className="h-[80px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={genderDistribution}
+                    data={sexDistribution}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -171,10 +319,16 @@ export default function DashboardOverview() {
                     innerRadius={30}
                     outerRadius={40}
                   >
-                    {genderDistribution.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={index === 0 ? "#8884d8" : index === 1 ? "#82ca9d" : "#ffc658"}
+                    {sexDistribution.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          entry.name === "Male"
+                            ? "#2196F3"
+                            : entry.name === "Female"
+                            ? "#E91E63"
+                            : "#9E9E9E"
+                        }
                       />
                     ))}
                   </Pie>
@@ -182,27 +336,25 @@ export default function DashboardOverview() {
               </ResponsiveContainer>
             </div>
             <div className="mt-2 flex justify-center space-x-2">
-              {genderDistribution.map((entry, index) => (
+              {sexDistribution.map((entry, index) => (
                 <div key={`legend-${index}`} className="flex items-center">
                   <div
                     className="w-3 h-3 mr-1"
-                    style={{ 
-                      backgroundColor: index === 0 ? "#8884d8" : index === 1 ? "#82ca9d" : "#ffc658"
+                    style={{
+                      backgroundColor:
+                        entry.name === "Male"
+                          ? "#2196F3"
+                          : entry.name === "Female"
+                          ? "#E91E63"
+                          : "#9E9E9E",
                     }}
                   ></div>
-                  <span className="text-xs">{entry.name}: {entry.value}</span>
+                  <span className="text-xs text-black">
+                    {entry.name}: {entry.value}
+                  </span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}</div>
           </CardContent>
         </Card>
       </div>
@@ -215,43 +367,73 @@ export default function DashboardOverview() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Event Name</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-center">Participants</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="font-bold text-black">
+                    Event Name
+                  </TableHead>
+
+                  <TableHead className="font-bold text-black">Date</TableHead>
+                  <TableHead className="font-bold text-black">Type</TableHead>
+                  <TableHead className="font-bold text-black">
+                    Location
+                  </TableHead>
+                  <TableHead className="text-center font-bold text-black">
+                    Participants
+                  </TableHead>
+                  <TableHead className="font-bold text-black">
+                    Created By
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.slice(0, 3).map((event) => (
-                  <TableRow key={event.$id}>
-                    <TableCell>{event.eventName}</TableCell>
-                    <TableCell>
-                      {new Date(event.eventDate).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell>{event.eventVenue}</TableCell>
-                    <TableCell className="text-center">
-                      {event.participants?.length || 0}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          new Date(event.eventDate) < new Date()
-                            ? "default"
-                            : "outline"
-                        }
-                      >
-                        {new Date(event.eventDate) < new Date()
-                          ? "Completed"
-                          : "Upcoming"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {eventsWithCreators.map((event) => {
+                  const eventParticipants = participants.filter(
+                    (p) => p.eventId === event.$id
+                  );
+                  const maleCount = eventParticipants.filter(
+                    (p) => p.sex === "Male"
+                  ).length;
+                  const femaleCount = eventParticipants.filter(
+                    (p) => p.sex === "Female"
+                  ).length;
+
+                  return (
+                    <TableRow key={event.$id}>
+                      <TableCell className="font-medium">
+                        {event.eventName}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(event.eventDate).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            event.eventType === "Academic"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          {event.eventType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{event.eventVenue}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center">
+                          <div>Total: {maleCount + femaleCount}</div>
+                          <div className="text-sm text-muted-foreground">
+                            <span className="text-blue-600">{maleCount}</span>
+                            {" / "}
+                            <span className="text-pink-600">{femaleCount}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{event.createdByName}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -264,23 +446,52 @@ export default function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="age">
-              <TabsList>
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="age">Age Distribution</TabsTrigger>
-                <TabsTrigger value="location">Location</TabsTrigger>
+                <TabsTrigger value="location">
+                  Location Distribution
+                </TabsTrigger>
               </TabsList>
-              <TabsContent value="age">
+              <TabsContent value="age" className="space-y-4">
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={ageDistribution}>
-                      <XAxis dataKey="age" />
+                      <XAxis dataKey="name" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="count" fill="#8884d8" />
+                      <Bar
+                        dataKey="value"
+                        label={{
+                          position: "center",
+                          content: ({ x, y, width, height, value }) => (
+                            <text
+                              x={x + width / 2}
+                              y={y + height / 2}
+                              fill="#000"
+                              fontSize={50}
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                            >
+                              {value}
+                            </text>
+                          ),
+                        }}
+                      >
+                        {ageDistribution.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={`hsl(${
+                              index * (360 / ageDistribution.length)
+                            }, 70%, 60%)`}
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </TabsContent>
-              <TabsContent value="location">
+              <TabsContent value="location" className="space-y-4">
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -290,19 +501,68 @@ export default function DashboardOverview() {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
-                        label
+                        outerRadius={100}
+                        label={({ name, value, percent }) =>
+                          `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
+                        }
+                        labelLine={true}
                       >
                         {locationDistribution.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={`hsl(${index * 45}, 70%, 60%)`}
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={`hsl(${
+                              index * (360 / locationDistribution.length)
+                            }, 70%, 60%)`}
                           />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip
+                        formatter={(value, name, props) => [
+                          `${value} participants (${(
+                            (value / participants.length) *
+                            100
+                          ).toFixed(1)}%)`,
+                          `Location: ${props.payload.name}`,
+                        ]}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
+                </div>
+                <div className="mt-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Count</TableHead>
+                        <TableHead>Percentage</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {locationDistribution.map((item, index) => {
+                        const percentage = (
+                          (item.value / participants.length) *
+                          100
+                        ).toFixed(1);
+                        return (
+                          <TableRow key={item.name}>
+                            <TableCell className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: `hsl(${
+                                    index * (360 / locationDistribution.length)
+                                  }, 70%, 60%)`,
+                                }}
+                              />
+                              {item.name}
+                            </TableCell>
+                            <TableCell>{item.value}</TableCell>
+                            <TableCell>{percentage}%</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
               </TabsContent>
             </Tabs>
@@ -312,4 +572,3 @@ export default function DashboardOverview() {
     </>
   );
 }
-

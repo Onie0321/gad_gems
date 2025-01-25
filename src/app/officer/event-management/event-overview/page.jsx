@@ -1,6 +1,7 @@
+"use client";
+
 import React, { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -26,43 +27,218 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Plus, Loader2, ArrowUpDown, RotateCcw } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
+import { Plus, Loader2, ArrowUpDown, RotateCcw, PieChart } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
-  getEvents,
   databases,
+  databaseId,
   eventCollectionId,
   participantCollectionId,
-  getParticipants,
-  subscribeToRealTimeUpdates,
   getCurrentUser,
+  subscribeToRealTimeUpdates,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
+import { client } from "@/lib/appwrite";
+import { useRouter } from "next/navigation";
+import { useTabContext, TabProvider } from "@/context/TabContext";
+import { Query } from "appwrite";
+import { LoadingAnimation } from "@/components/loading/loading-animation";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+import {
+  BarChart,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Bar,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
 
-export default function EventOverView({ setActiveSection }) {
+export default function EventOverview({
+  currentEventId,
+  setCurrentEventId,
+  user,
+  currentAcademicPeriod,
+}) {
   const [events, setEvents] = useState([]);
   const [participants, setParticipants] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState("eventDate");
   const [sortDirection, setSortDirection] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [eventsPerPage, setEventsPerPage] = useState(5);
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [ageDistribution, setAgeDistribution] = useState([]);
+  const [locationDistribution, setLocationDistribution] = useState([]);
+  const router = useRouter();
+  const { setActiveTab } = useTabContext();
+
+  const calculateDemographics = (participants) => {
+    // Calculate age distribution with better error handling
+    const ageGroups = {
+      "Below 18": 0,
+      "18-24": 0,
+      "25-34": 0,
+      "35-44": 0,
+      "45-54": 0,
+      "Above 55": 0
+    };
+
+    // Calculate location distribution with null checks
+    const locations = {};
+
+    participants.forEach(participant => {
+      // Age distribution
+      const age = parseInt(participant.age);
+      if (!isNaN(age)) {
+        if (age < 18) ageGroups["Below 18"]++;
+        else if (age <= 24) ageGroups["18-24"]++;
+        else if (age <= 34) ageGroups["25-34"]++;
+        else if (age <= 44) ageGroups["35-44"]++;
+        else if (age <= 54) ageGroups["45-54"]++;
+        else ageGroups["Above 55"]++;
+      }
+
+      // Location distribution using homeAddress
+      const location = participant.homeAddress || "Not Specified";
+      // Clean up the location string and capitalize first letter of each word
+      const formattedLocation = location
+        .split(',')[0]  // Take only the first part before comma if exists
+        .trim()
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+        
+      locations[formattedLocation] = (locations[formattedLocation] || 0) + 1;
+    });
+
+    // Convert age groups to chart format
+    const ageDistribution = Object.entries(ageGroups).map(([age, count]) => ({
+      age,
+      count
+    }));
+
+    // Convert locations to chart format and sort by count
+    const locationDistribution = Object.entries(locations)
+      .map(([name, value]) => ({
+        name,
+        value
+      }))
+      .sort((a, b) => b.value - a.value) // Sort by count in descending order
+      .slice(0, 10); // Only take top 10 locations to avoid cluttering
+
+    return { ageDistribution, locationDistribution };
+  };
+
+  const fetchData = async (userId) => {
+    try {
+      setLoading(true);
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+        return;
+      }
+
+      // First fetch events
+      const eventsResponse = await databases.listDocuments(
+        databaseId,
+        eventCollectionId,
+        [
+          Query.equal("createdBy", userId),
+          Query.equal("isArchived", false),
+          Query.equal("academicPeriodId", currentPeriod.$id),
+          Query.orderDesc("$createdAt"),
+        ]
+      );
+
+      // Get all event IDs from the current period
+      const eventIds = eventsResponse.documents.map((event) => event.$id);
+
+      // Fetch all participants for these events in one query
+      const participantsResponse = await databases.listDocuments(
+        databaseId,
+        participantCollectionId,
+        [
+          Query.equal("isArchived", false),
+          Query.equal("eventId", eventIds),
+        ]
+      );
+
+      // Map participants to their respective events and calculate demographics
+      if (eventsResponse.documents.length > 0) {
+        // Map participants to events
+        const eventsWithParticipants = eventsResponse.documents.map(event => ({
+          ...event,
+          participants: participantsResponse.documents.filter(p => p.eventId === event.$id)
+        }));
+
+        // Calculate demographics from all participants with better error handling
+        const { ageDistribution: ageDist, locationDistribution: locDist } = 
+          calculateDemographics(participantsResponse.documents);
+
+        console.log("Age Distribution:", ageDist);
+        console.log("Location Distribution:", locDist);
+
+        setEvents(eventsWithParticipants);
+        setParticipants(participantsResponse.documents);
+        setAgeDistribution(ageDist);
+        setLocationDistribution(locDist);
+      } else {
+        setEvents([]);
+        setParticipants([]);
+        setAgeDistribution([]);
+        setLocationDistribution([]);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to fetch data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchUserAndData = async () => {
       try {
-        const currentUser = await getCurrentUser();
-        if (currentUser) {
-          fetchData(currentUser.id);
+        const user = await getCurrentUser();
+        if (user) {
+          setCurrentUser(user);
+          await fetchData(user.$id);
 
+          // Set up real-time listeners
           const unsubscribeEvents = subscribeToRealTimeUpdates(
             eventCollectionId,
-            () => fetchData(currentUser.id)
+            async (response) => {
+              console.log("Event update received:", response);
+              await fetchData(user.$id);
+            }
           );
+
           const unsubscribeParticipants = subscribeToRealTimeUpdates(
             participantCollectionId,
-            () => fetchData(currentUser.id)
+            async (response) => {
+              console.log("Participant update received:", response);
+              await fetchData(user.$id);
+            }
           );
 
           return () => {
@@ -79,50 +255,78 @@ export default function EventOverView({ setActiveSection }) {
     fetchUserAndData();
   }, []);
 
-  const fetchData = async (userId) => {
-    try {
-      setLoading(true);
-      const fetchedEvents = await getEvents(userId);
-      setEvents(fetchedEvents || []);
+  // Add debug logging for state changes
+  useEffect(() => {
+    console.log("Events state updated:", events);
+  }, [events]);
 
-      if (fetchedEvents.length > 0) {
-        const allParticipants = await Promise.all(
-          fetchedEvents.map((event) => getParticipants(event.$id, userId))
-        );
-        setParticipants(allParticipants.flat() || []);
-      } else {
-        setParticipants([]);
+  useEffect(() => {
+    console.log("Participants state updated:", participants);
+  }, [participants]);
+
+  useEffect(() => {
+    const unsubscribe = client.subscribe(
+      `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID}.documents`,
+      (response) => {
+        if (
+          response.events.includes(
+            "databases.*.collections.*.documents.*.update"
+          ) ||
+          response.events.includes(
+            "databases.*.collections.*.documents.*.create"
+          )
+        ) {
+          // Update the specific event in the local state
+          const updatedEvent = response.payload;
+          setEvents((prevEvents) =>
+            prevEvents.map((event) =>
+              event.$id === updatedEvent.$id
+                ? { ...event, ...updatedEvent }
+                : event
+            )
+          );
+        }
       }
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      setError("Failed to fetch data.");
-    } finally {
-      setLoading(false);
-    }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const getParticipantCounts = (eventId) => {
+    const eventParticipants = participants.filter(p => p.eventId === eventId);
+    console.log(`Counting participants for event ${eventId}:`, eventParticipants);
+    
+    return {
+      total: eventParticipants.length,
+      male: eventParticipants.filter(p => p.sex === "Male").length,
+      female: eventParticipants.filter(p => p.sex === "Female").length
+    };
   };
 
   const summaryStats = useMemo(() => {
-    const totalParticipants = participants.length;
-    const maleParticipants = participants.filter(
-      (p) => p.sex === "Male"
-    ).length;
-    const femaleParticipants = participants.filter(
-      (p) => p.sex === "Female"
-    ).length;
-    const intersexParticipants = participants.filter(
-      (p) => p.sex === "Intersex"
-    ).length;
+    // Calculate totals from all events and their participants
+    let totalParticipants = 0;
+    let maleParticipants = 0;
+    let femaleParticipants = 0;
+
+    events.forEach(event => {
+      const participants = event.participants || [];
+      totalParticipants += participants.length;
+      maleParticipants += participants.filter(p => p.sex === "Male").length;
+      femaleParticipants += participants.filter(p => p.sex === "Female").length;
+    });
 
     return {
       total: events.length,
-      academic: events.filter((e) => e.eventType === "Academic").length,
-      nonAcademic: events.filter((e) => e.eventType === "Non-Academic").length,
+      academic: events.filter(e => e.eventType === "Academic").length,
+      nonAcademic: events.filter(e => e.eventType === "Non-Academic").length,
       totalParticipants,
       maleParticipants,
       femaleParticipants,
-      intersexParticipants,
     };
-  }, [events, participants]);
+  }, [events]);
 
   const filteredEvents = events.filter((event) => {
     const searchableFields = [
@@ -136,23 +340,6 @@ export default function EventOverView({ setActiveSection }) {
       field.includes(searchTerm.toLowerCase())
     );
   });
-
-  const getParticipantCounts = (eventId) => {
-    const eventParticipants = participants.filter((p) => p.eventId === eventId);
-    const maleCount = eventParticipants.filter((p) => p.sex === "Male").length;
-    const femaleCount = eventParticipants.filter(
-      (p) => p.sex === "Female"
-    ).length;
-    const intersexCount = eventParticipants.filter(
-      (p) => p.sex === "Intersex"
-    ).length;
-    return {
-      total: eventParticipants.length,
-      male: maleCount,
-      female: femaleCount,
-      intersex: intersexCount,
-    };
-  };
 
   const sortedEvents = useMemo(() => {
     return [...filteredEvents].sort((a, b) => {
@@ -193,64 +380,128 @@ export default function EventOverView({ setActiveSection }) {
     setSortDirection("desc");
   };
 
-  if (loading) {
+  const handleNavigateToCreateEvent = () => {
+    setActiveTab("createEvent");
+  };
+
+  const renderEmptyState = () => {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <Card className="w-full">
+        <CardHeader className="text-center">
+          <CardTitle>No Events Available</CardTitle>
+          <CardDescription>
+            There are no events in the current academic period
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-4">
+          <Button onClick={() => setActiveTab("createEvent")}>
+            <Plus className="mr-2 h-4 w-4" /> Create Your First Event
+          </Button>
+          <div className="flex items-center gap-2">
+            <div className="h-px w-16 bg-gray-300" />
+            <span className="text-sm text-gray-500">or</span>
+            <div className="h-px w-16 bg-gray-300" />
+          </div>
+          <ImportEventData />
+        </CardContent>
+      </Card>
     );
+  };
+
+  if (loading) {
+    return <LoadingAnimation message="Loading events..." />;
   }
 
   if (error) {
     return (
       <div className="text-center text-red-500">
         <p>{error}</p>
-        <Button
-          onClick={() => getCurrentUser().then((user) => fetchData(user.id))}
-          className="mt-4"
-        >
+        <Button onClick={() => fetchData(currentUser?.$id)} className="mt-4">
           Retry
         </Button>
       </div>
     );
   }
 
+  if (!currentAcademicPeriod) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Event Overview</CardTitle>
+          <CardDescription>View and analyze your events</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <div className="mb-4">
+              <PieChart className="mx-auto h-12 w-12 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">
+              No Active Academic Period
+            </h3>
+            <p className="text-muted-foreground">
+              Event overview will be available once an administrator sets up the
+              current academic period.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If there are no events, show empty state
+  if (events.length === 0) {
+    return renderEmptyState();
+  }
+
+  if (filteredEvents.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between">
+          <h2 className="text-2xl font-bold">Recent Events</h2>
+          <Button onClick={handleNavigateToCreateEvent}>
+            <Plus className="mr-2 h-4 w-4" /> Add Event
+          </Button>
+        </div>
+        {/* ... rest of the no search results UI ... */}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between">
-        <h2 className="text-2xl font-bold">Recent Events</h2>
-        <Button onClick={() => setActiveSection("create")}>
-          <Plus className="mr-2 h-4 w-4" /> Add Event
-        </Button>
-      </div>
-      <div className="relative w-full max-w-sm">
-        <Input
-          placeholder="Search events..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1); // Reset to first page when searching
-          }}
-          className="w-full"
-        />
-      </div>
-
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <h3 className="text-lg font-semibold">Total Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.total}</p>
+        <CardHeader>
+          <CardTitle>Event Overview</CardTitle>
+          <CardDescription>View and manage your events</CardDescription>
+          {currentAcademicPeriod && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              Academic Period: {currentAcademicPeriod.schoolYear} - {currentAcademicPeriod.periodType}
+              <br />
+              {format(new Date(currentAcademicPeriod.startDate), "MMM d, yyyy")} - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">Academic Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.academic}</p>
+          )}
+        </CardHeader>
+        <CardContent>
+          {events.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-lg">No events found in the current academic period</p>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">Non-Academic Events</h3>
-              <p className="text-3xl font-bold">{summaryStats.nonAcademic}</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-semibold">Total Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.total}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Academic Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.academic}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Non-Academic Events</h3>
+                <p className="text-3xl font-bold">{summaryStats.nonAcademic}</p>
+              </div>
             </div>
-          </div>
+          )}
           <div className="mt-4 text-center">
             <h3 className="text-lg font-semibold">Total Participants</h3>
             <p className="text-3xl font-bold">
@@ -258,8 +509,7 @@ export default function EventOverView({ setActiveSection }) {
             </p>
             <p className="text-sm text-muted-foreground">
               (Male: {summaryStats.maleParticipants} | Female:{" "}
-              {summaryStats.femaleParticipants} | Intersex:{" "}
-              {summaryStats.intersexParticipants})
+              {summaryStats.femaleParticipants})
             </p>
           </div>
         </CardContent>
@@ -314,7 +564,10 @@ export default function EventOverView({ setActiveSection }) {
         </TableHeader>
         <TableBody>
           {currentEvents.map((event) => {
-            const participantCounts = getParticipantCounts(event.$id);
+            const eventParticipants = event.participants || [];
+            const maleCount = eventParticipants.filter(p => p.sex === "Male").length;
+            const femaleCount = eventParticipants.filter(p => p.sex === "Female").length;
+            const totalCount = eventParticipants.length;
 
             return (
               <TableRow key={event.$id}>
@@ -323,11 +576,13 @@ export default function EventOverView({ setActiveSection }) {
                   {format(parseISO(event.eventDate), "MMMM d, yyyy")}
                 </TableCell>
                 <TableCell>{event.eventVenue}</TableCell>
-                <TableCell className="text-right">
-                  <div>(Total: {participantCounts.total})</div>
-                  <div className="text-sm text-muted-foreground">
-                    (M: {participantCounts.male} | F: {participantCounts.female}{" "}
-                    | I: {participantCounts.intersex})
+                <TableCell className="text-center">
+                  <div className="flex flex-col items-center">
+                    <div>Total: {totalCount}</div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="text-blue-600">{maleCount}</span>/
+                      <span className="text-pink-600">{femaleCount}</span>
+                    </div>
                   </div>
                 </TableCell>
               </TableRow>
@@ -365,7 +620,97 @@ export default function EventOverView({ setActiveSection }) {
           </PaginationItem>
         </PaginationContent>
       </Pagination>
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Demographic Analysis</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="age">
+              <TabsList>
+                <TabsTrigger value="age">Age Distribution</TabsTrigger>
+                <TabsTrigger value="location">Location Distribution</TabsTrigger>
+              </TabsList>
+              <TabsContent value="age">
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={ageDistribution}>
+                      <XAxis dataKey="age" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#2196F3" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </TabsContent>
+              <TabsContent value="location">
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={locationDistribution}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={({ name, value, percent }) => 
+                          `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
+                        }
+                        labelLine={true}
+                      >
+                        {locationDistribution.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={`hsl(${index * (360 / locationDistribution.length)}, 70%, 60%)`}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value, name, props) => [
+                          `${value} participants (${((value / participants.length) * 100).toFixed(1)}%)`,
+                          `Location: ${props.payload.name}`
+                        ]}
+                      />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Count</TableHead>
+                        <TableHead>Percentage</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {locationDistribution.map((item, index) => {
+                        const percentage = ((item.value / participants.length) * 100).toFixed(1);
+                        return (
+                          <TableRow key={item.name}>
+                            <TableCell className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: `hsl(${index * (360 / locationDistribution.length)}, 70%, 60%)`
+                                }}
+                              />
+                              {item.name}
+                            </TableCell>
+                            <TableCell>{item.value}</TableCell>
+                            <TableCell>{percentage}%</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
-

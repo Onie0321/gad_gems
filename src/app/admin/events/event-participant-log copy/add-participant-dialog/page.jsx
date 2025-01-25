@@ -43,7 +43,9 @@ import {
   debouncedCheckDuplicates,
   handleAutofill,
   checkDuplicates,
-  isStudentIdComplete
+  isStudentIdComplete,
+  isStaffIdComplete,
+  isIdComplete,
 } from "@/utils/participantUtils";
 import {
   createParticipant,
@@ -254,6 +256,15 @@ const AddParticipant = ({
     setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
     setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
   }, 500);
+
+  const checkIdCompleteness = (id, type) => {
+    if (type === 'student') {
+      return isStudentIdComplete(id);
+    } else if (type === 'staff') {
+      return isStaffIdComplete(id);
+    }
+    return false;
+  };
 
   return (
     <Dialog>
