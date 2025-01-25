@@ -6,7 +6,8 @@ import Image from "next/image";
 
 export default function Header() {
   const scrollToSection = (sectionId) => {
-    const element = document.getElementById(sectionId);
+    const formattedId = sectionId.toLowerCase().replace(/\s+/g, '-');
+    const element = document.getElementById(formattedId);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
     }
@@ -32,17 +33,17 @@ export default function Header() {
         <div className="flex items-center space-x-6">
           <nav>
             <ul className="flex space-x-1 sm:space-x-2 md:space-x-4">
-              <li>
-                {["Home", "About", "Events", "News", "Feedback", "FAQ"].map((item) => (
+              {["Home", "About", "Events", "News", "Our Office", "FAQ"].map(
+                (item) => (
                   <button
                     key={item}
-                    onClick={() => scrollToSection(item.toLowerCase())}
+                    onClick={() => scrollToSection(item)}
                     className="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-violet-600 hover:bg-violet-50 transition-colors duration-200"
                   >
                     {item}
                   </button>
-                ))}
-              </li>
+                )
+              )}
             </ul>
           </nav>
         </div>
