@@ -39,7 +39,7 @@ export const employeesSurveyCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_EMPLOYEESURVEY_COLLECTION_ID;
 export const notificationsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID;
-export const activityLogsCollectionId = 
+export const activityLogsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_ACTIVITYLOGS_COLLECTION_ID;
 export const newsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_NEWS_COLLECTION_ID;
@@ -127,7 +127,7 @@ export async function createUser(email, password, name, role = "user") {
     );
 
     // Log the registration activity
-    await logActivity(newUser.$id, "user_registration");
+    await logActivity(newUser.$id, "User Registered: " + name);
 
     // Create notifications
     await createNotification({
@@ -1667,13 +1667,13 @@ const calculateLocationDistribution = (participants) => {
     const location = participant.homeAddress || "Not Specified";
     // Clean up the location string and capitalize first letter of each word
     const formattedLocation = location
-      .split(',')[0]  // Take only the first part before comma if exists
+      .split(",")[0] // Take only the first part before comma if exists
       .trim()
       .toLowerCase()
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-      
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+
     locations[formattedLocation] = (locations[formattedLocation] || 0) + 1;
   });
 
@@ -1706,10 +1706,7 @@ export const fetchTotals = async (academicPeriodId) => {
       const participantsResponse = await databases.listDocuments(
         databaseId,
         participantCollectionId,
-        [
-          Query.equal("eventId", eventIds),
-          Query.equal("isArchived", false),
-        ]
+        [Query.equal("eventId", eventIds), Query.equal("isArchived", false)]
       );
       participants = participantsResponse.documents;
     }
@@ -1751,10 +1748,9 @@ export const logActivity = async (userId, activityType) => {
       activityLogsCollectionId,
       "unique()",
       {
-        userId: userId,
-        activityType: activityType, // Changed from 'activity' to 'activityType'
+        userId,
+        activityType,
         timestamp: new Date().toISOString(),
-        // Add any other required fields for your activities collection
       }
     );
     return response;
@@ -1771,7 +1767,7 @@ export const logSignOut = async (userId) => {
 
 // Function to log event creation
 export const logEventCreation = async (userId, eventName) => {
-  await logActivity(userId, `Created Event: ${eventName}`);
+  await logActivity(userId, "Created Event: " + eventName);
 };
 
 // Function to log participant addition
@@ -1854,23 +1850,19 @@ export const fetchUsers = async () => {
 };
 
 // Fetch activity logs function
-export const fetchActivityLogs = async () => {
+export async function fetchActivityLogs() {
   try {
-    if (!databaseId || !activityLogsCollectionId) {
-      throw new Error("Database or Collection ID not configured");
-    }
-
     const response = await databases.listDocuments(
       databaseId,
       activityLogsCollectionId,
-      [Query.orderDesc("timestamp")]
+      [Query.orderDesc("timestamp"), Query.limit(1000)]
     );
     return response.documents;
   } catch (error) {
     console.error("Error fetching activity logs:", error);
     throw error;
   }
-};
+}
 
 export const checkConnection = async () => {
   try {
@@ -1931,7 +1923,7 @@ export const listEvents = async () => {
 };
 // Add this new function to log user registrations
 export const logUserRegistration = async (userId, name) => {
-  await logActivity(userId, `New User Registration: ${name}`);
+  await logActivity(userId, "User Registered: " + name);
 };
 
 export const updateEventVisibility = async (eventId, showOnHomepage) => {
@@ -2027,7 +2019,7 @@ export const getCurrentAcademicPeriod = async () => {
 
     console.log("Fetching academic period with:", {
       databaseId,
-      academicPeriodCollectionId
+      academicPeriodCollectionId,
     });
 
     // Query for active academic period
@@ -2037,7 +2029,7 @@ export const getCurrentAcademicPeriod = async () => {
       [
         Query.equal("isActive", true),
         Query.orderDesc("createdAt"),
-        Query.limit(1)
+        Query.limit(1),
       ]
     );
 
@@ -2062,7 +2054,7 @@ export const getCurrentAcademicPeriod = async () => {
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       isBeforeStart: now < startDate,
-      isAfterEnd: now > endDate
+      isAfterEnd: now > endDate,
     });
 
     // Check if we're within the period dates
@@ -2081,7 +2073,7 @@ export const getCurrentAcademicPeriod = async () => {
           currentPeriod.$id,
           {
             isActive: false,
-            archivedAt: new Date().toISOString()
+            archivedAt: new Date().toISOString(),
           }
         );
         console.log("Successfully archived expired period");
@@ -2218,7 +2210,7 @@ export const fetchOfficerEvents = async (accountId) => {
       console.log("No active academic period found in fetchOfficerEvents");
       return {
         events: [],
-        currentPeriod: null
+        currentPeriod: null,
       };
     }
 

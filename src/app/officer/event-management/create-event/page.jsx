@@ -73,6 +73,7 @@ import {
   STORAGE_KEYS,
 } from "@/utils/formPersistence";
 import { importEventAndParticipants } from "@/utils/importUtils";
+import { createNotification } from "@/lib/appwrite";
 
 export default function CreateEvent({
   onEventCreated,
@@ -97,12 +98,25 @@ export default function CreateEvent({
             <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-semibold text-primary">Current Academic Period</h4>
-                  <p className="text-sm text-muted-foreground">{currentAcademicPeriod.schoolYear} - {currentAcademicPeriod.periodType}</p>
+                  <h4 className="font-semibold text-primary">
+                    Current Academic Period
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    {currentAcademicPeriod.schoolYear} -{" "}
+                    {currentAcademicPeriod.periodType}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(currentAcademicPeriod.startDate), "MMM d, yyyy")} - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
+                    {format(
+                      new Date(currentAcademicPeriod.startDate),
+                      "MMM d, yyyy"
+                    )}{" "}
+                    -{" "}
+                    {format(
+                      new Date(currentAcademicPeriod.endDate),
+                      "MMM d, yyyy"
+                    )}
                   </p>
                 </div>
               </div>
@@ -352,6 +366,18 @@ export default function CreateEvent({
       const newEvent = await createEvent(eventData);
 
       if (newEvent) {
+        // Create notification for admin
+        await createNotification({
+          userId: "admin",
+          type: "event",
+          title: "New Event Created",
+          message: `${user.name} has created a new event: ${eventName}`,
+          actionType: "event_creation",
+          eventId: newEvent.$id,
+          status: "info",
+          read: false,
+        });
+
         toast.success("Event created successfully!");
         clearFormData(STORAGE_KEYS.CREATE_EVENT);
         onEventCreated(newEvent);
@@ -577,12 +603,25 @@ export default function CreateEvent({
           <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-semibold text-primary">Current Academic Period</h4>
-                <p className="text-sm text-muted-foreground">{currentAcademicPeriod.schoolYear} - {currentAcademicPeriod.periodType}</p>
+                <h4 className="font-semibold text-primary">
+                  Current Academic Period
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {currentAcademicPeriod.schoolYear} -{" "}
+                  {currentAcademicPeriod.periodType}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(currentAcademicPeriod.startDate), "MMM d, yyyy")} - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
+                  {format(
+                    new Date(currentAcademicPeriod.startDate),
+                    "MMM d, yyyy"
+                  )}{" "}
+                  -{" "}
+                  {format(
+                    new Date(currentAcademicPeriod.endDate),
+                    "MMM d, yyyy"
+                  )}
                 </p>
               </div>
             </div>

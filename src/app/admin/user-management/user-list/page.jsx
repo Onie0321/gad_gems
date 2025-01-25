@@ -62,6 +62,7 @@ export default function UserList() {
     email: "",
     role: "",
   });
+  const [searchColumn, setSearchColumn] = useState("all");
 
   useEffect(() => {
     loadUsers();
@@ -113,7 +114,7 @@ export default function UserList() {
     try {
       const updated = await databases.updateDocument(
         databaseId,
-        usersCollectionId,
+        userCollectionId,
         selectedUser.$id,
         editForm
       );
@@ -170,12 +171,38 @@ export default function UserList() {
   };
 
   const filteredUsers = users.filter((user) => {
+    const name = user.name?.toLowerCase() || "";
+    const email = user.email?.toLowerCase() || "";
+    const role = user.role?.toLowerCase() || "";
+    const status = user.approvalStatus?.toLowerCase() || "";
+    const joinDate = format(
+      new Date(user.$createdAt),
+      "MMM d, yyyy"
+    ).toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
+
+    // Search based on selected column
     const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      searchColumn === "all"
+        ? name.includes(searchLower) ||
+          email.includes(searchLower) ||
+          role.includes(searchLower) ||
+          status.includes(searchLower) ||
+          joinDate.includes(searchLower)
+        : searchColumn === "name"
+        ? name.includes(searchLower)
+        : searchColumn === "email"
+        ? email.includes(searchLower)
+        : searchColumn === "role"
+        ? role.includes(searchLower)
+        : searchColumn === "status"
+        ? status.includes(searchLower)
+        : joinDate.includes(searchLower);
+
     const matchesRole =
       filterRole === "all" ||
       user.role.toLowerCase() === filterRole.toLowerCase();
+
     const matchesStatus =
       filterStatus === "all" ||
       user.approvalStatus.toLowerCase() === filterStatus.toLowerCase();
@@ -189,8 +216,6 @@ export default function UserList() {
         return "bg-green-100 text-green-800";
       case "pending":
         return "bg-yellow-100 text-yellow-800";
-      case "declined":
-        return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -212,22 +237,29 @@ export default function UserList() {
   return (
     <Card className="p-6">
       <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        
-        <div className="flex gap-2">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-yellow-100"></div>
-            <span className="text-sm">Pending: {users.filter(user => user.approvalStatus === 'pending').length}</span>
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-yellow-100"></div>
+              <span className="text-sm">
+                Pending:{" "}
+                {
+                  users.filter((user) => user.approvalStatus === "pending")
+                    .length
+                }
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-green-100"></div>
+              <span className="text-sm">
+                Approved:{" "}
+                {
+                  users.filter((user) => user.approvalStatus === "approved")
+                    .length
+                }
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-green-100"></div>
-            <span className="text-sm">Approved: {users.filter(user => user.approvalStatus === 'approved').length}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-red-100"></div>
-            <span className="text-sm">Declined: {users.filter(user => user.approvalStatus === 'declined').length}</span>
-          </div>
-        </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1 max-w-sm">
@@ -242,6 +274,20 @@ export default function UserList() {
               className="pl-10"
             />
           </div>
+
+          <Select value={searchColumn} onValueChange={setSearchColumn}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Search in column" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Columns</SelectItem>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="role">Role</SelectItem>
+              <SelectItem value="status">Status</SelectItem>
+              <SelectItem value="joined">Join Date</SelectItem>
+            </SelectContent>
+          </Select>
 
           <Select value={filterRole} onValueChange={setFilterRole}>
             <SelectTrigger className="w-[180px]">
@@ -262,17 +308,18 @@ export default function UserList() {
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="declined">Declined</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <Table>
           <TableCaption>
-            {users.length === 0 && !loading
-              ? "No users found"
-              : "A list of all users"}
-          </TableCaption>{" "}
+            {filteredUsers.length === 0
+              ? "No matching users found"
+              : `Showing ${filteredUsers.length} ${
+                  filteredUsers.length === 1 ? "user" : "users"
+                }`}
+          </TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
@@ -293,14 +340,14 @@ export default function UserList() {
                   </div>
                 </TableCell>
               </TableRow>
-            ) : users.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8">
-                  No users found
+                  No matching users found
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <TableRow key={user.$id}>
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
@@ -308,7 +355,9 @@ export default function UserList() {
                   <TableCell>
                     <SelectStatus
                       status={user.approvalStatus}
-                      onStatusChange={(newStatus) => handleUpdateStatus(user.$id, newStatus)}
+                      onStatusChange={(newStatus) =>
+                        handleUpdateStatus(user.$id, newStatus)
+                      }
                       className="text-xs"
                     />
                   </TableCell>
@@ -387,15 +436,15 @@ export default function UserList() {
                           />
                         </div>
                         <div>
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          value={editForm.email}
-          disabled // Make email read-only
-          className="bg-gray-100" // Visual indication that it's read-only
-        />
-      </div>
+                          <Label htmlFor="email">Email</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={editForm.email}
+                            disabled // Make email read-only
+                            className="bg-gray-100" // Visual indication that it's read-only
+                          />
+                        </div>
                         <div>
                           <Label htmlFor="role">Role</Label>
                           <Select

@@ -100,12 +100,25 @@ export default function SignInPage() {
   const handleGoogleSignIn = async () => {
     try {
       const currentUrl = window.location.origin;
-      await account.createOAuth2Session(
+      const session = await account.createOAuth2Session(
         "google",
         `${currentUrl}/auth-callback`,
         `${currentUrl}/sign-in`
       );
-      // Note: Activity logging will happen in the auth-callback page
+
+      // Create notification for admin
+      const user = await getCurrentUser();
+      if (user) {
+        await createNotification({
+          userId: "admin",
+          type: "account",
+          title: "Google Sign In",
+          message: `${user.name} has signed in using Google.`,
+          actionType: "google_signin",
+          status: "info",
+          read: false,
+        });
+      }
     } catch (error) {
       console.error("Google sign-in error:", error);
       toast({
@@ -133,6 +146,17 @@ export default function SignInPage() {
 
       // Log the sign-in activity
       await logActivity(user.$id, "email_signin");
+
+      // Create notification for admin
+      await createNotification({
+        userId: "admin",
+        type: "account",
+        title: "User Sign In",
+        message: `${user.name} has signed in to the system.`,
+        actionType: "user_signin",
+        status: "info",
+        read: false,
+      });
 
       // Handle navigation based on user role and approval status
       if (user.approvalStatus === "approved") {

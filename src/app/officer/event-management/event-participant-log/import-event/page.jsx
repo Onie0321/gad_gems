@@ -17,7 +17,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { getCurrentAcademicPeriod } from "@/lib/appwrite";
+import { getCurrentAcademicPeriod, getCurrentUser } from "@/lib/appwrite";
+import { createNotification } from "@/lib/appwrite";
 
 export default function ImportEventData() {
   const [file, setFile] = useState(null);
@@ -65,7 +66,9 @@ export default function ImportEventData() {
     try {
       const currentPeriod = await getCurrentAcademicPeriod();
       if (!currentPeriod) {
-        throw new Error("No active academic period found. Please set up an academic period first.");
+        throw new Error(
+          "No active academic period found. Please set up an academic period first."
+        );
       }
 
       validateFileType(file);
@@ -75,13 +78,26 @@ export default function ImportEventData() {
         currentPeriod.$id
       );
 
+      // Create notification for admin
+      const user = await getCurrentUser();
+      await createNotification({
+        userId: "admin",
+        type: "event",
+        title: "Event Import",
+        message: `${user.name} has imported an event with participants: ${result.event.eventName}`,
+        actionType: "event_import",
+        eventId: result.event.$id,
+        status: "info",
+        read: false,
+      });
+
       toast.success(result.message);
-      
+
       setFile(null);
       setPreviewData(null);
       setIsDialogOpen(false);
 
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         window.location.reload();
       }
     } catch (error) {
@@ -99,7 +115,7 @@ export default function ImportEventData() {
 
   const EventPreview = ({ data }) => {
     const previewData = importUtils.formatEventPreview(data);
-    
+
     return (
       <Card className="mt-4">
         <CardHeader>
@@ -135,15 +151,21 @@ export default function ImportEventData() {
           </p>
           <div className="mt-4">
             <p>
-              <strong>Total Participants:</strong> {previewData.totalParticipants}
+              <strong>Total Participants:</strong>{" "}
+              {previewData.totalParticipants}
             </p>
             <p>
-              <strong>Gender Distribution:</strong> Male: {previewData.participantDetails.male} | Female: {previewData.participantDetails.female}
+              <strong>Gender Distribution:</strong> Male:{" "}
+              {previewData.participantDetails.male} | Female:{" "}
+              {previewData.participantDetails.female}
             </p>
             <p className="text-sm mt-1">
-              <strong>Students:</strong> {previewData.participantDetails.students} | 
-              <strong> Staff/Faculty:</strong> {previewData.participantDetails.staffFaculty} | 
-              <strong> Community:</strong> {previewData.participantDetails.community}
+              <strong>Students:</strong>{" "}
+              {previewData.participantDetails.students} |
+              <strong> Staff/Faculty:</strong>{" "}
+              {previewData.participantDetails.staffFaculty} |
+              <strong> Community:</strong>{" "}
+              {previewData.participantDetails.community}
             </p>
           </div>
         </CardContent>
@@ -173,7 +195,9 @@ export default function ImportEventData() {
           {previewData ? (
             <EventPreview data={previewData} />
           ) : (
-            <p className="text-center text-gray-500">No file chosen. Upload a file to see the preview.</p>
+            <p className="text-center text-gray-500">
+              No file chosen. Upload a file to see the preview.
+            </p>
           )}
           {error && (
             <div className="text-red-500 mt-2" role="alert">
@@ -193,4 +217,3 @@ export default function ImportEventData() {
     </Dialog>
   );
 }
-

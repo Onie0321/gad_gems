@@ -34,6 +34,9 @@ import {
   userCollectionId,
   eventCollectionId,
   participantCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
+  getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -140,22 +143,59 @@ export default function AdminDashboard() {
         if (user && account) {
           setCurrentUser({ ...user, ...account });
 
+          // Get current academic period
+          const currentPeriod = await getCurrentAcademicPeriod();
+          if (!currentPeriod) {
+            throw new Error("No active academic period found");
+          }
+
           // Fetch all data in parallel
-          const [fetchedUsers, fetchedParticipants, fetchedEvents] =
-            await Promise.all([
-              databases.listDocuments(databaseId, userCollectionId, [
-                Query.limit(100),
-              ]),
-              databases.listDocuments(databaseId, participantCollectionId, [
-                Query.limit(100),
-              ]),
-              databases.listDocuments(databaseId, eventCollectionId, [
-                Query.limit(100),
-              ]),
-            ]);
+          const [
+            fetchedUsers,
+            fetchedStudents,
+            fetchedStaffFaculty,
+            fetchedCommunity,
+            fetchedEvents,
+          ] = await Promise.all([
+            databases.listDocuments(databaseId, userCollectionId, [
+              Query.limit(100),
+            ]),
+            // Fetch students
+            databases.listDocuments(databaseId, participantCollectionId, [
+              Query.limit(100),
+            ]),
+            // Fetch staff/faculty
+            databases.listDocuments(databaseId, staffFacultyCollectionId, [
+              Query.limit(100),
+            ]),
+            // Fetch community members
+            databases.listDocuments(databaseId, communityCollectionId, [
+              Query.limit(100),
+            ]),
+            // Fetch events
+            databases.listDocuments(databaseId, eventCollectionId, [
+              Query.limit(100),
+            ]),
+          ]);
+
+          // Combine all participants with their respective types
+          const allParticipants = [
+            ...fetchedStudents.documents.map((p) => ({
+              ...p,
+              participantType: "Student",
+            })),
+            ...fetchedStaffFaculty.documents.map((p) => ({
+              ...p,
+              participantType: "Staff/Faculty",
+            })),
+            ...fetchedCommunity.documents.map((p) => ({
+              ...p,
+              participantType: "Community Member",
+            })),
+          ];
 
           setUsers(fetchedUsers.documents);
-          setParticipants(fetchedParticipants.documents);
+          setParticipants(allParticipants);
           setEvents(fetchedEvents.documents);
         }
       } catch (err) {
@@ -175,11 +215,24 @@ export default function AdminDashboard() {
   };
 
   const renderActiveSection = () => {
+    // Calculate participant type totals
+    const participantTotals = {
+      students: participants.filter((p) => p.participantType === "Student")
+        .length,
+      staffFaculty: participants.filter(
+        (p) => p.participantType === "Staff/Faculty"
+      ).length,
+      communityMembers: participants.filter(
+        (p) => p.participantType === "Community Member"
+      ).length,
+    };
+
     const props = {
       currentUser,
       users,
       participants,
       events,
+      participantTotals,
     };
 
     switch (activeSection) {
@@ -187,7 +240,6 @@ export default function AdminDashboard() {
         return <UserManagement {...props} />;
       case "events":
         return <EventsSection {...props} />;
-
       case "demographics":
         return <DemographicAnalysis />;
       case "homepage":
