@@ -495,34 +495,14 @@ export const extractParticipants = (data) => {
 
   if (studentSectionIndex === -1) {
     console.warn("Student section header not found");
-    throw new Error("Unable to locate student section in the file.");
+    return []; // Return empty array instead of throwing error
   }
 
   // Headers are one row below the section header
   const headerRow = data[studentSectionIndex + 1];
-
-  // Validate header structure
-  const expectedHeaders = [
-    "Name",
-    "StudentId",
-    "Sex at Birth",
-    "Age",
-    "Home Address",
-    "School",
-    "Year",
-    "Section",
-    "Ethnic Group",
-  ];
-
-  const hasValidHeaders = expectedHeaders.every((header) =>
-    headerRow.includes(header)
-  );
-
-  if (!hasValidHeaders) {
-    console.warn("Invalid header structure:", headerRow);
-    throw new Error(
-      "Invalid participant data format. Please check the file structure."
-    );
+  if (!headerRow) {
+    console.warn("Header row not found");
+    return [];
   }
 
   // Get column indices for each field
@@ -536,34 +516,59 @@ export const extractParticipants = (data) => {
   const sectionIndex = headerRow.indexOf("Section");
   const ethnicGroupIndex = headerRow.indexOf("Ethnic Group");
 
-  // Extract participant data starting from the row after headers
+  // Validate required columns exist
+  if (nameIndex === -1 || sexIndex === -1) {
+    console.warn("Required columns missing", { nameIndex, sexIndex });
+    return [];
+  }
+
   const participants = [];
+  // Start from the row after headers
   for (let i = studentSectionIndex + 2; i < data.length; i++) {
     const row = data[i];
-
+    
     // Stop if we hit an empty row or the next section
-    if (!row[nameIndex] || row.includes("Staff/Faculty")) {
+    if (!row || !row[nameIndex] || row.includes("Staff/Faculty")) {
       break;
     }
 
-    participants.push({
-      name: row[nameIndex] || "",
-      studentId: row[studentIdIndex] || "",
-      sex: row[sexIndex] || "",
+    // Clean and validate the sex value
+    const rawSex = row[sexIndex]?.toString().trim();
+    const sex = rawSex?.toLowerCase() === 'male' ? 'Male' : 
+                rawSex?.toLowerCase() === 'female' ? 'Female' : 
+                null;
+
+    if (!sex) {
+      console.warn(`Invalid sex value for participant: ${row[nameIndex]}`);
+      continue; // Skip this participant
+    }
+
+    const participant = {
+      name: row[nameIndex]?.toString().trim() || '',
+      studentId: row[studentIdIndex]?.toString().trim() || '',
+      sex: sex,
       age: parseInt(row[ageIndex], 10) || null,
-      homeAddress: row[addressIndex] || "",
-      school: row[schoolIndex] || "",
-      year: row[yearIndex] || "",
-      section: row[sectionIndex] || "",
-      ethnicGroup: row[ethnicGroupIndex] || "",
-    });
+      homeAddress: row[addressIndex]?.toString().trim() || '',
+      school: row[schoolIndex]?.toString().trim() || '',
+      year: row[yearIndex]?.toString().trim() || '',
+      section: row[sectionIndex]?.toString().trim() || '',
+      ethnicGroup: row[ethnicGroupIndex]?.toString().trim() || '',
+      type: 'student'
+    };
+
+    // Only add participant if they have at least a name and valid sex
+    if (participant.name && participant.sex) {
+      participants.push(participant);
+    } else {
+      console.warn('Skipping invalid participant:', participant);
+    }
   }
 
-  console.log(`Found ${participants.length} participants:`, participants);
-
-  if (participants.length === 0) {
-    throw new Error("No valid participant data found in the file.");
-  }
+  console.log(`Found ${participants.length} valid participants:`, {
+    total: participants.length,
+    male: participants.filter(p => p.sex === 'Male').length,
+    female: participants.filter(p => p.sex === 'Female').length
+  });
 
   return participants;
 };
@@ -582,21 +587,8 @@ export const extractStaffFaculty = (data) => {
   }
 
   const headerRow = data[staffSectionIndex + 1];
-  const expectedHeaders = [
-    "Name",
-    "Staff/Faculty Id",
-    "Sex at Birth",
-    "Age",
-    "Home Address",
-    "Ethnic Group",
-  ];
-
-  const hasValidHeaders = expectedHeaders.every((header) =>
-    headerRow.includes(header)
-  );
-
-  if (!hasValidHeaders) {
-    console.warn("Invalid staff/faculty header structure");
+  if (!headerRow) {
+    console.warn("Staff/Faculty header row not found");
     return [];
   }
 
@@ -607,28 +599,50 @@ export const extractStaffFaculty = (data) => {
   const addressIndex = headerRow.indexOf("Home Address");
   const ethnicGroupIndex = headerRow.indexOf("Ethnic Group");
 
+  if (nameIndex === -1 || sexIndex === -1) {
+    console.warn("Required staff/faculty columns missing");
+    return [];
+  }
+
   const staffFaculty = [];
   for (let i = staffSectionIndex + 2; i < data.length; i++) {
     const row = data[i];
 
-    if (!row[nameIndex] || row.includes("Community Member")) {
+    if (!row || !row[nameIndex] || row.includes("Community Member")) {
       break;
     }
 
-    staffFaculty.push({
-      name: row[nameIndex] || "",
-      staffFacultyId: row[idIndex] || "",
-      sex: row[sexIndex] || "",
+    const rawSex = row[sexIndex]?.toString().trim();
+    const sex = rawSex?.toLowerCase() === 'male' ? 'Male' : 
+                rawSex?.toLowerCase() === 'female' ? 'Female' : 
+                null;
+
+    if (!sex) {
+      console.warn(`Invalid sex value for staff/faculty: ${row[nameIndex]}`);
+      continue;
+    }
+
+    const member = {
+      name: row[nameIndex]?.toString().trim() || '',
+      staffFacultyId: row[idIndex]?.toString().trim() || '',
+      sex: sex,
       age: parseInt(row[ageIndex], 10) || null,
-      address: row[addressIndex] || "",
-      ethnicGroup: row[ethnicGroupIndex] || "",
-    });
+      homeAddress: row[addressIndex]?.toString().trim() || '',
+      ethnicGroup: row[ethnicGroupIndex]?.toString().trim() || '',
+      type: 'staff'
+    };
+
+    if (member.name && member.sex) {
+      staffFaculty.push(member);
+    }
   }
 
-  console.log(
-    `Found ${staffFaculty.length} staff/faculty members:`,
-    staffFaculty
-  );
+  console.log(`Found ${staffFaculty.length} valid staff/faculty members:`, {
+    total: staffFaculty.length,
+    male: staffFaculty.filter(p => p.sex === 'Male').length,
+    female: staffFaculty.filter(p => p.sex === 'Female').length
+  });
+
   return staffFaculty;
 };
 
