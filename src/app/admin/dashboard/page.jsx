@@ -177,32 +177,7 @@ export default function DashboardOverview({
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4">Loading dashboard data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center text-red-600">
-          <p>Error loading dashboard: {error}</p>
-          <button
-            onClick={fetchDashboardData}
-            className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
+ 
 
   return (
     <>

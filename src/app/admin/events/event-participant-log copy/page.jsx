@@ -38,6 +38,14 @@ import {
   getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
+import { Eye, Edit } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ID } from "appwrite";
 
 import AddParticipant from "./add-participant-dialog/page";
 import EditEvent from "./edit-event-dialog/page";
@@ -55,6 +63,7 @@ export default function EventParticipantLog() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showEventDetails, setShowEventDetails] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -111,10 +120,7 @@ export default function EventParticipantLog() {
       const allParticipantsResponse = await databases.listDocuments(
         databaseId,
         participantCollectionId,
-        [
-          Query.equal("isArchived", false),
-          Query.equal("eventId", eventIds),
-        ]
+        [Query.equal("isArchived", false), Query.equal("eventId", eventIds)]
       );
 
       // Get creator information and combine with event data
@@ -130,7 +136,8 @@ export default function EventParticipantLog() {
             const participantCounts = {
               total: eventParticipants.length,
               male: eventParticipants.filter((p) => p.sex === "Male").length,
-              female: eventParticipants.filter((p) => p.sex === "Female").length,
+              female: eventParticipants.filter((p) => p.sex === "Female")
+                .length,
             };
 
             // Fetch creator information
@@ -213,6 +220,58 @@ export default function EventParticipantLog() {
     }
   };
 
+  const handleAddParticipant = async (newParticipant) => {
+    try {
+      // Create the new participant document
+      const response = await databases.createDocument(
+        databaseId,
+        participantCollectionId,
+        ID.unique(),
+        {
+          ...newParticipant,
+          eventId: selectedEvent.$id,
+          isArchived: false,
+        }
+      );
+
+      // Update the local state
+      setParticipants((prevParticipants) => [...prevParticipants, response]);
+
+      // Update the event's participant counts
+      const updatedEvent = {
+        ...selectedEvent,
+        participantCounts: {
+          ...selectedEvent.participantCounts,
+          total: selectedEvent.participantCounts.total + 1,
+          [newParticipant.sex.toLowerCase()]:
+            selectedEvent.participantCounts[newParticipant.sex.toLowerCase()] +
+            1,
+        },
+      };
+
+      setSelectedEvent(updatedEvent);
+
+      // Update the events list with new participant count
+      setEvents(
+        events.map((event) =>
+          event.$id === selectedEvent.$id ? updatedEvent : event
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Participant added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding participant:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add participant",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return <LoadingAnimation />;
   }
@@ -241,7 +300,10 @@ export default function EventParticipantLog() {
           <div className="bg-green-600 text-primary-foreground p-4 rounded-lg">
             <h3 className="text-lg font-semibold">Total Participants</h3>
             <p className="text-3xl font-bold">
-              {events.reduce((sum, event) => sum + (event.participantCounts?.total || 0), 0)}
+              {events.reduce(
+                (sum, event) => sum + (event.participantCounts?.total || 0),
+                0
+              )}
             </p>
           </div>
           <div className="bg-blue-600 text-primary-foreground p-4 rounded-lg">
@@ -289,12 +351,11 @@ export default function EventParticipantLog() {
               <TableRow>
                 <TableHead>Event Name</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Venue</TableHead>
                 <TableHead className="text-center">
                   Participants (M/F)
                 </TableHead>
-                <TableHead>Created By</TableHead> {/* New column */}
+                <TableHead>Created By</TableHead>
+                <TableHead>Created At</TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -307,11 +368,6 @@ export default function EventParticipantLog() {
                   <TableCell>
                     {format(new Date(event.eventDate), "MMM dd, yyyy")}
                   </TableCell>
-                  <TableCell>
-                    {format(new Date(event.eventTimeFrom), "hh:mm a")} -
-                    {format(new Date(event.eventTimeTo), "hh:mm a")}
-                  </TableCell>
-                  <TableCell>{event.eventVenue}</TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center">
                       <div>Total: {event.participantCounts.total}</div>
@@ -333,9 +389,11 @@ export default function EventParticipantLog() {
                       </span>
                     </div>
                   </TableCell>
-
+                  <TableCell>
+                    {format(new Date(event.$createdAt), "MMM dd, yyyy h:mm a")}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
+                    <div className="flex justify-end space-x-4">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -343,20 +401,24 @@ export default function EventParticipantLog() {
                           setSelectedEvent(event);
                           setShowParticipants(true);
                         }}
+                        className="flex flex-col items-center gap-1 h-auto py-2"
                       >
-                        View
+                        <Eye className="h-4 w-4" />
+                        <span className="text-xs">View</span>
                       </Button>
                       <EditEvent
                         event={event}
                         onUpdateEvent={handleUpdateEvent}
-                      />
-                      <ViewParticipants
-                        event={event}
-                        participants={event.participants}
-                        show={
-                          showParticipants && selectedEvent?.$id === event.$id
+                        trigger={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="flex flex-col items-center gap-1 h-auto py-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span className="text-xs">Edit</span>
+                          </Button>
                         }
-                        onClose={() => setShowParticipants(false)}
                       />
                     </div>
                   </TableCell>
@@ -366,21 +428,88 @@ export default function EventParticipantLog() {
           </Table>
         </div>
       </CardContent>
-      {/* Add this before the closing Card tag */}
-      {selectedEvent && (
-        <ViewParticipants
-          isOpen={showParticipants}
-          onClose={() => {
-            setShowParticipants(false);
-            setSelectedEvent(null);
-          }}
-          participants={selectedEvent.participants || []}
-          selectedEvent={selectedEvent}
-          onAddParticipant={async () => {
-            await fetchData(); // Refresh data after adding/updating participant
-          }}
-        />
-      )}
+      {/* Add these dialogs at the bottom of your return statement */}
+      <EventDetailsDialog
+        event={selectedEvent}
+        isOpen={showEventDetails}
+        onClose={() => {
+          setShowEventDetails(false);
+          setSelectedEvent(null);
+        }}
+      />
+      <ViewParticipants
+        isOpen={showParticipants}
+        onClose={() => setShowParticipants(false)}
+        participants={participants}
+        selectedEvent={selectedEvent}
+        onAddParticipant={handleAddParticipant}
+      />
     </Card>
   );
 }
+
+const EventDetailsDialog = ({ event, isOpen, onClose }) => {
+  if (!event) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Event Details</DialogTitle>
+        </DialogHeader>
+
+        {/* Event Details Section */}
+        <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Event Name
+            </label>
+            <p className="mt-1">{event?.eventName}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Event Date
+            </label>
+            <p className="mt-1">
+              {format(new Date(event?.eventDate), "MMMM dd, yyyy")}
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Event Time
+            </label>
+            <p className="mt-1">{event?.eventTime}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">Venue</label>
+            <p className="mt-1">{event?.eventVenue}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Event Type
+            </label>
+            <p className="mt-1">{event?.eventType}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Created By
+            </label>
+            <p className="mt-1">{event?.creatorName}</p>
+          </div>
+          <div className="col-span-2">
+            <label className="text-sm font-medium text-gray-500">
+              Description
+            </label>
+            <p className="mt-1">{event?.eventDescription}</p>
+          </div>
+        </div>
+
+        {/* Existing Participants Section */}
+        <DialogTitle className="text-lg font-semibold mb-4">
+          Participants
+        </DialogTitle>
+        {/* ... rest of your existing participants table ... */}
+      </DialogContent>
+    </Dialog>
+  );
+};
