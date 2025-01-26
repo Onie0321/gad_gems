@@ -51,23 +51,6 @@ import { useRouter } from "next/navigation";
 import { useTabContext, TabProvider } from "@/context/TabContext";
 import { Query } from "appwrite";
 import { LoadingAnimation } from "@/components/loading/loading-animation";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs";
-import {
-  BarChart,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Bar,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-} from "recharts";
 
 export default function EventOverview({
   currentEventId,
@@ -98,13 +81,13 @@ export default function EventOverview({
       "25-34": 0,
       "35-44": 0,
       "45-54": 0,
-      "Above 55": 0
+      "Above 55": 0,
     };
 
     // Calculate location distribution with null checks
     const locations = {};
 
-    participants.forEach(participant => {
+    participants.forEach((participant) => {
       // Age distribution
       const age = parseInt(participant.age);
       if (!isNaN(age)) {
@@ -120,27 +103,27 @@ export default function EventOverview({
       const location = participant.homeAddress || "Not Specified";
       // Clean up the location string and capitalize first letter of each word
       const formattedLocation = location
-        .split(',')[0]  // Take only the first part before comma if exists
+        .split(",")[0] // Take only the first part before comma if exists
         .trim()
         .toLowerCase()
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-        
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+
       locations[formattedLocation] = (locations[formattedLocation] || 0) + 1;
     });
 
     // Convert age groups to chart format
     const ageDistribution = Object.entries(ageGroups).map(([age, count]) => ({
       age,
-      count
+      count,
     }));
 
     // Convert locations to chart format and sort by count
     const locationDistribution = Object.entries(locations)
       .map(([name, value]) => ({
         name,
-        value
+        value,
       }))
       .sort((a, b) => b.value - a.value) // Sort by count in descending order
       .slice(0, 10); // Only take top 10 locations to avoid cluttering
@@ -170,44 +153,51 @@ export default function EventOverview({
         ]
       );
 
-      // Get all event IDs from the current period
-      const eventIds = eventsResponse.documents.map((event) => event.$id);
-
-      // Fetch all participants for these events in one query
-      const participantsResponse = await databases.listDocuments(
-        databaseId,
-        participantCollectionId,
-        [
-          Query.equal("isArchived", false),
-          Query.equal("eventId", eventIds),
-        ]
-      );
-
-      // Map participants to their respective events and calculate demographics
-      if (eventsResponse.documents.length > 0) {
-        // Map participants to events
-        const eventsWithParticipants = eventsResponse.documents.map(event => ({
-          ...event,
-          participants: participantsResponse.documents.filter(p => p.eventId === event.$id)
-        }));
-
-        // Calculate demographics from all participants with better error handling
-        const { ageDistribution: ageDist, locationDistribution: locDist } = 
-          calculateDemographics(participantsResponse.documents);
-
-        console.log("Age Distribution:", ageDist);
-        console.log("Location Distribution:", locDist);
-
-        setEvents(eventsWithParticipants);
-        setParticipants(participantsResponse.documents);
-        setAgeDistribution(ageDist);
-        setLocationDistribution(locDist);
-      } else {
+      if (eventsResponse.documents.length === 0) {
         setEvents([]);
         setParticipants([]);
         setAgeDistribution([]);
         setLocationDistribution([]);
+        return;
       }
+
+      // Get all event IDs
+      const eventIds = eventsResponse.documents.map((event) => event.$id);
+
+      // Fetch participants for all events
+      const participantsPromises = eventIds.map((eventId) =>
+        databases.listDocuments(databaseId, participantCollectionId, [
+          Query.equal("eventId", eventId),
+          Query.equal("isArchived", false),
+        ])
+      );
+
+      const participantsResponses = await Promise.all(participantsPromises);
+
+      // Combine all participants and map them to their events
+      const allParticipants = participantsResponses.flatMap(
+        (response) => response.documents
+      );
+
+      // Map participants to their respective events
+      const eventsWithParticipants = eventsResponse.documents.map((event) => ({
+        ...event,
+        participants: allParticipants.filter((p) => p.eventId === event.$id),
+      }));
+
+      // Calculate demographics from all participants
+      const { ageDistribution: ageDist, locationDistribution: locDist } =
+        calculateDemographics(allParticipants);
+
+      console.log("Events with participants:", eventsWithParticipants);
+      console.log("All participants:", allParticipants);
+      console.log("Age Distribution:", ageDist);
+      console.log("Location Distribution:", locDist);
+
+      setEvents(eventsWithParticipants);
+      setParticipants(allParticipants);
+      setAgeDistribution(ageDist);
+      setLocationDistribution(locDist);
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Failed to fetch data. Please try again.");
@@ -295,13 +285,16 @@ export default function EventOverview({
   }, []);
 
   const getParticipantCounts = (eventId) => {
-    const eventParticipants = participants.filter(p => p.eventId === eventId);
-    console.log(`Counting participants for event ${eventId}:`, eventParticipants);
-    
+    const eventParticipants = participants.filter((p) => p.eventId === eventId);
+    console.log(
+      `Counting participants for event ${eventId}:`,
+      eventParticipants
+    );
+
     return {
       total: eventParticipants.length,
-      male: eventParticipants.filter(p => p.sex === "Male").length,
-      female: eventParticipants.filter(p => p.sex === "Female").length
+      male: eventParticipants.filter((p) => p.sex === "Male").length,
+      female: eventParticipants.filter((p) => p.sex === "Female").length,
     };
   };
 
@@ -311,17 +304,19 @@ export default function EventOverview({
     let maleParticipants = 0;
     let femaleParticipants = 0;
 
-    events.forEach(event => {
+    events.forEach((event) => {
       const participants = event.participants || [];
       totalParticipants += participants.length;
-      maleParticipants += participants.filter(p => p.sex === "Male").length;
-      femaleParticipants += participants.filter(p => p.sex === "Female").length;
+      maleParticipants += participants.filter((p) => p.sex === "Male").length;
+      femaleParticipants += participants.filter(
+        (p) => p.sex === "Female"
+      ).length;
     });
 
     return {
       total: events.length,
-      academic: events.filter(e => e.eventType === "Academic").length,
-      nonAcademic: events.filter(e => e.eventType === "Non-Academic").length,
+      academic: events.filter((e) => e.eventType === "Academic").length,
+      nonAcademic: events.filter((e) => e.eventType === "Non-Academic").length,
       totalParticipants,
       maleParticipants,
       femaleParticipants,
@@ -475,16 +470,23 @@ export default function EventOverview({
           <CardDescription>View and manage your events</CardDescription>
           {currentAcademicPeriod && (
             <div className="mt-2 text-sm text-muted-foreground">
-              Academic Period: {currentAcademicPeriod.schoolYear} - {currentAcademicPeriod.periodType}
+              Academic Period: {currentAcademicPeriod.schoolYear} -{" "}
+              {currentAcademicPeriod.periodType}
               <br />
-              {format(new Date(currentAcademicPeriod.startDate), "MMM d, yyyy")} - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
+              {format(
+                new Date(currentAcademicPeriod.startDate),
+                "MMM d, yyyy"
+              )}{" "}
+              - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
             </div>
           )}
         </CardHeader>
         <CardContent>
           {events.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              <p className="text-lg">No events found in the current academic period</p>
+              <p className="text-lg">
+                No events found in the current academic period
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -565,8 +567,12 @@ export default function EventOverview({
         <TableBody>
           {currentEvents.map((event) => {
             const eventParticipants = event.participants || [];
-            const maleCount = eventParticipants.filter(p => p.sex === "Male").length;
-            const femaleCount = eventParticipants.filter(p => p.sex === "Female").length;
+            const maleCount = eventParticipants.filter(
+              (p) => p.sex === "Male"
+            ).length;
+            const femaleCount = eventParticipants.filter(
+              (p) => p.sex === "Female"
+            ).length;
             const totalCount = eventParticipants.length;
 
             return (
@@ -620,97 +626,6 @@ export default function EventOverview({
           </PaginationItem>
         </PaginationContent>
       </Pagination>
-      <div className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Demographic Analysis</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="age">
-              <TabsList>
-                <TabsTrigger value="age">Age Distribution</TabsTrigger>
-                <TabsTrigger value="location">Location Distribution</TabsTrigger>
-              </TabsList>
-              <TabsContent value="age">
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={ageDistribution}>
-                      <XAxis dataKey="age" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#2196F3" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </TabsContent>
-              <TabsContent value="location">
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPieChart>
-                      <Pie
-                        data={locationDistribution}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        label={({ name, value, percent }) => 
-                          `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
-                        }
-                        labelLine={true}
-                      >
-                        {locationDistribution.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={`hsl(${index * (360 / locationDistribution.length)}, 70%, 60%)`}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value, name, props) => [
-                          `${value} participants (${((value / participants.length) * 100).toFixed(1)}%)`,
-                          `Location: ${props.payload.name}`
-                        ]}
-                      />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Count</TableHead>
-                        <TableHead>Percentage</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {locationDistribution.map((item, index) => {
-                        const percentage = ((item.value / participants.length) * 100).toFixed(1);
-                        return (
-                          <TableRow key={item.name}>
-                            <TableCell className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{
-                                  backgroundColor: `hsl(${index * (360 / locationDistribution.length)}, 70%, 60%)`
-                                }}
-                              />
-                              {item.name}
-                            </TableCell>
-                            <TableCell>{item.value}</TableCell>
-                            <TableCell>{percentage}%</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
