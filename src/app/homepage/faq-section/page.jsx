@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from "react";
@@ -33,20 +32,31 @@ export default function FAQSection() {
   ];
 
   return (
-    <section id="faq" className="py-12 rounded-lg">
+    <section id="faq" className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30">
       <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-8">FAQ</h2>
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600 mb-4">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Find answers to common questions about our services and programs
+          </p>
+        </div>
         <Accordion
           type="single"
           collapsible
-          className="w-full max-w-2xl mx-auto shadow-md p-4 rounded-lg"
+          className="w-full max-w-3xl mx-auto bg-white/80 backdrop-blur-sm shadow-sm ring-1 ring-gray-200/50 rounded-2xl p-6"
         >
           {faqs.map((faq, index) => (
-            <AccordionItem key={index} value={`item-${index}`}>
-              <AccordionTrigger className="text-lg font-semibold">
+            <AccordionItem 
+              key={index} 
+              value={`item-${index}`}
+              className="border-b border-violet-100 last:border-0"
+            >
+              <AccordionTrigger className="text-lg font-semibold hover:text-violet-600 hover:no-underline">
                 {faq.question}
               </AccordionTrigger>
-              <AccordionContent className="p-4 rounded-md">
+              <AccordionContent className="text-gray-600">
                 {faq.answer}
               </AccordionContent>
             </AccordionItem>

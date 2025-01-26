@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+"use client";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,8 +18,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { getCurrentAcademicPeriod, getCurrentUser } from "@/lib/appwrite";
-import { createNotification } from "@/lib/appwrite";
+import { getCurrentAcademicPeriod } from "@/lib/appwrite";
 
 export default function ImportEventData() {
   const [file, setFile] = useState(null);
@@ -26,6 +26,20 @@ export default function ImportEventData() {
   const [error, setError] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentPeriod, setCurrentPeriod] = useState(null);
+
+  useEffect(() => {
+    const loadCurrentPeriod = async () => {
+      try {
+        const period = await getCurrentAcademicPeriod();
+        setCurrentPeriod(period);
+      } catch (error) {
+        console.error("Error loading academic period:", error);
+        toast.error("Failed to load academic period");
+      }
+    };
+    loadCurrentPeriod();
+  }, []);
 
   const handleFileChange = async (e) => {
     if (!e.target.files || e.target.files.length === 0) {
@@ -77,19 +91,6 @@ export default function ImportEventData() {
         file,
         currentPeriod.$id
       );
-
-      // Create notification for admin
-      const user = await getCurrentUser();
-      await createNotification({
-        userId: "admin",
-        type: "event",
-        title: "Event Import",
-        message: `${user.name} has imported an event with participants: ${result.event.eventName}`,
-        actionType: "event_import",
-        eventId: result.event.$id,
-        status: "info",
-        read: false,
-      });
 
       toast.success(result.message);
 

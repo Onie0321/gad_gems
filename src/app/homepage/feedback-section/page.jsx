@@ -1,112 +1,127 @@
-
-
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { toast } from "react-toastify";
 
 export default function FeedbackSection() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      // Implement contact form submission logic here
-      // For now, we'll just simulate an API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      toast.success("Your message has been sent! We'll get back to you soon!");
-      setName("");
-      setEmail("");
-      setMessage("");
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      toast.error("Failed to send message. Please try again later.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
-    <section id="feedback" className="py-12">
-      <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-8">Feedback</h2>
-        <div className="grid md:grid-cols-2 gap-8">
-          <div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Your Name</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+    <section
+      id="our-office"
+      className="py-24 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30"
+    >
+      <div className="container mx-auto px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600 mb-6">
+            Our Office
+          </h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Visit us at our main campus or reach out through our various
+            communication channels.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-16 items-start">
+          {/* Contact Information */}
+          <div className="space-y-8 order-2 md:order-1">
+            <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 ring-1 ring-gray-200/50 transform hover:-translate-y-1">
+              <div className="space-y-6 text-gray-600">
+                <div className="flex items-start space-x-4 group">
+                  <div className="bg-violet-100 p-3 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+                    <svg
+                      className="w-6 h-6 text-violet-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-1">
+                      Address
+                    </h3>
+                    <p>Brgy. Zabali, Baler, Aurora</p>
+                    <p>Gen Ed, Second Floor</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4 group">
+                  <div className="bg-violet-100 p-3 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+                    <svg
+                      className="w-6 h-6 text-violet-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-1">Phone</h3>
+                    <p>+63 9123456789</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4 group">
+                  <div className="bg-violet-100 p-3 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+                    <svg
+                      className="w-6 h-6 text-violet-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-1">Email</h3>
+                    <a
+                      href="mailto:gad@ascot.edu.ph"
+                      className="text-violet-600 hover:text-violet-700 transition-colors duration-300"
+                    >
+                      gad@ascot.edu.ph
+                    </a>
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="email">Your Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="message">Your Message</Label>
-                <Textarea
-                  id="message"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Submitting..." : "Submit Feedback"}
-              </Button>
-            </form>
+            </div>
           </div>
-          <div>
-            <div className="mb-8">
-              <h3 className="text-xl font-semibold mb-4">Our Office</h3>
-              <p>Brgy. Zabali, Baler, Aurora</p>
-              <p>Gen Ed, Second Floor</p>
-              <p>Phone: +63 9123456789</p>
-              <p>
-                Email:{" "}
-                <a href="gad@ascot.edu.ph" className="hover:underline">
-                gad@ascot.edu.ph
-                </a>
-              </p>
-            </div>
-            <div className="aspect-w-16 aspect-h-9">
-              <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3917.218497498902!2d121.5740752!3d15.7440445!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3390a6dde33069ab%3A0x6352ac3889b63f4!2sAurora%20State%20College%20of%20Technology%20(ASCOT)%20Main%20Campus%20Administration%20Building!5e0!3m2!1sen!2sph!4v1691580195739"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allowFullScreen
-                loading="lazy"
-                title="ASCOT Main Campus"
-              ></iframe>
-            </div>
-            <div className="mt-4">
-              <Image
-                src="/logo/pictureascojpg"
-                alt="ASCOT Campus"
-                width={200}
-                height={150}
-                className="rounded-lg"
-              />
+
+          {/* Map */}
+          <div className="order-1 md:order-2">
+            <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ring-1 ring-gray-200/50 overflow-hidden transform hover:-translate-y-1">
+              <div className="rounded-xl overflow-hidden">
+                <iframe
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3917.218497498902!2d121.5740752!3d15.7440445!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3390a6dde33069ab%3A0x6352ac3889b63f4!2sAurora%20State%20College%20of%20Technology%20(ASCOT)%20Main%20Campus%20Administration%20Building!5e0!3m2!1sen!2sph!4v1691580195739"
+                  width="100%"
+                  height="400"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  className="w-full"
+                  title="ASCOT Main Campus"
+                ></iframe>
+              </div>
             </div>
           </div>
         </div>
@@ -114,10 +129,3 @@ export default function FeedbackSection() {
     </section>
   );
 }
-
-
-
-
-
- 
-
