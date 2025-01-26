@@ -244,7 +244,7 @@ export default function AdminDashboard() {
         return <DemographicAnalysis />;
       case "homepage":
         return <HomepageSettings />;
-      case "academic-period":
+      case "academic Period":
         return <AcademicPeriodManagement />;
       case "archives":
         return <Archives />;
@@ -337,10 +337,10 @@ export default function AdminDashboard() {
             </Button>
             <Button
               variant={
-                activeSection === "academic-period" ? "default" : "ghost"
+                activeSection === "academic Period" ? "default" : "ghost"
               }
               className="w-full justify-start"
-              onClick={() => setActiveSection("academic-period")}
+              onClick={() => setActiveSection("academic Period")}
             >
               <Clock className="mr-2 h-4 w-4" />
               Academic Period
@@ -356,6 +356,7 @@ export default function AdminDashboard() {
           </nav>
         </div>
       </aside>
+
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Bar */}
