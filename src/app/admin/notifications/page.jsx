@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, X, Check } from "lucide-react";
+import { Bell, X, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -185,6 +185,65 @@ export default function Notifications() {
     }
   };
 
+  const deleteNotification = async (notificationId, e) => {
+    e.stopPropagation();
+    try {
+      await databases.deleteDocument(
+        databaseId,
+        notificationsCollectionId,
+        notificationId
+      );
+
+      setNotifications(notifications.filter((n) => n.$id !== notificationId));
+      setUnreadCount(
+        (prev) =>
+          notifications.filter((n) => !n.read && n.$id !== notificationId)
+            .length
+      );
+
+      toast({
+        title: "Success",
+        description: "Notification deleted",
+      });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete notification",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteAllNotifications = async () => {
+    try {
+      await Promise.all(
+        notifications.map((notification) =>
+          databases.deleteDocument(
+            databaseId,
+            notificationsCollectionId,
+            notification.$id
+          )
+        )
+      );
+
+      setNotifications([]);
+      setUnreadCount(0);
+
+      toast({
+        title: "Success",
+        description: "All notifications deleted",
+      });
+    } catch (error) {
+      console.error("Error deleting all notifications:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete all notifications",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getNotificationIcon = (type, actionType) => {
     switch (actionType) {
       case "user_signin":
@@ -227,16 +286,28 @@ export default function Notifications() {
         <DropdownMenuContent className="w-96 max-h-[500px] overflow-y-auto">
           <div className="flex justify-between items-center p-2 border-b">
             <h3 className="font-semibold">Notifications</h3>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={markAllAsRead}
-                className="text-xs"
-              >
-                Mark all as read
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={markAllAsRead}
+                  className="text-xs"
+                >
+                  Mark all as read
+                </Button>
+              )}
+              {notifications.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={deleteAllNotifications}
+                  className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  Delete all
+                </Button>
+              )}
+            </div>
           </div>
           {notifications.length > 0 ? (
             notifications.map((notification) => (
@@ -263,19 +334,29 @@ export default function Notifications() {
                     {format(new Date(notification.$createdAt), "PPp")}
                   </p>
                 </div>
-                {!notification.read && (
+                <div className="flex items-center gap-2">
+                  {!notification.read && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAsRead(notification.$id);
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="ml-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      markAsRead(notification.$id);
-                    }}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={(e) => deleteNotification(notification.$id, e)}
                   >
-                    <Check className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                )}
+                </div>
               </DropdownMenuItem>
             ))
           ) : (
