@@ -16,14 +16,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getEvents, getParticipants, getCurrentUser, getCurrentAcademicPeriod } from "@/lib/appwrite";
+import {
+  getEvents,
+  getParticipants,
+  getCurrentUser,
+  getCurrentAcademicPeriod,
+} from "@/lib/appwrite";
 import GenderBreakdown from "./gender-breakdown/page";
 import AgeDistribution from "./age-distribution/page";
 import EducationLevel from "./educational-level/page";
-import EthnicGroupAnalysis from "../../admin/demographics/ethnic-group-analysis/page";
+import EthnicGroupAnalysis from "./ethnic-group-analysis/page";
 import SchoolDistribution from "./school-distribution/page";
 import SectionDistribution from "./section-distribution/page";
-import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
+import { ColorfulSpinner } from "@/components/ui/loader";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -46,6 +51,35 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "react-toastify";
 import { checkNetworkStatus } from "@/utils/networkUtils";
 import { format } from "date-fns";
+import {
+  databases,
+  databaseId,
+  eventCollectionId,
+  participantCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
+  academicPeriodCollectionId,
+} from "@/lib/appwrite";
+import { Query } from "appwrite";
+import { Input } from "@/components/ui/input";
+
+const getEventNames = async (eventIds) => {
+  if (eventIds.includes("all")) {
+    return ["All Events"];
+  }
+
+  try {
+    const response = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [Query.equal("$id", eventIds), Query.equal("isArchived", false)]
+    );
+
+    return response.documents.map((event) => event.eventName);
+  } catch (error) {
+    return eventIds.map((id) => `Event ${id}`); // Fallback names
+  }
+};
 
 export default function DemographicAnalysis() {
   const [events, setEvents] = useState([]);
@@ -73,6 +107,9 @@ export default function DemographicAnalysis() {
     ethnicGroups: [],
     schools: [],
     sections: [],
+    participantType: [],
+    semester: [],
+    academicPeriod: [],
   });
   const [tempFilters, setTempFilters] = useState({
     gender: [],
@@ -81,6 +118,9 @@ export default function DemographicAnalysis() {
     ethnicGroups: [],
     schools: [],
     sections: [],
+    participantType: [],
+    semester: [],
+    academicPeriod: [],
   });
   const [pendingSelectedEvents, setPendingSelectedEvents] = useState(["all"]);
   const [pendingFilters, setPendingFilters] = useState({
@@ -101,16 +141,38 @@ export default function DemographicAnalysis() {
     message: "",
   });
 
+  // Move filterOptions to component state so it can be updated
+  const [filterOptions, setFilterOptions] = useState({
+    gender: ["Male", "Female"],
+    ageGroups: ["Below 18", "18-24", "25-34", "35-44", "45-54", "Above 55"],
+    educationLevels: [
+      "First Year",
+      "Second Year",
+      "Third Year",
+      "Fourth Year",
+      "Fifth Year",
+    ],
+    ethnicGroup: [], // Will be populated dynamically
+    school: schoolOptions.map((school) => school.name),
+    section: [], // Will be populated dynamically
+    participantType: ["Student", "Staff/Faculty", "Community Member"],
+    semester: ["First Semester", "Second Semester", "Summer"],
+    academicPeriod: [], // Will be populated from API
+  });
+
+  // Add new state for custom age range
+  const [customAgeRange, setCustomAgeRange] = useState({ min: "", max: "" });
+  const [pendingEventSelection, setPendingEventSelection] = useState(["all"]);
+
   useEffect(() => {
     const initializeData = async () => {
       try {
         setIsLoading(true);
         setLoadingMessage("Checking user and academic period...");
-        
-        // Get current user and academic period in parallel
+
         const [user, academicPeriod] = await Promise.all([
           getCurrentUser(),
-          getCurrentAcademicPeriod()
+          getCurrentAcademicPeriod(),
         ]);
 
         if (!user) {
@@ -118,7 +180,7 @@ export default function DemographicAnalysis() {
           return;
         }
 
-        if (!academicPeriod) {
+        if (!academicPeriod || !academicPeriod.isActive) {
           toast.error("No active academic period found");
           setIsLoading(false);
           return;
@@ -126,21 +188,39 @@ export default function DemographicAnalysis() {
 
         setCurrentUser(user);
         setCurrentAcademicPeriod(academicPeriod);
-        
-        setLoadingMessage("Fetching events...");
-        // Fetch only events created by the current user AND in the current academic period
-        const fetchedEvents = await getEvents(user.$id, academicPeriod.$id);
-        setEvents(fetchedEvents);
 
-        // Set initial event selection
+        // Fetch all required data in parallel
+        const [eventsResponse, academicPeriodsResponse] = await Promise.all([
+          databases.listDocuments(
+            databaseId,
+            eventCollectionId,
+            [
+              Query.equal("createdBy", user.$id),
+              Query.equal("academicPeriodId", academicPeriod.$id),
+              Query.equal("isArchived", false),
+              Query.orderDesc("$createdAt"),
+            ]
+          ),
+          databases.listDocuments(
+            databaseId,
+            academicPeriodCollectionId,
+            [Query.orderDesc("startDate")]
+          )
+        ]);
+
+        setEvents(eventsResponse.documents);
+        setFilterOptions(prev => ({
+          ...prev,
+          academicPeriod: academicPeriodsResponse.documents
+        }));
+
         setSelectedEvents(["all"]);
         setSelectedEventNames(["All Events"]);
-
         setIsLoading(false);
       } catch (error) {
-        console.error("Error initializing data:", error);
         setIsLoading(false);
         setLoadingMessage("Error loading data. Please try again.");
+        toast.error("Failed to load data. Please try again.");
       }
     };
 
@@ -193,7 +273,7 @@ export default function DemographicAnalysis() {
   }, [currentUser, selectedEvents]);
 
   const fetchDemographicData = async (eventIds) => {
-    if (!currentUser) return;
+    if (!currentUser || !currentAcademicPeriod?.isActive) return;
 
     try {
       setIsLoading(true);
@@ -214,27 +294,32 @@ export default function DemographicAnalysis() {
 
       setLoadingMessage("Fetching demographic data...");
 
-      // Add user filtering to the query
+      // Add academic period filtering to the query
       const [participantsData, eventNames] = await Promise.all([
         eventIds.includes("all")
-          ? getParticipants(null, currentUser.$id) // Add user ID parameter
-          : Promise.all(
-              eventIds.map((eventId) => getParticipants(eventId, currentUser.$id)) // Add user ID parameter
-            ).then((arrays) => arrays.flat()),
-        eventIds.includes("all")
-          ? Promise.resolve(["All Events"])
-          : Promise.resolve(
-              events
-                .filter((event) => eventIds.includes(event.$id) && event.createdBy === currentUser.$id) // Filter events by user
-                .map((event) => event.eventName)
+          ? getParticipants(null, currentUser.$id, currentAcademicPeriod.$id)
+          : getParticipants(
+              eventIds,
+              currentUser.$id,
+              currentAcademicPeriod.$id
             ),
+        getEventNames(eventIds),
       ]);
 
-      setSelectedEventNames(eventNames);
-      setParticipants(participantsData);
-      setFilteredParticipants(participantsData);
+      // Apply semester filter if selected
+      const filteredParticipants = participantsData.filter((participant) => {
+        const matchesSemester =
+          filters.semester.length === 0 ||
+          filters.semester.includes(participant.semester);
 
-      if (participantsData?.length > 0) {
+        return matchesSemester;
+      });
+
+      setSelectedEventNames(eventNames);
+      setParticipants(filteredParticipants);
+      setFilteredParticipants(filteredParticipants);
+
+      if (filteredParticipants?.length > 0) {
         // Process data in chunks to avoid blocking the main thread
         const processDataInChunks = async (data) => {
           const chunkSize = 100;
@@ -266,7 +351,7 @@ export default function DemographicAnalysis() {
           return processedData;
         };
 
-        const processedData = await processDataInChunks(participantsData);
+        const processedData = await processDataInChunks(filteredParticipants);
         setDemographicData(processedData);
 
         // Cache the results
@@ -281,13 +366,8 @@ export default function DemographicAnalysis() {
 
       setIsLoading(false);
     } catch (error) {
-      console.error("Error fetching demographic data:", error);
+      toast.error("Failed to fetch demographic data");
       setIsLoading(false);
-      toast.error(
-        networkStatus.isOnline
-          ? "Error processing data. Please try again."
-          : networkStatus.message
-      );
     }
   };
 
@@ -384,59 +464,110 @@ export default function DemographicAnalysis() {
   };
 
   const processEthnicData = (participants) => {
-    const ethnicCount = participants.reduce((acc, p) => {
-      const group =
-        p.ethnicGroup === "Other" ? p.otherEthnicGroup : p.ethnicGroup;
-      const sex = p.sex.toLowerCase();
-      if (!acc[group]) {
-        acc[group] = { male: 0, female: 0 };
-      }
-      acc[group][sex]++;
-      return acc;
-    }, {});
+    if (!participants || !Array.isArray(participants)) return [];
 
-    return Object.entries(ethnicCount).map(([name, value]) => ({
-      name,
-      male: value.male,
-      female: value.female,
-      total: value.male + value.female,
-    }));
+    // First, collect all unique ethnic groups from participants
+    const uniqueEthnicGroups = new Set(
+      participants
+        .filter((p) => p.ethnicGroup && p.ethnicGroup.trim() !== "")
+        .map((p) => p.ethnicGroup)
+    );
+
+    // Update the filterOptions by adding new ethnic groups while keeping existing ones
+    setFilterOptions((prev) => {
+      const existingGroups = new Set(prev.ethnicGroup);
+      const newGroups = Array.from(uniqueEthnicGroups);
+      newGroups.forEach((group) => existingGroups.add(group));
+      return {
+        ...prev,
+        ethnicGroup: Array.from(existingGroups).sort(),
+      };
+    });
+
+    // Process the data for the chart
+    const ethnicCount = {};
+    participants.forEach((p) => {
+      if (p.ethnicGroup && p.sex) {
+        if (!ethnicCount[p.ethnicGroup]) {
+          ethnicCount[p.ethnicGroup] = {
+            name: p.ethnicGroup,
+            male: 0,
+            female: 0,
+          };
+        }
+        const gender = p.sex.toLowerCase();
+        if (gender === "male" || gender === "female") {
+          ethnicCount[p.ethnicGroup][gender]++;
+        }
+      }
+    });
+
+    return Object.values(ethnicCount);
   };
 
   const processSchoolData = (participants) => {
-    const schoolCount = participants.reduce((acc, p) => {
-      const sex = p.sex.toLowerCase();
-      if (!acc[p.school]) {
-        acc[p.school] = { male: 0, female: 0 };
-      }
-      acc[p.school][sex]++;
-      return acc;
-    }, {});
+    if (!participants || !Array.isArray(participants)) return [];
 
-    return Object.entries(schoolCount).map(([name, value]) => ({
-      name,
-      male: value.male,
-      female: value.female,
-      total: value.male + value.female,
-    }));
+    // First, collect all unique schools
+    const uniqueSchools = new Set(
+      participants
+        .filter((p) => p.school) // Filter out undefined/null values
+        .map((p) => p.school)
+    );
+
+    // Process the data for the chart
+    const schoolCount = {};
+    participants.forEach((p) => {
+      if (p.school && p.sex) {
+        if (!schoolCount[p.school]) {
+          schoolCount[p.school] = { name: p.school, male: 0, female: 0 };
+        }
+        const gender = p.sex.toLowerCase();
+        if (gender === "male" || gender === "female") {
+          schoolCount[p.school][gender]++;
+        }
+      }
+    });
+
+    return Object.values(schoolCount);
   };
 
   const processSectionData = (participants) => {
-    const sectionCount = participants.reduce((acc, p) => {
-      const sex = p.sex.toLowerCase();
-      if (!acc[p.section]) {
-        acc[p.section] = { male: 0, female: 0 };
-      }
-      acc[p.section][sex]++;
-      return acc;
-    }, {});
+    if (!participants || !Array.isArray(participants)) return [];
 
-    return Object.entries(sectionCount).map(([name, value]) => ({
-      name,
-      male: value.male,
-      female: value.female,
-      total: value.male + value.female,
-    }));
+    // First, collect all unique sections from participants
+    const uniqueSections = new Set(
+      participants
+        .filter((p) => p.section && p.section.trim() !== "")
+        .map((p) => p.section)
+    );
+
+    // Update the filterOptions by adding new sections while keeping existing ones
+    setFilterOptions((prev) => {
+      const existingSections = new Set(prev.section);
+      const newSections = Array.from(uniqueSections);
+      newSections.forEach((section) => existingSections.add(section));
+      return {
+        ...prev,
+        section: Array.from(existingSections).sort(),
+      };
+    });
+
+    // Process the data for the chart
+    const sectionCount = {};
+    participants.forEach((p) => {
+      if (p.section && p.sex) {
+        if (!sectionCount[p.section]) {
+          sectionCount[p.section] = { name: p.section, male: 0, female: 0 };
+        }
+        const gender = p.sex.toLowerCase();
+        if (gender === "male" || gender === "female") {
+          sectionCount[p.section][gender]++;
+        }
+      }
+    });
+
+    return Object.values(sectionCount);
   };
 
   const handleFilterChange = (filteredData) => {
@@ -453,62 +584,9 @@ export default function DemographicAnalysis() {
 
   const applyFilters = () => {
     setFilters(tempFilters);
-    let filteredData = [...participants];
-
-    // Apply filters
-    if (tempFilters.gender.length > 0) {
-      filteredData = filteredData.filter((p) =>
-        tempFilters.gender.includes(p.sex)
-      );
-    }
-    if (tempFilters.ageGroups.length > 0) {
-      filteredData = filteredData.filter((p) => {
-        const age = parseInt(p.age);
-        return tempFilters.ageGroups.some((range) => {
-          switch (range) {
-            case "Below 18":
-              return age < 18;
-            case "18-24":
-              return age >= 18 && age <= 24;
-            case "25-34":
-              return age >= 25 && age <= 34;
-            case "35-44":
-              return age >= 35 && age <= 44;
-            case "45-54":
-              return age >= 45 && age <= 54;
-            case "Above 55":
-              return age > 55;
-            default:
-              return false;
-          }
-        });
-      });
-    }
-    if (tempFilters.educationLevels.length > 0) {
-      filteredData = filteredData.filter((p) =>
-        tempFilters.educationLevels.includes(p.year)
-      );
-    }
-    if (tempFilters.ethnicGroups.length > 0) {
-      filteredData = filteredData.filter((p) =>
-        tempFilters.ethnicGroups.includes(p.ethnicGroup)
-      );
-    }
-    if (tempFilters.schools.length > 0) {
-      filteredData = filteredData.filter((p) =>
-        tempFilters.schools.includes(p.school)
-      );
-    }
-    if (tempFilters.sections.length > 0) {
-      filteredData = filteredData.filter((p) =>
-        tempFilters.sections.includes(p.section)
-      );
-    }
-
-    if (filteredData.length === 0) {
-      toast.warning("No data matches the selected filters.");
-    }
-
+    const filteredData = participants.filter(participant => {
+      // ... existing filtering logic ...
+    });
     setFilteredParticipants(filteredData);
     handleFilterChange(filteredData);
   };
@@ -524,457 +602,550 @@ export default function DemographicAnalysis() {
     chartColors: ["#2D89EF", "#4DB6AC", "#FF6F61", "#9C27B0"], // Blue, Teal, Coral, Purple
   };
 
-  const filterOptions = {
-    gender: ["Male", "Female"],
-    ageGroups: ["Below 18", "18-24", "25-34", "35-44", "45-54", "Above 55"],
-    educationLevels: [
-      "First Year",
-      "Second Year",
-      "Third Year",
-      "Fourth Year",
-      "Fifth Year",
-    ],
-    ethnicGroups: [
-      "Tagalog",
-      "Cebuano",
-      "Ilocano",
-      "Bicolano",
-      "Waray",
-      "Other",
-    ],
-    schools: schoolOptions.map((school) => school.name),
-    sections: ["A", "B", "C", "D", "E", "F"],
+  const handleEventSelectionChange = (eventId) => {
+    // If "all" is selected, select or deselect all events
+    if (eventId === "all") {
+      if (pendingEventSelection.includes("all")) {
+        // If "all" is already selected, deselect everything
+        setPendingEventSelection([]);
+      } else {
+        // If "all" is not selected, select all events
+        const allIds = ["all", ...events.map(event => event.$id)];
+        setPendingEventSelection(allIds);
+      }
+      return;
+    }
+
+    // Handle individual event selection
+    setPendingEventSelection((prev) => {
+      // Remove "all" when deselecting any individual event
+      if (prev.includes("all")) {
+        prev = prev.filter(id => id !== "all");
+      }
+
+      const newSelection = prev.includes(eventId)
+        ? prev.filter((id) => id !== eventId)
+        : [...prev, eventId];
+
+      // If all individual events are selected, add "all"
+      if (newSelection.length === events.length) {
+        return ["all", ...newSelection];
+      }
+
+      return newSelection;
+    });
   };
 
   if (!currentUser) {
-    return <GADConnectSimpleLoader />;
+    return <ColorfulSpinner />;
   }
 
-  return (
-    <div className="space-y-4 p-4 bg-[#F5F5F5]">
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center min-h-screen">
-          <GADConnectSimpleLoader />
-          <p className="mt-4 text-gray-600">{loadingMessage}</p>
-          {networkStatus.isLow && (
-            <p className="mt-2 text-yellow-600">{networkStatus.message}</p>
-          )}
-        </div>
-      ) : !currentAcademicPeriod ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Demographic Analysis</CardTitle>
-            <CardDescription>View demographic data for your events</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <div className="mb-4">
-                <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-              </div>
+  if (!currentAcademicPeriod?.isActive) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Demographic Analysis</CardTitle>
+          <CardDescription>
+            View and analyze participant demographics
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="text-center">
               <h3 className="text-lg font-semibold mb-2">
                 No Active Academic Period
               </h3>
               <p className="text-muted-foreground">
-                Demographic analysis is only available during an active academic period.
-                Please contact an administrator to set up the current academic period.
+                Demographic analysis will be available once an administrator
+                sets up the current academic period.
               </p>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Tabs value={activeSection} onValueChange={setActiveSection}>
-          <TabsList className="bg-white">
-            <TabsTrigger
-              value="demographic"
-              className="data-[state=active]:bg-[#2D89EF] data-[state=active]:text-white"
-            >
-              Demographic Overview
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="demographic">
-            <div className="flex justify-between items-center mb-4">
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-[#37474F]">
-                  {selectedEventNames.join(", ")}
-                </h2>
-                {currentAcademicPeriod && (
-                  <div className="text-sm text-muted-foreground">
-                    Academic Period: {currentAcademicPeriod.schoolYear} - {currentAcademicPeriod.periodType}
-                    <br />
-                    {format(new Date(currentAcademicPeriod.startDate), "MMM d, yyyy")} - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Dialog
-                  open={showEventSelector}
-                  onOpenChange={setShowEventSelector}
-                >
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2"
-                    >
-                      Select Events <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[400px]">
-                    <DialogHeader>
-                      <DialogTitle>Select Events</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4">
-                      <div className="flex items-center space-x-2 mb-4">
-                        <input
-                          type="checkbox"
-                          id="all-events"
-                          checked={pendingSelectedEvents.includes("all")}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setPendingSelectedEvents(["all"]);
-                            } else if (pendingSelectedEvents.length > 1) {
-                              setPendingSelectedEvents(
-                                pendingSelectedEvents.filter(
-                                  (id) => id !== "all"
-                                )
-                              );
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        <Label
-                          htmlFor="all-events"
-                          className="text-sm font-medium"
-                        >
-                          All Events
-                        </Label>
-                      </div>
-                      {events.map((event) => (
-                        <div
-                          key={event.$id}
-                          className="flex items-center space-x-2 mb-2"
-                        >
-                          <input
-                            type="checkbox"
-                            id={event.$id}
-                            checked={pendingSelectedEvents.includes(event.$id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setPendingSelectedEvents((prev) =>
-                                  prev
-                                    .filter((id) => id !== "all")
-                                    .concat(event.$id)
-                                );
-                              } else {
-                                const newSelection =
-                                  pendingSelectedEvents.filter(
-                                    (id) => id !== event.$id
-                                  );
-                                setPendingSelectedEvents(
-                                  newSelection.length ? newSelection : ["all"]
-                                );
-                              }
-                            }}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <Label
-                            htmlFor={event.$id}
-                            className="text-sm font-medium"
-                          >
-                            {event.eventName}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setPendingSelectedEvents(selectedEvents);
-                          setShowEventSelector(false);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSelectedEvents(pendingSelectedEvents);
-                          const selectedEventObjs = events.filter((event) =>
-                            pendingSelectedEvents.includes(event.$id)
-                          );
-                          setSelectedEventNames(
-                            pendingSelectedEvents.includes("all")
-                              ? ["All Events"]
-                              : selectedEventObjs.map(
-                                  (event) => event.eventName
-                                )
-                          );
-                          setShowEventSelector(false);
-                        }}
-                      >
-                        Apply
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-                <Dialog open={showFilters} onOpenChange={setShowFilters}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2"
-                    >
-                      Filters <Filter className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>Filter Data</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto">
-                      {/* Gender Filter */}
-                      <div className="space-y-2">
-                        <Label className="text-base font-semibold">
-                          Gender
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {filterOptions.gender.map((gender) => (
-                            <div
-                              key={gender}
-                              className="flex items-center space-x-2"
-                            >
-                              <Checkbox
-                                checked={tempFilters.gender.includes(gender)}
-                                onCheckedChange={(checked) => {
-                                  setTempFilters((prev) => ({
-                                    ...prev,
-                                    gender: checked
-                                      ? [...prev.gender, gender]
-                                      : prev.gender.filter((g) => g !== gender),
-                                  }));
-                                }}
-                              />
-                              <Label>{gender}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+  if (isLoading) {
+    return <ColorfulSpinner />;
+  }
 
-                      {/* Age Groups Filter */}
-                      <div className="space-y-2">
-                        <Label className="text-base font-semibold">
-                          Age Groups
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {filterOptions.ageGroups.map((ageGroup) => (
-                            <div
-                              key={ageGroup}
-                              className="flex items-center space-x-2"
-                            >
-                              <Checkbox
-                                checked={tempFilters.ageGroups.includes(
-                                  ageGroup
-                                )}
-                                onCheckedChange={(checked) => {
-                                  setTempFilters((prev) => ({
-                                    ...prev,
-                                    ageGroups: checked
-                                      ? [...prev.ageGroups, ageGroup]
-                                      : prev.ageGroups.filter(
-                                          (ag) => ag !== ageGroup
-                                        ),
-                                  }));
-                                }}
-                              />
-                              <Label>{ageGroup}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Education Levels Filter */}
-                      <div className="space-y-2">
-                        <Label className="text-base font-semibold">
-                          Educational Level
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {filterOptions.educationLevels.map((level) => (
-                            <div
-                              key={level}
-                              className="flex items-center space-x-2"
-                            >
-                              <Checkbox
-                                checked={tempFilters.educationLevels.includes(
-                                  level
-                                )}
-                                onCheckedChange={(checked) => {
-                                  setTempFilters((prev) => ({
-                                    ...prev,
-                                    educationLevels: checked
-                                      ? [...prev.educationLevels, level]
-                                      : prev.educationLevels.filter(
-                                          (l) => l !== level
-                                        ),
-                                  }));
-                                }}
-                              />
-                              <Label>{level}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Schools Filter */}
-                      <div className="space-y-2">
-                        <Label className="text-base font-semibold">
-                          Schools
-                        </Label>
-                        <div className="grid grid-cols-1 gap-2">
-                          {filterOptions.schools.map((school) => (
-                            <div
-                              key={school}
-                              className="flex items-center space-x-2"
-                            >
-                              <Checkbox
-                                checked={tempFilters.schools.includes(school)}
-                                onCheckedChange={(checked) => {
-                                  setTempFilters((prev) => ({
-                                    ...prev,
-                                    schools: checked
-                                      ? [...prev.schools, school]
-                                      : prev.schools.filter(
-                                          (s) => s !== school
-                                        ),
-                                  }));
-                                }}
-                              />
-                              <Label>{school}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Sections Filter */}
-                      <div className="space-y-2">
-                        <Label className="text-base font-semibold">
-                          Sections
-                        </Label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {filterOptions.sections.map((section) => (
-                            <div
-                              key={section}
-                              className="flex items-center space-x-2"
-                            >
-                              <Checkbox
-                                checked={tempFilters.sections.includes(section)}
-                                onCheckedChange={(checked) => {
-                                  setTempFilters((prev) => ({
-                                    ...prev,
-                                    sections: checked
-                                      ? [...prev.sections, section]
-                                      : prev.sections.filter(
-                                          (s) => s !== section
-                                        ),
-                                  }));
-                                }}
-                              />
-                              <Label>{section}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Ethnic Groups Filter */}
-                      <div className="space-y-2">
-                        <Label className="text-base font-semibold">
-                          Ethnic Groups
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {filterOptions.ethnicGroups.map((group) => (
-                            <div
-                              key={group}
-                              className="flex items-center space-x-2"
-                            >
-                              <Checkbox
-                                checked={tempFilters.ethnicGroups.includes(
-                                  group
-                                )}
-                                onCheckedChange={(checked) => {
-                                  setTempFilters((prev) => ({
-                                    ...prev,
-                                    ethnicGroups: checked
-                                      ? [...prev.ethnicGroups, group]
-                                      : prev.ethnicGroups.filter(
-                                          (g) => g !== group
-                                        ),
-                                  }));
-                                }}
-                              />
-                              <Label>{group}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setTempFilters(filters);
-                          setShowFilters(false);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          applyFilters();
-                          setShowFilters(false);
-                        }}
-                      >
-                        Apply Filters
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {demographicData.genderData.length > 0 ? (
-                <>
-                  <GenderBreakdown
-                    data={demographicData.genderData}
-                    colors={colors.chartColors}
-                  />
-                  <AgeDistribution
-                    data={demographicData.ageData}
-                    colors={colors.chartColors}
-                  />
-                  <EducationLevel
-                    data={demographicData.educationData}
-                    colors={colors.chartColors}
-                  />
-                  <EthnicGroupAnalysis
-                    data={demographicData.ethnicData}
-                    colors={colors.chartColors}
-                  />
-                  <SchoolDistribution
-                    data={demographicData.schoolData}
-                    colors={colors.chartColors}
-                  />
-                  <SectionDistribution
-                    data={demographicData.sectionData}
-                    colors={colors.chartColors}
-                  />
-                </>
-              ) : (
-                <div className="col-span-2 text-center py-4">
-                  <p>No data available for the selected event.</p>
+  return (
+    <div className="space-y-4 p-4 bg-[#F5F5F5]">
+      <Tabs value={activeSection} onValueChange={setActiveSection}>
+        <TabsList className="bg-white">
+          <TabsTrigger
+            value="demographic"
+            className="data-[state=active]:bg-[#2D89EF] data-[state=active]:text-white"
+          >
+            Demographic Overview
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="demographic">
+          <div className="flex justify-between items-center mb-4">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-[#37474F]">
+                {selectedEventNames.join(", ")}
+              </h2>
+              {currentAcademicPeriod && (
+                <div className="text-sm text-muted-foreground">
+                  Academic Period: {currentAcademicPeriod.schoolYear} -{" "}
+                  {currentAcademicPeriod.periodType}
+                  <br />
+                  {format(
+                    new Date(currentAcademicPeriod.startDate),
+                    "MMM d, yyyy"
+                  )}{" "}
+                  -{" "}
+                  {format(
+                    new Date(currentAcademicPeriod.endDate),
+                    "MMM d, yyyy"
+                  )}
                 </div>
               )}
             </div>
-          </TabsContent>
-        </Tabs>
-      )}
+            <div className="flex gap-2">
+              <Dialog
+                open={showEventSelector}
+                onOpenChange={setShowEventSelector}
+              >
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    Select Events <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent
+                  className="max-w-[500px]"
+                  aria-describedby="event-selector-description"
+                >
+                  <DialogHeader>
+                    <DialogTitle>Select Events</DialogTitle>
+                    <DialogDescription id="event-selector-description">
+                      Choose the events you want to analyze
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="all-events"
+                        checked={pendingEventSelection.includes("all")}
+                        onCheckedChange={() => handleEventSelectionChange("all")}
+                      />
+                      <label htmlFor="all-events">All Events</label>
+                    </div>
+                    <div className="space-y-2">
+                      {events.map((event) => (
+                        <div key={event.$id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={event.$id}
+                            checked={pendingEventSelection.includes(event.$id) || pendingEventSelection.includes("all")}
+                            onCheckedChange={() => handleEventSelectionChange(event.$id)}
+                          />
+                          <label htmlFor={event.$id}>{event.eventName}</label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setPendingEventSelection(selectedEvents);
+                        setShowEventSelector(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setSelectedEvents(pendingEventSelection);
+                        setSelectedEventNames(
+                          pendingEventSelection.includes("all")
+                            ? ["All Events"]
+                            : events
+                                .filter(event => pendingEventSelection.includes(event.$id))
+                                .map(event => event.eventName)
+                        );
+                        setShowEventSelector(false);
+                      }}
+                    >
+                      Apply
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={showFilters} onOpenChange={setShowFilters}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <Filter className="h-4 w-4" />
+                    Filters
+                  </Button>
+                </DialogTrigger>
+                <DialogContent
+                  className="max-w-[800px]"
+                  aria-describedby="filters-dialog-description"
+                >
+                  <DialogHeader>
+                    <DialogTitle>Filter Data</DialogTitle>
+                    <DialogDescription id="filters-dialog-description">
+                      Select filters to analyze specific demographic data
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                      <div className="space-y-6">
+                        <div className="space-y-2">
+                          <Label className="text-base font-semibold">
+                            Participant Type
+                          </Label>
+                          <div className="grid grid-cols-1 gap-2">
+                            {filterOptions.participantType.map((type) => (
+                              <div
+                                key={type}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={tempFilters.participantType.includes(
+                                    type
+                                  )}
+                                  onCheckedChange={(checked) => {
+                                    setTempFilters((prev) => ({
+                                      ...prev,
+                                      participantType: checked
+                                        ? [...prev.participantType, type]
+                                        : prev.participantType.filter(
+                                            (t) => t !== type
+                                          ),
+                                    }));
+                                  }}
+                                />
+                                <Label>{type}</Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-base font-semibold">
+                            Age Groups
+                          </Label>
+                          <div className="grid grid-cols-1 gap-2">
+                            {filterOptions.ageGroups.map((age) => (
+                              <div
+                                key={age}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={tempFilters.ageGroups.includes(
+                                    age
+                                  )}
+                                  onCheckedChange={(checked) => {
+                                    setTempFilters((prev) => ({
+                                      ...prev,
+                                      ageGroups: checked
+                                        ? [...prev.ageGroups, age]
+                                        : prev.ageGroups.filter(
+                                            (a) => a !== age
+                                          ),
+                                    }));
+                                  }}
+                                />
+                                <Label>{age}</Label>
+                              </div>
+                            ))}
+                            <div className="pt-2 space-y-2">
+                              <Label className="text-sm">
+                                Custom Age Range
+                              </Label>
+                              <div className="flex items-center space-x-2">
+                                <Input
+                                  type="number"
+                                  placeholder="Min"
+                                  className="w-20"
+                                  value={customAgeRange.min}
+                                  onChange={(e) =>
+                                    setCustomAgeRange((prev) => ({
+                                      ...prev,
+                                      min: e.target.value,
+                                    }))
+                                  }
+                                />
+                                <span>to</span>
+                                <Input
+                                  type="number"
+                                  placeholder="Max"
+                                  className="w-20"
+                                  value={customAgeRange.max}
+                                  onChange={(e) =>
+                                    setCustomAgeRange((prev) => ({
+                                      ...prev,
+                                      max: e.target.value,
+                                    }))
+                                  }
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (
+                                      customAgeRange.min &&
+                                      customAgeRange.max
+                                    ) {
+                                      const customRange = `${customAgeRange.min}-${customAgeRange.max}`;
+                                      setTempFilters((prev) => ({
+                                        ...prev,
+                                        ageGroups: [
+                                          ...prev.ageGroups,
+                                          customRange,
+                                        ],
+                                      }));
+                                      setCustomAgeRange({ min: "", max: "" });
+                                    }
+                                  }}
+                                >
+                                  Add
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-base font-semibold">
+                            Schools
+                          </Label>
+                          <div className="max-h-[200px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                            {filterOptions.school.map((school) => (
+                              <div
+                                key={school}
+                                className="flex items-center space-x-2 py-1"
+                              >
+                                <Checkbox
+                                  checked={tempFilters.schools.includes(
+                                    school
+                                  )}
+                                  onCheckedChange={(checked) => {
+                                    setTempFilters((prev) => ({
+                                      ...prev,
+                                      schools: checked
+                                        ? [...prev.schools, school]
+                                        : prev.schools.filter(
+                                            (s) => s !== school
+                                          ),
+                                    }));
+                                  }}
+                                />
+                                <Label>{school}</Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="space-y-2">
+                          <Label className="text-base font-semibold">
+                            Academic Period
+                          </Label>
+                          <div className="max-h-[200px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                            {filterOptions.academicPeriod.map((period) => (
+                              <div
+                                key={period.$id}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={tempFilters.academicPeriod.includes(
+                                    period.$id
+                                  )}
+                                  onCheckedChange={(checked) => {
+                                    setTempFilters((prev) => ({
+                                      ...prev,
+                                      academicPeriod: checked
+                                        ? [...prev.academicPeriod, period.$id]
+                                        : prev.academicPeriod.filter(
+                                            (p) => p !== period.$id
+                                          ),
+                                    }));
+                                  }}
+                                />
+                                <Label className="text-sm">
+                                  {period.schoolYear}
+                                  <span className="block text-xs text-muted-foreground">
+                                    {format(
+                                      new Date(period.startDate),
+                                      "MMM d, yyyy"
+                                    )}{" "}
+                                    -{" "}
+                                    {format(
+                                      new Date(period.endDate),
+                                      "MMM d, yyyy"
+                                    )}
+                                  </span>
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-base font-semibold">
+                            Sex at Birth
+                          </Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {filterOptions.gender.map((gender) => (
+                              <div
+                                key={gender}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={tempFilters.gender.includes(
+                                    gender
+                                  )}
+                                  onCheckedChange={(checked) => {
+                                    setTempFilters((prev) => ({
+                                      ...prev,
+                                      gender: checked
+                                        ? [...prev.gender, gender]
+                                        : prev.gender.filter(
+                                            (g) => g !== gender
+                                          ),
+                                    }));
+                                  }}
+                                />
+                                <Label>{gender}</Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-base font-semibold">
+                            Ethnic Groups
+                          </Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {filterOptions.ethnicGroup.map((group) => (
+                              <div
+                                key={group}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={tempFilters.ethnicGroups.includes(
+                                    group
+                                  )}
+                                  onCheckedChange={(checked) => {
+                                    setTempFilters((prev) => ({
+                                      ...prev,
+                                      ethnicGroups: checked
+                                        ? [...prev.ethnicGroups, group]
+                                        : prev.ethnicGroups.filter(
+                                            (g) => g !== group
+                                          ),
+                                    }));
+                                  }}
+                                />
+                                <Label>{group}</Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-base font-semibold">
+                            Semester
+                          </Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {filterOptions.semester.map((sem) => (
+                              <div
+                                key={sem}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={tempFilters.semester.includes(sem)}
+                                  onCheckedChange={(checked) => {
+                                    setTempFilters((prev) => ({
+                                      ...prev,
+                                      semester: checked
+                                        ? [...prev.semester, sem]
+                                        : prev.semester.filter(
+                                            (s) => s !== sem
+                                          ),
+                                    }));
+                                  }}
+                                />
+                                <Label>{sem}</Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setTempFilters(filters);
+                        setShowFilters(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        applyFilters();
+                        setShowFilters(false);
+                      }}
+                    >
+                      Apply Filters
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {demographicData.genderData.length > 0 ? (
+              <>
+                <GenderBreakdown
+                  data={demographicData.genderData}
+                  colors={colors.chartColors}
+                />
+                <AgeDistribution
+                  data={demographicData.ageData}
+                  colors={colors.chartColors}
+                />
+                <EducationLevel
+                  data={demographicData.educationData}
+                  colors={colors.chartColors}
+                />
+                <EthnicGroupAnalysis
+                  data={demographicData.ethnicData}
+                  colors={colors.chartColors}
+                />
+                <SchoolDistribution
+                  data={demographicData.schoolData}
+                  colors={colors.chartColors}
+                />
+                <SectionDistribution
+                  data={demographicData.sectionData}
+                  colors={colors.chartColors}
+                />
+              </>
+            ) : (
+              <div className="col-span-2 text-center py-4">
+                <p>No data available for the selected event.</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

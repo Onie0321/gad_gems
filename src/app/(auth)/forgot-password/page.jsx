@@ -14,7 +14,7 @@ import {
 import { Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { account, createNotification, getCurrentUser } from "@/lib/appwrite";
+import { account } from "@/lib/appwrite";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -32,17 +32,6 @@ export default function ForgotPassword() {
         window.location.origin
       }/reset-password?email=${encodeURIComponent(email)}`;
       await account.createRecovery(email, recoveryUrl);
-
-      // Create notification for admin
-      await createNotification({
-        userId: "admin",
-        type: "account",
-        title: "Password Reset Request",
-        message: `A password reset was requested for email: ${email}`,
-        actionType: "password_reset_request",
-        status: "info",
-        read: false,
-      });
 
       setMessage("Recovery email sent. Please check your inbox.");
       toast({

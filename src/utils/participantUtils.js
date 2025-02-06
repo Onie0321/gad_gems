@@ -1,15 +1,18 @@
 import { debounce } from "lodash";
+import { Query } from "appwrite";
 import {
   checkDuplicateParticipant,
   fetchParticipantData,
+  databases,
+  databaseId,
+  participantCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
 } from "@/lib/appwrite";
 
 export const formatStudentId = (input) => {
   if (!input) return "";
-  // Remove non-digits
   const numbers = input.replace(/\D/g, "").slice(0, 8);
-
-  // Format as XX-XX-XXXX
   if (numbers.length <= 2) return numbers;
   if (numbers.length <= 4) return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
   return `${numbers.slice(0, 2)}-${numbers.slice(2, 4)}-${numbers.slice(4)}`;
@@ -38,8 +41,8 @@ export const validateEditParticipantForm = (participant) => {
     errors.age = "Age must be between 1 and 125.";
   }
 
-  if (!participant.homeAddress || participant.homeAddress.trim() === "") {
-    errors.homeAddress = "Home Address is required.";
+  if (!participant.address || participant.address.trim() === "") {
+    errors.address = "Address is required.";
   }
 
   // Validate Sex
@@ -85,7 +88,7 @@ export const requiredFields = {
     name: "Name",
     sex: "Sex",
     age: "Age",
-    homeAddress: "Home Address",
+    address: "Address",
     school: "School",
     year: "Year",
     section: "Section",
@@ -96,63 +99,90 @@ export const requiredFields = {
     name: "Name",
     sex: "Sex",
     age: "Age",
-    homeAddress: "Home Address",
+    address: "Address",
     ethnicGroup: "Ethnic Group",
   },
   community: {
     name: "Name",
     sex: "Sex",
     age: "Age",
-    homeAddress: "Home Address",
+    address: "Address",
     ethnicGroup: "Ethnic Group",
   },
 };
 
-export const validateParticipantForm = (participant, participantType) => {
-  console.log(
-    "Validating participant data for type:",
-    participantType,
-    participant
-  );
+export const validateParticipantForm = (data, type) => {
+  console.log("Starting validation for type:", type);
+  console.log("Data to validate:", data);
+  console.log("staffFacultyId type:", typeof data.staffFacultyId);
+  console.log("staffFacultyId value:", data.staffFacultyId);
+  
   const errors = {};
 
-  try {
-    // Get the required fields for this participant type
-    const requiredFieldsForType = requiredFields[participantType];
-    if (!requiredFieldsForType) {
-      throw new Error(`Invalid participant type: ${participantType}`);
-    }
-
-    // Check only the fields that are required for this type
-    Object.entries(requiredFieldsForType).forEach(([field, label]) => {
-      if (!participant[field] || participant[field].toString().trim() === "") {
-        errors[field] = `${label} is required`;
-      }
-    });
-
-    // Age validation for all types
-    if (participant.age) {
-      const age = parseInt(participant.age);
-      if (isNaN(age) || age <= 0 || age > 120) {
-        errors.age = "Please enter a valid age between 1 and 120";
-      }
-    }
-
-    // Ethnic Group "Other" validation
-    if (
-      participant.ethnicGroup === "Other" &&
-      !participant.otherEthnicGroup?.trim()
-    ) {
-      errors.otherEthnicGroup = "Please specify the ethnic group";
-    }
-
-    const hasErrors = Object.keys(errors).length > 0;
-    console.log("Validation results:", { hasErrors, errors });
-    return hasErrors ? errors : null;
-  } catch (error) {
-    console.error("Validation error:", error);
-    return { general: "An error occurred during validation" };
+  // Common validations
+  if (!data.name?.trim()) {
+    errors.name = "Name is required";
   }
+
+  if (!data.sex) {
+    errors.sex = "Sex is required";
+  }
+
+  if (!data.age) {
+    errors.age = "Age is required";
+  } else {
+    const age = parseInt(data.age);
+    if (isNaN(age) || age <= 0 || age > 125) {
+      errors.age = "Age must be between 1 and 125";
+    }
+  }
+
+  if (!data.address?.trim()) {
+    errors.address = "Address is required";
+  }
+
+  if (!data.ethnicGroup) {
+    errors.ethnicGroup = "Ethnic group is required";
+  } else if (data.ethnicGroup === "Other" && !data.otherEthnicGroup?.trim()) {
+    errors.otherEthnicGroup = "Please specify your ethnic group";
+  }
+
+  // Type-specific validations
+  switch (type) {
+    case "student":
+      if (!data.studentId) {
+        errors.studentId = "Student ID is required";
+      } else if (!isStudentIdComplete(data.studentId)) {
+        errors.studentId = "Invalid Student ID format";
+      }
+      if (!data.school) errors.school = "School is required";
+      if (!data.year) errors.year = "Year level is required";
+      if (!data.section) errors.section = "Section is required";
+      break;
+
+    case "staff":
+      if (!data.staffFacultyId) {
+        errors.staffFacultyId = "Staff/Faculty ID is required";
+      } else {
+        // Handle both string and number types
+        const staffId = typeof data.staffFacultyId === 'string' 
+          ? data.staffFacultyId.replace(/\D/g, '')
+          : data.staffFacultyId.toString();
+
+        console.log("Processed staffId:", staffId);
+        console.log("staffId length:", staffId.length);
+
+        if (staffId.length !== 3) {
+          errors.staffFacultyId = "Staff/Faculty ID must be exactly 3 digits";
+        } else if (!/^\d{3}$/.test(staffId)) {
+          errors.staffFacultyId = "Staff/Faculty ID must contain only digits";
+        }
+      }
+      break;
+  }
+
+  console.log("Validation complete. Errors found:", errors);
+  return errors;
 };
 
 export const capitalizeWords = (input) => {
@@ -171,44 +201,85 @@ export const schoolOptions = [
   { name: "School of Information Technology", abbr: "SITech" },
 ];
 
-export const checkDuplicates = async (field, value, currentEventId) => {
+export const checkDuplicates = async (field, value, currentEventId, participantType) => {
   if (!field || !value || !currentEventId || value.trim() === "") {
-    return { duplicateError: "", newEntryInfo: "" };
+    return { error: "", participant: null };
   }
 
   try {
-    const type =
-      field === "studentId"
-        ? "student"
-        : field === "staffFacultyId"
-        ? "staff"
-        : "community";
+    let collectionId;
+    let query;
 
-    const isDuplicate = await checkDuplicateParticipant(
-      currentEventId,
-      value,
-      type
+    switch (participantType) {
+      case "student":
+        collectionId = participantCollectionId;
+        query = field === "studentId" ? 
+          Query.equal("studentId", value) : 
+          Query.equal("name", value);
+        break;
+      case "staff":
+        collectionId = staffFacultyCollectionId;
+        // For staff ID, ensure we're sending an integer
+        if (field === "staffFacultyId") {
+          const staffId = parseInt(value.replace(/\D/g, ''));
+          // Only proceed if we have a valid number
+          if (isNaN(staffId)) {
+            return { error: "", participant: null };
+          }
+          query = Query.equal("staffFacultyId", staffId);
+        } else {
+          query = Query.equal("name", value);
+        }
+        break;
+      case "community":
+        collectionId = communityCollectionId;
+        query = Query.equal("name", value);
+        break;
+      default:
+        throw new Error("Invalid participant type");
+    }
+
+    const response = await databases.listDocuments(
+      databaseId,
+      collectionId,
+      [
+        Query.equal("eventId", currentEventId),
+        query
+      ]
     );
 
-    if (isDuplicate) {
+    if (response.documents.length > 0) {
       return {
-        duplicateError: `This ${
-          field === "studentId"
-            ? "Student ID"
-            : field === "staffFacultyId"
-            ? "Staff/Faculty ID"
-            : "Name"
-        } is already added to this event.`,
-        newEntryInfo: "",
+        error: `This ${field === "studentId" ? "Student ID" : 
+               field === "staffFacultyId" ? "Staff/Faculty ID" : 
+               "Name"} is already registered for this event.`,
+        participant: response.documents[0]
       };
     }
 
-    return { duplicateError: "", newEntryInfo: "" };
+    // Check in other events
+    const otherEventsResponse = await databases.listDocuments(
+      databaseId,
+      collectionId,
+      [
+        Query.notEqual("eventId", currentEventId),
+        query
+      ]
+    );
+
+    if (otherEventsResponse.documents.length > 0) {
+      return {
+        error: "",
+        participant: otherEventsResponse.documents[0]
+      };
+    }
+
+    return { error: "", participant: null };
   } catch (error) {
     console.error("Error checking duplicates:", error);
     return {
-      duplicateError: "Error checking for duplicates",
-      newEntryInfo: "",
+      error: "Error checking for duplicates",
+      participant: null
     };
   }
 };
@@ -256,8 +327,8 @@ export const isStudentIdComplete = (studentId) => {
 
 export const isStaffIdComplete = (staffId) => {
   if (!staffId) return false;
-  const cleanId = staffId.replace(/\D/g, '');
-  return cleanId.length === 6;
+  const numbers = staffId.replace(/\D/g, '');
+  return numbers.length === 3;
 };
 
 export const handleAutofill = async (
@@ -320,7 +391,7 @@ export const handleAutofill = async (
       mappedData.name = data.name;
       mappedData.sex = data.sex;
       mappedData.age = data.age;
-      mappedData.homeAddress = data.homeAddress || data.address;
+      mappedData.address = data.address;
       mappedData.ethnicGroup = data.ethnicGroup;
       mappedData.otherEthnicGroup = data.otherEthnicGroup;
 
@@ -339,7 +410,7 @@ export const handleAutofillConfirm = (autofillData, setParticipantData) => {
     name: autofillData.name,
     sex: autofillData.sex,
     age: autofillData.age,
-    homeAddress: autofillData.homeAddress || autofillData.address,
+    address: autofillData.address,
     ethnicGroup: autofillData.ethnicGroup,
     otherEthnicGroup: autofillData.otherEthnicGroup || "",
   };
@@ -365,8 +436,8 @@ export const handleAutofillConfirm = (autofillData, setParticipantData) => {
 
 export const formatStaffFacultyId = (input) => {
   if (!input) return "";
-  const numbers = input.replace(/\D/g, "").slice(0, 3);
-  return numbers;
+  // Only keep first 3 digits, no prefix
+  return input.replace(/\D/g, "").slice(0, 3);
 };
 
 // Update initial state helper
@@ -375,7 +446,7 @@ export const getInitialParticipantData = (participantType) => {
     name: "",
     sex: "",
     age: "",
-    homeAddress: "",
+    address: "",
     ethnicGroup: "",
     otherEthnicGroup: "",
   };
@@ -403,7 +474,10 @@ export const getInitialParticipantData = (participantType) => {
 
 // Helper function to clean participant data before submission
 export const cleanParticipantData = (data, participantType) => {
-  console.log("Cleaning data for type:", participantType, data);
+  console.log("Cleaning data for type:", participantType);
+  console.log("Raw data:", data);
+  console.log("staffFacultyId before cleaning:", data.staffFacultyId);
+  console.log("staffFacultyId type:", typeof data.staffFacultyId);
 
   // Handle ethnicGroup logic
   let ethnicGroup = data.ethnicGroup;
@@ -416,7 +490,8 @@ export const cleanParticipantData = (data, participantType) => {
     name: data.name?.trim(),
     age: data.age,
     sex: data.sex,
-    ethnicGroup: ethnicGroup, // Include ethnicGroup in base fields
+    address: data.address?.trim(),
+    ethnicGroup: ethnicGroup,
   };
 
   switch (participantType) {
@@ -424,24 +499,29 @@ export const cleanParticipantData = (data, participantType) => {
       return {
         ...cleanedData,
         studentId: data.studentId?.trim(),
-        homeAddress: data.homeAddress?.trim(),
         school: data.school?.trim(),
         year: data.year?.trim(),
         section: data.section?.trim(),
       };
 
     case "staff":
+      // Handle staffFacultyId conversion safely
+      const staffId = typeof data.staffFacultyId === 'string' 
+        ? parseInt(data.staffFacultyId.replace(/\D/g, '') || '0')
+        : typeof data.staffFacultyId === 'number' 
+          ? data.staffFacultyId 
+          : 0;
+
+      console.log("Processed staffId:", staffId);
+      console.log("staffId type:", typeof staffId);
+
       return {
         ...cleanedData,
-        staffFacultyId: data.staffFacultyId?.trim(),
-        address: data.homeAddress?.trim(), // Map homeAddress to address
+        staffFacultyId: staffId,
       };
 
     case "community":
-      return {
-        ...cleanedData,
-        address: data.homeAddress?.trim(), // Map homeAddress to address
-      };
+      return cleanedData;
 
     default:
       throw new Error(`Invalid participant type: ${participantType}`);
@@ -457,177 +537,6 @@ export const handleParticipantTypeChange = (
   setParticipantType(type);
   setParticipantData(getInitialParticipantData(type));
   setErrors({});
-};
-
-export const handleInputChange = async (
-  field,
-  value,
-  participantData,
-  setParticipantData,
-  currentEventId,
-  setDuplicateErrors,
-  setNewEntryInfo,
-  setAutofillData,
-  setShowAutofillDialog,
-  participantType
-) => {
-  try {
-    const updatedData = { ...participantData, [field]: value };
-    setParticipantData(updatedData);
-
-    // Show specific error messages when fields are empty
-    if (!value.trim()) {
-      setDuplicateErrors((prev) => ({
-        ...prev,
-        [field]: `Please enter ${getFieldLabel(field).toLowerCase()}`,
-      }));
-      setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-      return;
-    }
-
-    // Check if we should validate this field
-    const shouldCheck =
-      (participantType === "student" &&
-        (field === "studentId" || field === "name")) ||
-      (participantType === "staff" &&
-        (field === "staffFacultyId" || field === "name")) ||
-      (participantType === "community" && field === "name");
-
-    if (!shouldCheck) return;
-
-    // Check for duplicates in the current event first (case-insensitive)
-    const duplicateInEvent = await checkDuplicateInCurrentEvent(
-      currentEventId,
-      field,
-      value.toLowerCase(),
-      participantType
-    );
-
-    if (duplicateInEvent) {
-      const message = getParticipantTypeMessage(participantType, "duplicate");
-      setDuplicateErrors((prev) => ({
-        ...prev,
-        [field]: message,
-      }));
-      setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-      return;
-    }
-
-    // Then check for duplicates in other events (case-insensitive)
-    const result = await debouncedCheckDuplicates(
-      field,
-      value.toLowerCase(),
-      currentEventId
-    );
-
-    if (result.duplicateError) {
-      setDuplicateErrors((prev) => ({
-        ...prev,
-        [field]: result.duplicateError,
-      }));
-      setNewEntryInfo((prev) => ({ ...prev, [field]: "" }));
-
-      // Check for autofill data
-      const autofillData = await handleAutofill(
-        value,
-        currentEventId,
-        participantType
-      );
-      if (autofillData) {
-        setAutofillData(autofillData);
-        setShowAutofillDialog(true);
-      }
-    } else {
-      setDuplicateErrors((prev) => ({ ...prev, [field]: "" }));
-      const message = getParticipantTypeMessage(participantType, "new");
-      setNewEntryInfo((prev) => ({
-        ...prev,
-        [field]: message,
-      }));
-    }
-  } catch (error) {
-    console.error("Error in handleInputChange:", error);
-    setDuplicateErrors((prev) => ({
-      ...prev,
-      [field]: "Error checking participant information",
-    }));
-  }
-};
-
-const getParticipantTypeMessage = (type, status) => {
-  switch (type) {
-    case "student":
-      return status === "duplicate"
-        ? "This student is already added to the current event."
-        : "This is a new student.";
-    case "staff":
-      return status === "duplicate"
-        ? "This staff/faculty member is already added to the current event."
-        : "This is a new staff/faculty member.";
-    case "community":
-      return status === "duplicate"
-        ? "This community member is already added to the current event."
-        : "This is a new community member.";
-    default:
-      return "";
-  }
-};
-
-// Add this new function to check duplicates in current event
-export const checkDuplicateInCurrentEvent = async (
-  eventId,
-  field,
-  value,
-  participantType
-) => {
-  try {
-    let query = [Query.equal("eventId", eventId)];
-
-    switch (participantType) {
-      case "student":
-        if (field === "studentId") {
-          query.push(Query.equal("studentId", value));
-        } else if (field === "name") {
-          query.push(Query.equal("name", value));
-        }
-        break;
-      case "staff":
-        if (field === "staffFacultyId") {
-          query.push(Query.equal("staffFacultyId", value));
-        } else if (field === "name") {
-          query.push(Query.equal("name", value));
-        }
-        break;
-      case "community":
-        query.push(Query.equal("name", value));
-        break;
-    }
-
-    const response = await databases.listDocuments(
-      databaseId,
-      participantCollectionId,
-      query
-    );
-
-    return response.documents.length > 0;
-  } catch (error) {
-    console.error("Error checking duplicate in current event:", error);
-    return false;
-  }
-};
-
-// Helper function to get field label
-const getFieldLabel = (field) => {
-  switch (field) {
-    case "studentId":
-      return "Student ID";
-    case "staffFacultyId":
-      return "Staff/Faculty ID";
-    case "name":
-      return "Name";
-    default:
-      return field;
-  }
 };
 
 export const updateParticipantCounts = (
