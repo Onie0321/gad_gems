@@ -74,11 +74,19 @@ import {
 } from "@/utils/formPersistence";
 import { importEventAndParticipants } from "@/utils/importUtils";
 import { createNotification } from "@/lib/appwrite";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function CreateEvent({
   onEventCreated,
   user,
   currentAcademicPeriod,
+  setActiveTab,
+  setCurrentEventId,
 }) {
   // Add debug logging
   console.log(
@@ -152,7 +160,7 @@ export default function CreateEvent({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [isTimeValid, setIsTimeValid] = useState(true);
-  const { setActiveTab } = useTabContext();
+  const { setActiveTab: setTabContextActiveTab } = useTabContext();
   const [tempTimeFrom, setTempTimeFrom] = useState("");
   const [tempTimeTo, setTempTimeTo] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -244,12 +252,9 @@ export default function CreateEvent({
         toast.warning("End time cannot be earlier than start time.");
       } else {
         setIsTimeValid(true);
-        const hours = Math.floor(
-          (end.getTime() - start.getTime()) / (1000 * 60 * 60)
-        );
-        const minutes = Math.floor(
-          ((end.getTime() - start.getTime()) / (1000 * 60)) % 60
-        );
+        const diffHours = (end - start) / (1000 * 60 * 60);
+        const hours = Math.floor(diffHours);
+        const minutes = Math.round((diffHours - hours) * 60);
         setDuration(`${hours} hours ${minutes} minutes`);
       }
     }
@@ -283,30 +288,36 @@ export default function CreateEvent({
     first.getMonth() === second.getMonth() &&
     first.getDate() === second.getDate();
 
+  // Add this resetForm function
+  const resetForm = () => {
+    setEventName("");
+    setEventDate(null);
+    setEventTimeFrom("");
+    setEventTimeTo("");
+    setEventVenue("");
+    setEventType([]);
+    setEventCategory("");
+    setSelectedDates([]);
+    setDateRanges([]);
+    setSelectedCategories([]);
+    setDuration("");
+    setErrors({});
+    setCurrentRange({ from: undefined, to: undefined });
+    setExcludeWeekends(false);
+    setExcludeHolidays(false);
+  };
+
   // Main function to handle event creation
   const handleCreateEvent = async (e) => {
     e.preventDefault();
 
     if (!currentAcademicPeriod) {
-      toast.error(
-        "No active academic period found. Please set up an academic period first."
-      );
+      toast.error("No active academic period found. Please set up an academic period first.");
       return;
     }
 
     // Validate form
-    const validationErrors = validateEventForm({
-      eventName,
-      eventDate,
-      eventTimeFrom,
-      eventTimeTo,
-      eventVenue,
-      eventType,
-      selectedCategories,
-    });
-
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    if (!validateEventForm()) {
       return;
     }
 
@@ -316,35 +327,6 @@ export default function CreateEvent({
       // Format the date
       const formattedDate = format(new Date(eventDate), "yyyy-MM-dd");
 
-      // Check for duplicate event
-      const isDuplicate = await checkDuplicateEvent(
-        eventName,
-        formattedDate,
-        eventVenue
-      );
-
-      if (isDuplicate) {
-        toast.error(
-          "An event with the same name, date, and venue already exists."
-        );
-        return;
-      }
-
-      // Check for time conflict
-      const hasTimeConflict = await checkTimeConflict(
-        formattedDate,
-        eventVenue,
-        eventTimeFrom,
-        eventTimeTo
-      );
-
-      if (hasTimeConflict) {
-        toast.error(
-          "There is a time conflict with another event at this venue."
-        );
-        return;
-      }
-
       // Create event document
       const eventData = {
         eventName,
@@ -352,39 +334,39 @@ export default function CreateEvent({
         eventTimeFrom,
         eventTimeTo,
         eventVenue,
-        eventType: eventType.join(", "), // Join array into string
-        eventCategory: selectedCategories.join(", "), // Join array into string
+        eventType: eventType.join(", "),
+        eventCategory: selectedCategories.join(", "),
         numberOfHours: duration,
-        participants: [], // Initialize empty array for participants
+        participants: [],
         createdBy: user.$id,
         showOnHomepage: false,
         isArchived: false,
         academicPeriodId: currentAcademicPeriod.$id,
+        archivedAt: '',
         createdAt: new Date().toISOString(),
+        source: 'created'
       };
 
-      const newEvent = await createEvent(eventData);
+      const createdEvent = await createEvent(eventData);
 
-      if (newEvent) {
-        // Create notification for admin
-        await createNotification({
-          userId: "admin",
-          type: "event",
-          title: "New Event Created",
-          message: `${user.name} has created a new event: ${eventName}`,
-          actionType: "event_creation",
-          eventId: newEvent.$id,
-          status: "info",
-          read: false,
-        });
-
-        toast.success("Event created successfully!");
+      if (createdEvent) {
+        // Clear form data from storage
         clearFormData(STORAGE_KEYS.CREATE_EVENT);
-        onEventCreated(newEvent);
+        
+        // Call the parent's event handler
+        await handleEventCreated(createdEvent);
+        
+        // Reset the form
+        resetForm();
+        
+        // Show success message
+        toast.success(`Event "${createdEvent.eventName}" created successfully!`, {
+          autoClose: 2000 // 2 seconds
+        });
       }
     } catch (error) {
-      console.error("Error creating event: ", error);
-      toast.error("Failed to create event. Please try again.");
+      console.error("Error creating event:", error);
+      toast.error("Failed to create event");
     } finally {
       setLoading(false);
     }
@@ -518,51 +500,6 @@ export default function CreateEvent({
     setSelectAllNonAcademic(checked);
   };
 
-  const handleImportEvent = async (file) => {
-    try {
-      setLoading(true);
-
-      // Validate file type
-      const fileType = file.name.split(".").pop().toLowerCase();
-      if (!["xlsx", "xls", "csv"].includes(fileType)) {
-        toast.error("Please upload a valid Excel or CSV file");
-        return;
-      }
-
-      // Add validation for current academic period
-      if (!currentAcademicPeriod) {
-        toast.error(
-          "No active academic period found. Please set up an academic period first."
-        );
-        return;
-      }
-
-      const result = await importEventAndParticipants(
-        file,
-        currentAcademicPeriod.$id
-      );
-
-      if (result.success) {
-        toast.success(result.message);
-        // Clear form data after successful import
-        clearFormData(STORAGE_KEYS.CREATE_EVENT);
-        // Pass the imported event to the parent handler
-        onEventCreated(result.event);
-      } else {
-        toast.error(result.message || "Failed to import event");
-      }
-    } catch (error) {
-      console.error("Error importing event:", error);
-      // Provide more specific error message based on the error type
-      const errorMessage = error.message.includes("duration")
-        ? "Invalid time format in the imported file. Please ensure start and end times are in correct format (HH:mm)."
-        : "Failed to import event. Please check the file format and try again.";
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleCategoryClick = (category) => {
     const isSelected = tempSelectedCategories.includes(category);
     if (isSelected) {
@@ -578,21 +515,28 @@ export default function CreateEvent({
   useEffect(() => {
     const checkAcademicPeriod = async () => {
       try {
-        console.log("Checking academic period...");
+        ("Checking academic period...");
         const period = await getCurrentAcademicPeriod();
-        console.log("Retrieved academic period:", period);
+        ("Retrieved academic period:", period);
         if (!period) {
-          console.log("No active academic period found");
+          ("No active academic period found");
           // You might want to show a toast here
           toast.error("No active academic period found");
         }
       } catch (error) {
-        console.error("Error checking academic period:", error);
+        ("Error checking academic period:", error);
       }
     };
 
     checkAcademicPeriod();
   }, []);
+
+  const handleEventCreated = async (newEvent) => {
+    if (onEventCreated) {
+      await onEventCreated(newEvent);
+    }
+    setActiveTab("participants"); // Switch to participant management tab
+  };
 
   return (
     <Card>
@@ -632,7 +576,16 @@ export default function CreateEvent({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="eventName">Event Name</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label htmlFor="eventName">Event Name</Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Enter the official name of the event</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Input
                 id="eventName"
                 value={eventName}
@@ -644,10 +597,19 @@ export default function CreateEvent({
               )}
             </div>
             <div className="space-y-4">
-              <Label>
-                Event Date(s){" "}
-                {getTotalDays() > 0 && `(${getTotalDays()} days selected)`}
-              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label>
+                      Event Date(s){" "}
+                      {getTotalDays() > 0 && `(${getTotalDays()} days selected)`}
+                    </Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Select single or multiple dates for the event</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
               <Dialog open={showDatePicker} onOpenChange={setShowDatePicker}>
                 <DialogTrigger asChild>
@@ -976,7 +938,16 @@ export default function CreateEvent({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="eventTimeFrom">Start Time</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label htmlFor="eventTimeFrom">Start Time</Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Enter the time when the event starts</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <div className="relative">
                 <Input
                   id="eventTimeFrom"
@@ -1014,7 +985,16 @@ export default function CreateEvent({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="eventTimeTo">End Time</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label htmlFor="eventTimeTo">End Time</Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Enter the time when the event ends</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <div className="relative">
                 <Input
                   id="eventTimeTo"
@@ -1052,7 +1032,16 @@ export default function CreateEvent({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="eventVenue">Venue</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label htmlFor="eventVenue">Venue</Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Enter the location where the event will be held</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Input
                 id="eventVenue"
                 value={eventVenue}
@@ -1064,7 +1053,16 @@ export default function CreateEvent({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="eventType">Event Type</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label htmlFor="eventType">Event Type</Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Select one or more types that describe this event</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="academic"
@@ -1103,11 +1101,20 @@ export default function CreateEvent({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="eventCategory">
-                Event Category{" "}
-                {selectedCategories.length > 0 &&
-                  `(${selectedCategories.length} selected)`}
-              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label htmlFor="eventCategory">
+                      Event Category{" "}
+                      {selectedCategories.length > 0 &&
+                        `(${selectedCategories.length} selected)`}
+                    </Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Select the category that best fits this event</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Dialog
                 open={showCategoryDialog}
                 onOpenChange={setShowCategoryDialog}
@@ -1301,7 +1308,16 @@ export default function CreateEvent({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="duration">Duration</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label htmlFor="duration">Duration</Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Total duration calculated from start and end time</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Input
                 id="duration"
                 value={duration}
@@ -1329,32 +1345,6 @@ export default function CreateEvent({
                 "Create Event"
               )}
             </Button>
-            <div className="relative">
-              <input
-                type="file"
-                id="importFile"
-                className="hidden"
-                accept=".xlsx,.xls,.csv"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    handleImportEvent(e.target.files[0]);
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                variant="default"
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById("importFile").click();
-                }}
-                disabled={loading}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Import Event
-              </Button>
-            </div>
           </div>
         </CardFooter>
       </form>

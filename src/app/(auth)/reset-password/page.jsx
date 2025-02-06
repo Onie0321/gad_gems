@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useSearchParams } from "next/navigation";
-import { account, createNotification } from "@/lib/appwrite";
+import { account } from "@/lib/appwrite";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 
@@ -72,28 +72,17 @@ export default function ResetPassword() {
     }
 
     try {
-      await account.updateRecovery(userId, secret, password, password);
-
-      // Create notification for admin
-      await createNotification({
-        userId: "admin",
-        type: "account",
-        title: "Password Reset Completed",
-        message: `Password was successfully reset for email: ${email}`,
-        actionType: "password_reset_complete",
-        status: "info",
-        read: false,
-      });
+      await account.updateRecovery(userId, secret, password, confirmPassword);
 
       toast({
         title: "Success",
-        description: "Your password has been reset successfully.",
+        description: "Password reset successful. You can now log in with your new password.",
         variant: "success",
       });
 
       router.push("/sign-in");
     } catch (error) {
-      console.error("Error resetting password:", error);
+      console.error("Password reset error:", error);
       toast({
         title: "Error",
         description: "Failed to reset password. Please try again.",

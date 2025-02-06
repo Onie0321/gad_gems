@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "GAD - Gender and Development",
-  description: "Gender and Development",
+  description: "Gender and Development Initiatives",
 };
 
 export default function RootLayout({ children }) {

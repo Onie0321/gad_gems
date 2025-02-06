@@ -141,106 +141,353 @@ const formatDate = (dateString) => {
   ).toISOString();
 };
 
-export const importEventAndParticipants = async (file, academicPeriodId) => {
-  try {
-    const data = await readFile(file);
+// Function to create participants in their respective collections
+const createParticipants = async (
+  participants,
+  collectionId,
+  type,
+  eventId,
+  academicPeriodId,
+  currentUser
+) => {
+  console.log(`Starting creation of ${type} participants:`, {
+    count: participants.length,
+    collectionId,
+    eventId,
+    type,
+  });
 
-    // Extract all data
-    const eventMetadata = extractEventMetadata(data);
-    const students = extractParticipants(data);
-    const staffFaculty = extractStaffFaculty(data);
-    const community = extractCommunityMembers(data);
-
-    // Check for duplicate event
-    const isDuplicate = await checkForDuplicateEvent(eventMetadata);
-    if (isDuplicate) {
-      throw new Error(
-        "An event with the same name, date, and venue already exists."
-      );
-    }
-
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      throw new Error("You must be logged in to import events");
-    }
-
+  const createdParticipants = [];
+  for (const participant of participants) {
     try {
-      // Create event document
-      const eventData = {
-        eventName: eventMetadata.eventName,
-        eventDate: eventMetadata.eventDate,
-        eventTimeFrom: eventMetadata.eventTimeFrom,
-        eventTimeTo: eventMetadata.eventTimeTo,
-        eventVenue: eventMetadata.eventVenue,
-        eventType: eventMetadata.eventType,
-        eventCategory: eventMetadata.eventCategory,
-        numberOfHours: eventMetadata.numberOfHours,
-        academicPeriodId,
-        isArchived: false,
+      const participantId = ID.unique();
+
+      // Base participant data
+      let participantData = {
+        name: participant.name,
+        sex: participant.sex,
+        age: parseInt(participant.age) || 0,
+        ethnicGroup: participant.ethnicGroup || "",
+        otherEthnicGroup: participant.otherEthnicGroup || "",
+        eventId: eventId,
+        academicPeriodId: academicPeriodId,
         createdBy: currentUser.$id,
+        isArchived: false,
+        participantType: type,
+        address: participant.address || participant.homeAddress || "N/A",
       };
 
-      const event = await databases.createDocument(
-        databaseId,
-        eventCollectionId,
-        "unique()",
-        eventData
-      );
-
-      // If we get here, event was created successfully despite the error
-      console.log("Event created successfully:", event);
-
-      // Create participants
-      const createParticipants = async (participants, collectionId) => {
-        return Promise.all(
-          participants.map((participant) =>
-            databases.createDocument(databaseId, collectionId, "unique()", {
-              ...participant,
-              eventId: event.$id,
-              academicPeriodId,
-              isArchived: false,
-              createdBy: currentUser.$id,
-            })
-          )
-        );
-      };
-
-      const [createdStudents, createdStaffFaculty, createdCommunity] =
-        await Promise.all([
-          createParticipants(students, participantCollectionId),
-          createParticipants(staffFaculty, staffFacultyCollectionId),
-          createParticipants(community, communityCollectionId),
-        ]);
-
-      return {
-        success: true,
-        message: `Successfully imported event "${eventMetadata.eventName}" with ${
-          students.length + staffFaculty.length + community.length
-        } participants`,
-        event,
-        participants: {
-          students: createdStudents,
-          staffFaculty: createdStaffFaculty,
-          community: createdCommunity,
-        },
-      };
-    } catch (error) {
-      // Check if it's the known "Unknown attribute" error but data was saved
-      if (
-        error.message?.includes("Unknown attribute") &&
-        error.message?.includes("academicPeriodId")
-      ) {
-        // Continue with success path since we know the data was saved
-        return {
-          success: true,
-          message: `Successfully imported event "${eventMetadata.eventName}" with ${
-            students.length + staffFaculty.length + community.length
-          } participants`,
+      // Add type-specific fields
+      if (type === "student") {
+        participantData = {
+          ...participantData,
+          studentId: participant.studentId,
+          school: participant.school || "",
+          year: participant.year || "",
+          section: participant.section || "",
+        };
+      } else if (type === "staff") {
+        participantData = {
+          ...participantData,
+          staffFacultyId: participant.staffFacultyId || "",
         };
       }
-      // If it's any other error, rethrow it
+
+      console.log(`Creating ${type} participant with data:`, participantData);
+
+      const createdParticipant = await databases.createDocument(
+        databaseId,
+        collectionId,
+        participantId,
+        participantData
+      );
+
+      console.log(
+        `Successfully created ${type} participant:`,
+        createdParticipant
+      );
+      createdParticipants.push(participantId);
+    } catch (error) {
+      console.error(`Error creating ${type} participant:`, error);
       throw error;
     }
+  }
+
+  return createdParticipants;
+};
+
+// Update the extraction functions to match Excel format exactly
+export const extractParticipants = (excelData) => {
+  const participants = [];
+  for (let i = 9; i < excelData.length; i++) {
+    const row = excelData[i];
+    if (row && row[0] && row[1]) {
+      participants.push({
+        name: row[0],
+        studentId: row[1],
+        sex: row[2]?.split(" ")[0],
+        age: parseInt(row[3]) || 0,
+        address: row[4] || "N/A", // Changed from homeAddress to address
+        school: row[5] || "",
+        year: row[6] || "",
+        section: row[7] || "",
+        ethnicGroup: row[8] || "",
+      });
+    }
+  }
+  return participants.filter((p) => p.name && p.name !== "N/A");
+};
+
+export const extractStaffFaculty = (excelData) => {
+  console.log("Starting staff/faculty extraction...");
+  const staffFaculty = [];
+
+  for (let i = 9; i < excelData.length; i++) {
+    const row = excelData[i];
+    if (row && row[10] && row[11]) {
+      const staffMember = {
+        name: row[10],
+        staffFacultyId: row[11],
+        sex: row[12]?.split(" ")[0] || "N/A",
+        age: parseInt(row[13]) || 0,
+        address: row[14] || "N/A", // Ensure address is never empty
+        ethnicGroup: row[15] || "N/A",
+        otherEthnicGroup: "",
+      };
+
+      console.log("Found staff/faculty:", staffMember);
+      staffFaculty.push(staffMember);
+    }
+  }
+
+  return staffFaculty;
+};
+
+export const extractCommunityMembers = (excelData) => {
+  console.log("Starting community members extraction...");
+  const community = [];
+
+  for (let i = 9; i < excelData.length; i++) {
+    const row = excelData[i];
+    if (row && row[17] && row[18]) {
+      const communityMember = {
+        name: row[17],
+        sex: row[18]?.split(" ")[0] || "N/A",
+        age: parseInt(row[19]) || 0,
+        address: row[20] || "N/A", // Ensure address is never empty
+        ethnicGroup: row[21] || "N/A",
+        otherEthnicGroup: "",
+      };
+
+      console.log("Found community member:", communityMember);
+      community.push(communityMember);
+    }
+  }
+
+  return community;
+};
+
+// Update the formatEventData function
+const formatEventData = (rawData) => {
+  console.log('Raw event data:', rawData);
+  console.log('Raw numberOfHours:', rawData.numberOfHours);
+  console.log('Type of numberOfHours:', typeof rawData.numberOfHours);
+
+  // Calculate duration from time range
+  let numberOfHours = '';
+  try {
+    console.log('Calculating duration from time range');
+    
+    // Extract time portions from the ISO strings
+    const timeFrom = rawData.eventTimeFrom.split('T')[1].split('.')[0];
+    const timeTo = rawData.eventTimeTo.split('T')[1].split('.')[0];
+    
+    console.log('Time From:', timeFrom);
+    console.log('Time To:', timeTo);
+    
+    // Create Date objects for today with the extracted times
+    const startTime = new Date(`2000-01-01T${timeFrom}`);
+    const endTime = new Date(`2000-01-01T${timeTo}`);
+    
+    // Handle case where end time is on next day (e.g., event ends after midnight)
+    if (endTime < startTime) {
+      endTime.setDate(endTime.getDate() + 1);
+    }
+    
+    console.log('Start Time:', startTime);
+    console.log('End Time:', endTime);
+    
+    const diffHours = (endTime - startTime) / (1000 * 60 * 60);
+    const hours = Math.floor(diffHours);
+    const minutes = Math.round((diffHours - hours) * 60);
+    
+    console.log('Calculated diff hours:', diffHours);
+    console.log('Final hours:', hours);
+    console.log('Final minutes:', minutes);
+    
+    numberOfHours = `${hours} hours ${minutes} minutes`;
+  } catch (error) {
+    console.error('Error calculating duration:', error);
+    numberOfHours = '0 hours 0 minutes';
+  }
+
+  console.log('Final formatted numberOfHours:', numberOfHours);
+
+  const formattedData = {
+    ...rawData,
+    numberOfHours
+  };
+
+  console.log('Final formatted event data:', formattedData);
+  return formattedData;
+};
+
+// Update the importEventAndParticipants function
+export const importEventAndParticipants = async (file, academicPeriodId) => {
+  try {
+    const data = await handleFileChange(file);
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      throw new Error("No authenticated user found");
+    }
+
+    const eventData = formatEventData(data.eventMetadata);
+
+    // Ensure numberOfHours is properly formatted before saving
+    if (!eventData.numberOfHours || eventData.numberOfHours.includes('NaN')) {
+      eventData.numberOfHours = '0 hours 0 minutes';
+    }
+
+    // Create event with academicPeriodId
+    const eventId = ID.unique();
+    const eventDataToSave = {
+      eventName: eventData.eventName,
+      eventDate: eventData.eventDate,
+      eventTimeFrom: eventData.eventTimeFrom,
+      eventTimeTo: eventData.eventTimeTo,
+      eventVenue: eventData.eventVenue,
+      eventType: eventData.eventType,
+      eventCategory: eventData.eventCategory,
+      numberOfHours: eventData.numberOfHours,
+      participants: [],
+      createdBy: currentUser.$id,
+      showOnHomepage: false,
+      isArchived: false,
+      academicPeriodId: academicPeriodId, // Make sure this is set
+      archivedAt: '',
+      createdAt: new Date().toISOString(),
+      source: 'imported'
+    };
+
+    // Create participants first to get their IDs
+    const participantIds = [];
+
+    // Create student participants
+    for (const participant of data.participants) {
+      const participantId = ID.unique();
+      const participantData = {
+        name: participant.name,
+        studentId: participant.studentId,
+        sex: participant.sex,
+        age: parseInt(participant.age) || 0,
+        address: participant.address || "N/A",
+        school: participant.school || "",
+        year: participant.year || "",
+        section: participant.section || "",
+        ethnicGroup: participant.ethnicGroup || "",
+        eventId: eventId,
+        academicPeriodId: academicPeriodId,
+        createdBy: currentUser.$id,
+        isArchived: false,
+        participantType: "student",
+      };
+
+      await databases.createDocument(
+        databaseId,
+        participantCollectionId,
+        participantId,
+        participantData
+      );
+
+      participantIds.push(`student_${participantId}`);
+    }
+
+    // Create staff/faculty participants
+    for (const staff of data.staffFaculty) {
+      const staffId = ID.unique();
+      const staffData = {
+        name: staff.name,
+        staffFacultyId: staff.staffFacultyId || "",
+        sex: staff.sex,
+        age: parseInt(staff.age) || 0,
+        address: staff.address || "N/A",
+        ethnicGroup: staff.ethnicGroup || "",
+        eventId: eventId,
+        academicPeriodId: academicPeriodId,
+        createdBy: currentUser.$id,
+        isArchived: false,
+        participantType: "staff",
+      };
+
+      await databases.createDocument(
+        databaseId,
+        staffFacultyCollectionId,
+        staffId,
+        staffData
+      );
+
+      participantIds.push(`staff_${staffId}`);
+    }
+
+    // Create community participants
+    for (const member of data.community) {
+      const memberId = ID.unique();
+      const memberData = {
+        name: member.name,
+        sex: member.sex,
+        age: parseInt(member.age) || 0,
+        address: member.address || "N/A",
+        ethnicGroup: member.ethnicGroup || "",
+        eventId: eventId,
+        academicPeriodId: academicPeriodId,
+        createdBy: currentUser.$id,
+        isArchived: false,
+        participantType: "community",
+      };
+
+      await databases.createDocument(
+        databaseId,
+        communityCollectionId,
+        memberId,
+        memberData
+      );
+
+      participantIds.push(`community_${memberId}`);
+    }
+
+    // Update event data with participant IDs array
+    eventData.participants = participantIds;
+
+    // Create the event with all participants
+    const createdEvent = await databases.createDocument(
+      databaseId,
+      eventCollectionId,
+      eventId,
+      eventDataToSave
+    );
+
+    return {
+      success: true,
+      message: `Successfully imported event "${data.eventMetadata.eventName}" with ${participantIds.length} participants`,
+      event: createdEvent,
+      participantCounts: {
+        total: participantIds.length,
+        students: data.participants.length,
+        staffFaculty: data.staffFaculty.length,
+        community: data.community.length,
+      },
+    };
   } catch (error) {
     console.error("Import error:", error);
     throw error;
@@ -485,228 +732,6 @@ const validateEventMetadata = (eventMetadata) => {
   }
 };
 
-export const extractParticipants = (data) => {
-  console.log("Searching for participant data...");
-
-  // Find the row that contains the "Student" section header
-  const studentSectionIndex = data.findIndex((row) =>
-    row.some((cell) => cell === "Student")
-  );
-
-  if (studentSectionIndex === -1) {
-    console.warn("Student section header not found");
-    return []; // Return empty array instead of throwing error
-  }
-
-  // Headers are one row below the section header
-  const headerRow = data[studentSectionIndex + 1];
-  if (!headerRow) {
-    console.warn("Header row not found");
-    return [];
-  }
-
-  // Get column indices for each field
-  const nameIndex = headerRow.indexOf("Name");
-  const studentIdIndex = headerRow.indexOf("StudentId");
-  const sexIndex = headerRow.indexOf("Sex at Birth");
-  const ageIndex = headerRow.indexOf("Age");
-  const addressIndex = headerRow.indexOf("Home Address");
-  const schoolIndex = headerRow.indexOf("School");
-  const yearIndex = headerRow.indexOf("Year");
-  const sectionIndex = headerRow.indexOf("Section");
-  const ethnicGroupIndex = headerRow.indexOf("Ethnic Group");
-
-  // Validate required columns exist
-  if (nameIndex === -1 || sexIndex === -1) {
-    console.warn("Required columns missing", { nameIndex, sexIndex });
-    return [];
-  }
-
-  const participants = [];
-  // Start from the row after headers
-  for (let i = studentSectionIndex + 2; i < data.length; i++) {
-    const row = data[i];
-    
-    // Stop if we hit an empty row or the next section
-    if (!row || !row[nameIndex] || row.includes("Staff/Faculty")) {
-      break;
-    }
-
-    // Clean and validate the sex value
-    const rawSex = row[sexIndex]?.toString().trim();
-    const sex = rawSex?.toLowerCase() === 'male' ? 'Male' : 
-                rawSex?.toLowerCase() === 'female' ? 'Female' : 
-                null;
-
-    if (!sex) {
-      console.warn(`Invalid sex value for participant: ${row[nameIndex]}`);
-      continue; // Skip this participant
-    }
-
-    const participant = {
-      name: row[nameIndex]?.toString().trim() || '',
-      studentId: row[studentIdIndex]?.toString().trim() || '',
-      sex: sex,
-      age: parseInt(row[ageIndex], 10) || null,
-      homeAddress: row[addressIndex]?.toString().trim() || '',
-      school: row[schoolIndex]?.toString().trim() || '',
-      year: row[yearIndex]?.toString().trim() || '',
-      section: row[sectionIndex]?.toString().trim() || '',
-      ethnicGroup: row[ethnicGroupIndex]?.toString().trim() || '',
-      type: 'student'
-    };
-
-    // Only add participant if they have at least a name and valid sex
-    if (participant.name && participant.sex) {
-      participants.push(participant);
-    } else {
-      console.warn('Skipping invalid participant:', participant);
-    }
-  }
-
-  console.log(`Found ${participants.length} valid participants:`, {
-    total: participants.length,
-    male: participants.filter(p => p.sex === 'Male').length,
-    female: participants.filter(p => p.sex === 'Female').length
-  });
-
-  return participants;
-};
-
-// Helper function to extract staff/faculty data
-export const extractStaffFaculty = (data) => {
-  console.log("Searching for staff/faculty data...");
-
-  const staffSectionIndex = data.findIndex((row) =>
-    row.some((cell) => cell === "Staff/Faculty")
-  );
-
-  if (staffSectionIndex === -1) {
-    console.log("No staff/faculty section found");
-    return [];
-  }
-
-  const headerRow = data[staffSectionIndex + 1];
-  if (!headerRow) {
-    console.warn("Staff/Faculty header row not found");
-    return [];
-  }
-
-  const nameIndex = headerRow.indexOf("Name");
-  const idIndex = headerRow.indexOf("Staff/Faculty Id");
-  const sexIndex = headerRow.indexOf("Sex at Birth");
-  const ageIndex = headerRow.indexOf("Age");
-  const addressIndex = headerRow.indexOf("Home Address");
-  const ethnicGroupIndex = headerRow.indexOf("Ethnic Group");
-
-  if (nameIndex === -1 || sexIndex === -1) {
-    console.warn("Required staff/faculty columns missing");
-    return [];
-  }
-
-  const staffFaculty = [];
-  for (let i = staffSectionIndex + 2; i < data.length; i++) {
-    const row = data[i];
-
-    if (!row || !row[nameIndex] || row.includes("Community Member")) {
-      break;
-    }
-
-    const rawSex = row[sexIndex]?.toString().trim();
-    const sex = rawSex?.toLowerCase() === 'male' ? 'Male' : 
-                rawSex?.toLowerCase() === 'female' ? 'Female' : 
-                null;
-
-    if (!sex) {
-      console.warn(`Invalid sex value for staff/faculty: ${row[nameIndex]}`);
-      continue;
-    }
-
-    const member = {
-      name: row[nameIndex]?.toString().trim() || '',
-      staffFacultyId: row[idIndex]?.toString().trim() || '',
-      sex: sex,
-      age: parseInt(row[ageIndex], 10) || null,
-      homeAddress: row[addressIndex]?.toString().trim() || '',
-      ethnicGroup: row[ethnicGroupIndex]?.toString().trim() || '',
-      type: 'staff'
-    };
-
-    if (member.name && member.sex) {
-      staffFaculty.push(member);
-    }
-  }
-
-  console.log(`Found ${staffFaculty.length} valid staff/faculty members:`, {
-    total: staffFaculty.length,
-    male: staffFaculty.filter(p => p.sex === 'Male').length,
-    female: staffFaculty.filter(p => p.sex === 'Female').length
-  });
-
-  return staffFaculty;
-};
-
-// Helper function to extract community member data
-export const extractCommunityMembers = (data) => {
-  console.log("Searching for community member data...");
-
-  const communitySectionIndex = data.findIndex((row) =>
-    row.some((cell) => cell === "Community Member")
-  );
-
-  if (communitySectionIndex === -1) {
-    console.log("No community member section found");
-    return [];
-  }
-
-  const headerRow = data[communitySectionIndex + 1];
-  const expectedHeaders = [
-    "Name",
-    "Sex at Birth",
-    "Age",
-    "Home Address",
-    "Ethnic Group",
-  ];
-
-  const hasValidHeaders = expectedHeaders.every((header) =>
-    headerRow.includes(header)
-  );
-
-  if (!hasValidHeaders) {
-    console.warn("Invalid community member header structure");
-    return [];
-  }
-
-  const nameIndex = headerRow.indexOf("Name");
-  const sexIndex = headerRow.indexOf("Sex at Birth");
-  const ageIndex = headerRow.indexOf("Age");
-  const addressIndex = headerRow.indexOf("Home Address");
-  const ethnicGroupIndex = headerRow.indexOf("Ethnic Group");
-
-  const communityMembers = [];
-  for (let i = communitySectionIndex + 2; i < data.length; i++) {
-    const row = data[i];
-
-    if (!row[nameIndex]) {
-      break;
-    }
-
-    communityMembers.push({
-      name: row[nameIndex] || "",
-      sex: row[sexIndex] || "",
-      age: parseInt(row[ageIndex], 10) || null,
-      address: row[addressIndex] || "",
-      ethnicGroup: row[ethnicGroupIndex] || "",
-    });
-  }
-
-  console.log(
-    `Found ${communityMembers.length} community members:`,
-    communityMembers
-  );
-  return communityMembers;
-};
-
 const validateParticipants = (participants) => {
   participants.forEach((participant, index) => {
     if (!participant.name) {
@@ -757,28 +782,18 @@ export const formatTime = (dateString) => {
     .replace(/\s/g, " "); // Ensure consistent spacing
 };
 
-// Update the formatEventPreview function to calculate counts from the data
+// Update the formatEventPreview function
 export const formatEventPreview = (data) => {
-  const startTime = formatTime(data.eventMetadata.eventTimeFrom);
-  const endTime = formatTime(data.eventMetadata.eventTimeTo);
-
-  // Get school year and period type from the Excel data
-  const schoolYear = data.excelData[0][1] || "2023-2024";
-  const periodType = data.excelData[1][1] || "First Semester";
-
-  // Calculate participant counts for preview only
-  const totalParticipants = data.participants.length;
-  const maleCount = data.participants.filter((p) => p.sex === "Male").length;
-  const femaleCount = data.participants.filter(
-    (p) => p.sex === "Female"
-  ).length;
+  console.log("Formatting preview data:", data);
 
   return {
-    schoolYear,
-    periodType,
+    schoolYear: data.schoolYear,
+    periodType: data.periodType,
     eventName: data.eventMetadata.eventName,
     eventDate: formatDateForDisplay(data.eventMetadata.eventDate),
-    eventTime: `${startTime} - ${endTime}`,
+    eventTime: `${formatTime(data.eventMetadata.eventTimeFrom)} - ${formatTime(
+      data.eventMetadata.eventTimeTo
+    )}`,
     duration: calculateDuration(
       data.eventMetadata.eventTimeFrom,
       data.eventMetadata.eventTimeTo
@@ -786,31 +801,57 @@ export const formatEventPreview = (data) => {
     eventVenue: data.eventMetadata.eventVenue,
     eventType: data.eventMetadata.eventType,
     eventCategory: data.eventMetadata.eventCategory,
-    totalParticipants,
+    totalParticipants: data.totalParticipants,
     participantDetails: {
-      male: maleCount,
-      female: femaleCount,
-      students: data.participants.length,
-      staffFaculty: data.staffFaculty?.length || 0,
-      community: data.community?.length || 0,
+      male: data.participantDetails.male,
+      female: data.participantDetails.female,
+      students: data.participantDetails.students,
+      staffFaculty: data.participantDetails.staffFaculty,
+      community: data.participantDetails.community,
     },
   };
 };
 
-// Update the handleFileChange function in your import page
+// Update the handleFileChange function
 export const handleFileChange = async (file) => {
   try {
     const excelData = await readFile(file);
+
     const eventMetadata = extractEventMetadata(excelData);
     const participants = extractParticipants(excelData);
+    const staffFaculty = extractStaffFaculty(excelData);
+    const community = extractCommunityMembers(excelData);
+
+    // Get the counts from specific cells in the Excel file
+    const totalParticipants = parseInt(excelData[3][5]) || 0;
+    const totalMale = parseInt(excelData[4][5]) || 0;
+    const totalFemale = parseInt(excelData[5][5]) || 0;
+    const studentCount = parseInt(excelData[0][8]) || 0;
+    const staffFacultyCount = parseInt(excelData[1][8]) || 0;
+    const communityCount = parseInt(excelData[2][8]) || 0;
+
+    // Get school year and period type
+    const schoolYear = excelData[0][1];
+    const periodType = excelData[1][1];
 
     return {
       eventMetadata,
+      excelData,
+      schoolYear,
+      periodType,
+      totalParticipants,
+      participantDetails: {
+        male: totalMale,
+        female: totalFemale,
+        students: studentCount,
+        staffFaculty: staffFacultyCount,
+        community: communityCount,
+      },
       participants,
-      excelData, // Pass the raw Excel data
+      staffFaculty,
+      community,
     };
   } catch (error) {
-    console.error("Error parsing file:", error);
     throw error;
   }
 };

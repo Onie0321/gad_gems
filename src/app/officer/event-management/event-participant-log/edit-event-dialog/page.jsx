@@ -41,7 +41,7 @@ const EditEvent = ({ event, onUpdateEvent }) => {
   const [editingEvent, setEditingEvent] = useState(() => ({
     eventTimeFrom: event?.eventTimeFrom || null,
     eventTimeTo: event?.eventTimeTo || null,
-    duration: event?.duration || "",
+    numberOfHours: event?.numberOfHours || 0,
     ...event,
   }));
 
@@ -51,46 +51,76 @@ const EditEvent = ({ event, onUpdateEvent }) => {
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const calculateDuration = (startTime, endTime) => {
+    if (!startTime || !endTime) return "";
+
+    const start = new Date(`1970-01-01T${startTime}`);
+    const end = new Date(`1970-01-01T${endTime}`);
+
+    // Handle case where end time is on the next day
+    if (end < start) {
+      end.setDate(end.getDate() + 1);
+    }
+
+    const diffInMinutes = (end - start) / (1000 * 60);
+    const hours = Math.floor(diffInMinutes / 60);
+    const minutes = Math.floor(diffInMinutes % 60);
+
+    return `${hours} hours ${minutes} minutes`;
+  };
+
+  useEffect(() => {
+    if (event?.eventTimeFrom && event?.eventTimeTo) {
+      const start = new Date(event.eventTimeFrom);
+      const end = new Date(event.eventTimeTo);
+      
+      const startTime = start.toTimeString().slice(0, 5);
+      const endTime = end.toTimeString().slice(0, 5);
+      const calculatedDuration = calculateDuration(startTime, endTime);
+      setDuration(calculatedDuration);
+      setIsTimeValid(true);
+    }
+  }, [event]);
+
   useEffect(() => {
     if (!isDialogOpen) {
       return; // Skip validation if dialog is not open
     }
 
     if (!editingEvent.eventTimeFrom || !editingEvent.eventTimeTo) {
-      setDuration("");
-      setIsTimeValid(true); // Assume valid if times are not yet set
+      setDuration(duration || ""); // Keep existing duration if times haven't changed
+      setIsTimeValid(true);
       return;
     }
 
     const start = new Date(editingEvent.eventTimeFrom);
     const end = new Date(editingEvent.eventTimeTo);
 
-    // Ensure valid date objects
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      setDuration("");
-      setIsTimeValid(true); // Avoid triggering warnings on invalid dates
-      return;
-    }
+    const startTime = start.toTimeString().slice(0, 5);
+    const endTime = end.toTimeString().slice(0, 5);
+    const calculatedDuration = calculateDuration(startTime, endTime);
 
-    // Compare times and set state
-    if (isBefore(end, start)) {
-      if (isTimeValid) {
-        // Only warn once to prevent repeated warnings
-        toast.warning("End time cannot be earlier than start time.");
-      }
+    if (calculatedDuration) {
+      setIsTimeValid(true);
+      setDuration(calculatedDuration);
+      const [hours, minutes] = calculatedDuration.match(/\d+/g).map(Number);
+      setEditingEvent(prev => ({
+        ...prev,
+        numberOfHours: hours + (minutes / 60)
+      }));
+    } else {
       setIsTimeValid(false);
       setDuration("");
-    } else {
-      setIsTimeValid(true);
-      const hours = Math.floor((end - start) / (1000 * 60 * 60));
-      const minutes = Math.floor(((end - start) / (1000 * 60)) % 60);
-      setDuration(`${hours} hours ${minutes} minutes`);
+      if (isTimeValid) {
+        toast.warning("Invalid time range");
+      }
     }
   }, [
     editingEvent.eventTimeFrom,
     editingEvent.eventTimeTo,
     isDialogOpen,
     isTimeValid,
+    duration
   ]);
 
   const handleSave = async () => {
@@ -101,7 +131,7 @@ const EditEvent = ({ event, onUpdateEvent }) => {
 
     setLoading(true);
     try {
-      // Extract valid fields for updating
+      // Clean the event object by only including the fields we want to update
       const updatedEvent = {
         eventName: editingEvent.eventName,
         eventDate: editingEvent.eventDate,
@@ -110,8 +140,19 @@ const EditEvent = ({ event, onUpdateEvent }) => {
         eventVenue: editingEvent.eventVenue,
         eventType: editingEvent.eventType,
         eventCategory: editingEvent.eventCategory,
-        numberOfHours: parseFloat(duration.split(" ")[0]) || 0, // Convert duration to numeric hours
+        numberOfHours: editingEvent.numberOfHours,
+        isArchived: editingEvent.isArchived || false,
+        academicPeriodId: editingEvent.academicPeriodId,
+        createdBy: editingEvent.createdBy,
+        source: editingEvent.source || 'created'
       };
+
+      // Remove any undefined or null values
+      Object.keys(updatedEvent).forEach(key => {
+        if (updatedEvent[key] === undefined || updatedEvent[key] === null) {
+          delete updatedEvent[key];
+        }
+      });
 
       // Update the event in the database
       const response = await editEvent(editingEvent.$id, updatedEvent);
@@ -122,7 +163,6 @@ const EditEvent = ({ event, onUpdateEvent }) => {
       toast.success("Event updated successfully.");
       setIsDialogOpen(false); // Close dialog on success
     } catch (error) {
-      console.error("Error updating event:", error);
       toast.error("Failed to update event.");
     } finally {
       setLoading(false);

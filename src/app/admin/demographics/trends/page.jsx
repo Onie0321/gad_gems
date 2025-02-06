@@ -71,7 +71,7 @@ export const Trends = () => {
     const ageGroups = participants.reduce((acc, participant) => {
       const age = parseInt(participant.age);
       let group = '';
-      if (age < 18) group = 'Under 18';
+      if (age < 18) group = '18 and below';
       else if (age <= 24) group = '18-24';
       else if (age <= 34) group = '25-34';
       else if (age <= 44) group = '35-44';

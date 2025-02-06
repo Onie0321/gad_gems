@@ -20,14 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
   Card,
   CardContent,
   CardHeader,
@@ -35,8 +27,23 @@ import {
   CardDescription,
   CardFooter,
 } from "@/components/ui/card";
-import { Plus, Loader2, ArrowUpDown, RotateCcw, PieChart } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import {
+  Plus,
+  Loader2,
+  ArrowUpDown,
+  RotateCcw,
+  PieChart,
+  Calendar,
+  GraduationCap,
+  PartyPopper,
+  Users,
+  CalendarDays,
+  BookOpen,
+  Music,
+  UsersRound,
+  Upload,
+} from "lucide-react";
+import { format, parseISO, formatDistanceToNow } from "date-fns";
 import {
   databases,
   databaseId,
@@ -45,12 +52,17 @@ import {
   getCurrentUser,
   subscribeToRealTimeUpdates,
   getCurrentAcademicPeriod,
+  academicPeriodCollectionId,
+  notificationsCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
 } from "@/lib/appwrite";
 import { client } from "@/lib/appwrite";
 import { useRouter } from "next/navigation";
 import { useTabContext, TabProvider } from "@/context/TabContext";
 import { Query } from "appwrite";
-import { LoadingAnimation } from "@/components/loading/loading-animation";
+import { ColorfulSpinner } from "@/components/ui/loader";
+import { toast } from "@/hooks/use-toast";
 
 export default function EventOverview({
   currentEventId,
@@ -62,14 +74,14 @@ export default function EventOverview({
   const [participants, setParticipants] = useState([]);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortColumn, setSortColumn] = useState("eventDate");
+  const [sortColumn, setSortColumn] = useState("updatedAt");
   const [sortDirection, setSortDirection] = useState("desc");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [eventsPerPage, setEventsPerPage] = useState(5);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [ageDistribution, setAgeDistribution] = useState([]);
   const [locationDistribution, setLocationDistribution] = useState([]);
+  const [academicPeriod, setAcademicPeriod] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const router = useRouter();
   const { setActiveTab } = useTabContext();
 
@@ -142,7 +154,7 @@ export default function EventOverview({
       }
 
       // First fetch events
-      const eventsResponse = await databases.listDocuments(
+      const response = await databases.listDocuments(
         databaseId,
         eventCollectionId,
         [
@@ -150,10 +162,11 @@ export default function EventOverview({
           Query.equal("isArchived", false),
           Query.equal("academicPeriodId", currentPeriod.$id),
           Query.orderDesc("$createdAt"),
+          Query.limit(5)
         ]
       );
 
-      if (eventsResponse.documents.length === 0) {
+      if (response.documents.length === 0) {
         setEvents([]);
         setParticipants([]);
         setAgeDistribution([]);
@@ -162,25 +175,37 @@ export default function EventOverview({
       }
 
       // Get all event IDs
-      const eventIds = eventsResponse.documents.map((event) => event.$id);
+      const eventIds = response.documents.map((event) => event.$id);
 
-      // Fetch participants for all events
-      const participantsPromises = eventIds.map((eventId) =>
-        databases.listDocuments(databaseId, participantCollectionId, [
-          Query.equal("eventId", eventId),
-          Query.equal("isArchived", false),
-        ])
-      );
+      // Fetch participants, staffFaculty, and community members for all events
+      const [participantsResponse, staffFacultyResponse, communityResponse] =
+        await Promise.all([
+          databases.listDocuments(databaseId, participantCollectionId, [
+            Query.equal("eventId", eventIds),
+            Query.equal("isArchived", false),
+            Query.equal("createdBy", userId),
+          ]),
+          databases.listDocuments(databaseId, staffFacultyCollectionId, [
+            Query.equal("eventId", eventIds),
+            Query.equal("isArchived", false),
+            Query.equal("createdBy", userId),
+          ]),
+          databases.listDocuments(databaseId, communityCollectionId, [
+            Query.equal("eventId", eventIds),
+            Query.equal("isArchived", false),
+            Query.equal("createdBy", userId),
+          ]),
+        ]);
 
-      const participantsResponses = await Promise.all(participantsPromises);
-
-      // Combine all participants and map them to their events
-      const allParticipants = participantsResponses.flatMap(
-        (response) => response.documents
-      );
+      // Combine all participants
+      const allParticipants = [
+        ...participantsResponse.documents,
+        ...staffFacultyResponse.documents,
+        ...communityResponse.documents,
+      ];
 
       // Map participants to their respective events
-      const eventsWithParticipants = eventsResponse.documents.map((event) => ({
+      const eventsWithParticipants = response.documents.map((event) => ({
         ...event,
         participants: allParticipants.filter((p) => p.eventId === event.$id),
       }));
@@ -188,11 +213,6 @@ export default function EventOverview({
       // Calculate demographics from all participants
       const { ageDistribution: ageDist, locationDistribution: locDist } =
         calculateDemographics(allParticipants);
-
-      console.log("Events with participants:", eventsWithParticipants);
-      console.log("All participants:", allParticipants);
-      console.log("Age Distribution:", ageDist);
-      console.log("Location Distribution:", locDist);
 
       setEvents(eventsWithParticipants);
       setParticipants(allParticipants);
@@ -203,6 +223,37 @@ export default function EventOverview({
       setError("Failed to fetch data. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNotifications = async (userId) => {
+    try {
+      // First check if we have a valid collection ID
+      if (!notificationsCollectionId) {
+        console.warn("Notifications collection ID is not configured");
+        return [];
+      }
+
+      const response = await databases.listDocuments(
+        databaseId,
+        notificationsCollectionId,
+        [
+          Query.equal("userId", userId),
+          Query.orderDesc("$createdAt"),
+          Query.limit(5),
+        ]
+      );
+      return response.documents;
+    } catch (error) {
+      // If collection doesn't exist, log warning and return empty array
+      if (error.code === 404) {
+        console.warn(
+          "Notifications collection not found - this feature might not be set up yet"
+        );
+        return [];
+      }
+      console.error("Error fetching notifications:", error);
+      return [];
     }
   };
 
@@ -245,14 +296,21 @@ export default function EventOverview({
     fetchUserAndData();
   }, []);
 
-  // Add debug logging for state changes
   useEffect(() => {
-    console.log("Events state updated:", events);
-  }, [events]);
+    const loadNotifications = async () => {
+      if (user?.$id) {
+        try {
+          const notifications = await fetchNotifications(user.$id);
+          setNotifications(notifications);
+        } catch (error) {
+          console.warn("Failed to load notifications:", error);
+          // Continue with the app even if notifications fail
+        }
+      }
+    };
 
-  useEffect(() => {
-    console.log("Participants state updated:", participants);
-  }, [participants]);
+    loadNotifications();
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = client.subscribe(
@@ -268,13 +326,23 @@ export default function EventOverview({
         ) {
           // Update the specific event in the local state
           const updatedEvent = response.payload;
-          setEvents((prevEvents) =>
-            prevEvents.map((event) =>
-              event.$id === updatedEvent.$id
-                ? { ...event, ...updatedEvent }
-                : event
-            )
-          );
+          setEvents((prevEvents) => {
+            // Check if the event already exists
+            const eventExists = prevEvents.some(event => event.$id === updatedEvent.$id);
+            
+            if (eventExists) {
+              // Update existing event
+              return prevEvents.map((event) =>
+                event.$id === updatedEvent.$id ? { ...event, ...updatedEvent } : event
+              );
+            } else {
+              // Add new event and maintain only 5 most recent
+              const newEvents = [updatedEvent, ...prevEvents]
+                .sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt))
+                .slice(0, 5);
+              return newEvents;
+            }
+          });
         }
       }
     );
@@ -286,15 +354,59 @@ export default function EventOverview({
 
   const getParticipantCounts = (eventId) => {
     const eventParticipants = participants.filter((p) => p.eventId === eventId);
-    console.log(
-      `Counting participants for event ${eventId}:`,
-      eventParticipants
-    );
+
+    // Count by participant type - handle both created and imported events
+    const studentCount = eventParticipants.filter(
+      (p) =>
+        p.participantType === "student" ||
+        p.participantType === "Student" ||
+        p.type === "student" ||
+        p.category === "student"
+    ).length;
+
+    const staffFacultyCount = eventParticipants.filter(
+      (p) =>
+        p.participantType === "staff" ||
+        p.participantType === "Staff" ||
+        p.type === "staff/faculty" ||
+        p.category === "staff" ||
+        p.category === "faculty"
+    ).length;
+
+    const communityCount = eventParticipants.filter(
+      (p) =>
+        p.participantType === "community" ||
+        p.participantType === "Community" ||
+        p.type === "community member" ||
+        p.category === "community"
+    ).length;
+
+    // Count by gender across all types
+    const maleCount = eventParticipants.filter((p) => p.sex === "Male").length;
+    const femaleCount = eventParticipants.filter(
+      (p) => p.sex === "Female"
+    ).length;
+    const totalCount = eventParticipants.length;
+
+    // Add debug logging
+    ("Event Participants:", {
+      eventId,
+      participants: eventParticipants,
+      studentCount,
+      staffFacultyCount,
+      communityCount,
+      maleCount,
+      femaleCount,
+      totalCount,
+    });
 
     return {
-      total: eventParticipants.length,
-      male: eventParticipants.filter((p) => p.sex === "Male").length,
-      female: eventParticipants.filter((p) => p.sex === "Female").length,
+      total: totalCount,
+      male: maleCount,
+      female: femaleCount,
+      students: studentCount,
+      staffFaculty: staffFacultyCount,
+      community: communityCount,
     };
   };
 
@@ -303,14 +415,42 @@ export default function EventOverview({
     let totalParticipants = 0;
     let maleParticipants = 0;
     let femaleParticipants = 0;
+    let studentParticipants = 0;
+    let staffParticipants = 0;
+    let communityParticipants = 0;
 
     events.forEach((event) => {
-      const participants = event.participants || [];
-      totalParticipants += participants.length;
-      maleParticipants += participants.filter((p) => p.sex === "Male").length;
-      femaleParticipants += participants.filter(
+      // Get all types of participants for this event
+      const eventStudents = participants.filter(
+        (p) => p.eventId === event.$id && p.participantType === "student"
+      );
+      const eventStaff = participants.filter(
+        (p) => p.eventId === event.$id && p.participantType === "staff"
+      );
+      const eventCommunity = participants.filter(
+        (p) => p.eventId === event.$id && p.participantType === "community"
+      );
+
+      // Combine all participants for this event
+      const allEventParticipants = [
+        ...eventStudents,
+        ...eventStaff,
+        ...eventCommunity,
+      ];
+
+      // Update totals
+      totalParticipants += allEventParticipants.length;
+      maleParticipants += allEventParticipants.filter(
+        (p) => p.sex === "Male"
+      ).length;
+      femaleParticipants += allEventParticipants.filter(
         (p) => p.sex === "Female"
       ).length;
+
+      // Update type counts
+      studentParticipants += eventStudents.length;
+      staffParticipants += eventStaff.length;
+      communityParticipants += eventCommunity.length;
     });
 
     return {
@@ -320,8 +460,11 @@ export default function EventOverview({
       totalParticipants,
       maleParticipants,
       femaleParticipants,
+      studentParticipants,
+      staffParticipants,
+      communityParticipants,
     };
-  }, [events]);
+  }, [events, participants]);
 
   const filteredEvents = events.filter((event) => {
     const searchableFields = [
@@ -338,7 +481,12 @@ export default function EventOverview({
 
   const sortedEvents = useMemo(() => {
     return [...filteredEvents].sort((a, b) => {
-      if (sortColumn === "default" || sortColumn === "eventDate") {
+      if (sortColumn === "updatedAt") {
+        // Sort by Appwrite's $updatedAt field
+        return sortDirection === "asc"
+          ? new Date(a.$updatedAt) - new Date(b.$updatedAt)
+          : new Date(b.$updatedAt) - new Date(a.$updatedAt);
+      } else if (sortColumn === "eventDate") {
         return sortDirection === "asc"
           ? new Date(a.eventDate) - new Date(b.eventDate)
           : new Date(b.eventDate) - new Date(a.eventDate);
@@ -351,15 +499,12 @@ export default function EventOverview({
         const bCount = getParticipantCounts(b.$id).total;
         return sortDirection === "asc" ? aCount - bCount : bCount - aCount;
       }
-      return 0;
+      // Default to sorting by updatedAt
+      return sortDirection === "asc"
+        ? new Date(a.$updatedAt) - new Date(b.$updatedAt)
+        : new Date(b.$updatedAt) - new Date(a.$updatedAt);
     });
   }, [filteredEvents, sortColumn, sortDirection, participants]);
-
-  const indexOfLastEvent = currentPage * eventsPerPage;
-  const indexOfFirstEvent = indexOfLastEvent - eventsPerPage;
-  const currentEvents = sortedEvents.slice(indexOfFirstEvent, indexOfLastEvent);
-
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleSort = (column) => {
     if (column === sortColumn) {
@@ -371,7 +516,7 @@ export default function EventOverview({
   };
 
   const resetSort = () => {
-    setSortColumn("default");
+    setSortColumn("updatedAt");
     setSortDirection("desc");
   };
 
@@ -379,32 +524,45 @@ export default function EventOverview({
     setActiveTab("createEvent");
   };
 
-  const renderEmptyState = () => {
-    return (
-      <Card className="w-full">
-        <CardHeader className="text-center">
-          <CardTitle>No Events Available</CardTitle>
-          <CardDescription>
-            There are no events in the current academic period
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center gap-4">
-          <Button onClick={() => setActiveTab("createEvent")}>
-            <Plus className="mr-2 h-4 w-4" /> Create Your First Event
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="h-px w-16 bg-gray-300" />
-            <span className="text-sm text-gray-500">or</span>
-            <div className="h-px w-16 bg-gray-300" />
-          </div>
-          <ImportEventData />
-        </CardContent>
-      </Card>
-    );
+  useEffect(() => {
+    const fetchAcademicPeriod = async () => {
+      try {
+        const response = await databases.listDocuments(
+          databaseId,
+          academicPeriodCollectionId,
+          [
+            Query.equal("isActive", true),
+            Query.orderDesc("$createdAt"),
+            Query.limit(1),
+          ]
+        );
+
+        if (response.documents.length > 0) {
+          setAcademicPeriod(response.documents[0]);
+        }
+      } catch (error) {
+        setError("Failed to fetch academic period");
+      }
+    };
+
+    fetchAcademicPeriod();
+  }, []);
+
+  const handleEventCreated = async (event) => {
+    try {
+      await fetchData();
+      toast.success("Event created successfully!");
+    } catch (error) {
+      toast.error("Error updating event list");
+    }
+  };
+
+  const handleError = (error) => {
+    toast.error(error.message || "Operation failed");
   };
 
   if (loading) {
-    return <LoadingAnimation message="Loading events..." />;
+    return <ColorfulSpinner size="md" className="mr-2" />;
   }
 
   if (error) {
@@ -463,77 +621,121 @@ export default function EventOverview({
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
+    <div className="space-y-6">
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Event Overview</CardTitle>
           <CardDescription>View and manage your events</CardDescription>
-          {currentAcademicPeriod && (
+          {academicPeriod ? (
             <div className="mt-2 text-sm text-muted-foreground">
-              Academic Period: {currentAcademicPeriod.schoolYear} -{" "}
-              {currentAcademicPeriod.periodType}
-              <br />
-              {format(
-                new Date(currentAcademicPeriod.startDate),
-                "MMM d, yyyy"
-              )}{" "}
-              - {format(new Date(currentAcademicPeriod.endDate), "MMM d, yyyy")}
+              <div>
+                Academic Period: {academicPeriod.schoolYear} -{" "}
+                {academicPeriod.periodType}
+              </div>
+              <div>
+                {format(new Date(academicPeriod.startDate), "MMM d, yyyy")} -{" "}
+                {format(new Date(academicPeriod.endDate), "MMM d, yyyy")}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 text-sm text-muted-foreground">
+              No active academic period found
             </div>
           )}
         </CardHeader>
-        <CardContent>
-          {events.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p className="text-lg">
-                No events found in the current academic period
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div>
-                <h3 className="text-lg font-semibold">Total Events</h3>
-                <p className="text-3xl font-bold">{summaryStats.total}</p>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Academic Events</h3>
-                <p className="text-3xl font-bold">{summaryStats.academic}</p>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Non-Academic Events</h3>
-                <p className="text-3xl font-bold">{summaryStats.nonAcademic}</p>
-              </div>
-            </div>
-          )}
-          <div className="mt-4 text-center">
-            <h3 className="text-lg font-semibold">Total Participants</h3>
-            <p className="text-3xl font-bold">
-              {summaryStats.totalParticipants}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              (Male: {summaryStats.maleParticipants} | Female:{" "}
-              {summaryStats.femaleParticipants})
-            </p>
-          </div>
-        </CardContent>
       </Card>
-      <div className="flex justify-between items-center">
-        <Button variant="outline" onClick={resetSort}>
-          <RotateCcw className="mr-2 h-4 w-4" />
-          Reset Sort
-        </Button>
-        <Select
-          value={`${eventsPerPage}`}
-          onValueChange={(value) => setEventsPerPage(Number(value))}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Events per page" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="5">5 per page</SelectItem>
-            <SelectItem value="10">10 per page</SelectItem>
-            <SelectItem value="15">15 per page</SelectItem>
-          </SelectContent>
-        </Select>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+          <CardHeader className="pb-2">
+            <div className="flex items-center space-x-2">
+              <CalendarDays className="h-5 w-5 opacity-80" />
+              <CardTitle className="text-lg font-medium opacity-80">
+                Total Events
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center">
+              <div className="text-3xl font-bold">{summaryStats.total}</div>
+              <div className="p-2 bg-blue-400 rounded-full">
+                <CalendarDays className="h-6 w-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
+          <CardHeader className="pb-2">
+            <div className="flex items-center space-x-2">
+              <BookOpen className="h-5 w-5 opacity-80" />
+              <CardTitle className="text-lg font-medium opacity-80">
+                Academic Events
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center">
+              <div className="text-3xl font-bold">{summaryStats.academic}</div>
+              <div className="p-2 bg-green-400 rounded-full">
+                <BookOpen className="h-6 w-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+          <CardHeader className="pb-2">
+            <div className="flex items-center space-x-2">
+              <Music className="h-5 w-5 opacity-80" />
+              <CardTitle className="text-lg font-medium opacity-80">
+                Non-Academic Events
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center">
+              <div className="text-3xl font-bold">
+                {summaryStats.nonAcademic}
+              </div>
+              <div className="p-2 bg-purple-400 rounded-full">
+                <Music className="h-6 w-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+          <CardHeader className="pb-2">
+            <div className="flex items-center space-x-2">
+              <UsersRound className="h-5 w-5 opacity-80" />
+              <CardTitle className="text-lg font-medium opacity-80">
+                Total Participants
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col">
+              <div className="flex justify-between items-center">
+                <div className="text-3xl font-bold">
+                  {summaryStats.totalParticipants}
+                </div>
+                <div className="p-2 bg-orange-400 rounded-full">
+                  <UsersRound className="h-6 w-6" />
+                </div>
+              </div>
+              <div className="text-xs mt-2 opacity-80">
+                Male: {summaryStats.maleParticipants} | Female:{" "}
+                {summaryStats.femaleParticipants}
+              </div>
+              <div className="text-xs mt-1 opacity-80">
+                Students: {summaryStats.studentParticipants} | Staff:{" "}
+                {summaryStats.staffParticipants} | Community:{" "}
+                {summaryStats.communityParticipants}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Table>
@@ -553,6 +755,13 @@ export default function EventOverview({
               </Button>
             </TableHead>
             <TableHead>Location</TableHead>
+            <TableHead>Source</TableHead>
+            <TableHead>
+              <Button variant="ghost" onClick={() => handleSort("$createdAt")}>
+                Created At
+                <ArrowUpDown className="ml-2 h-4 w-4" />
+              </Button>
+            </TableHead>
             <TableHead className="text-right">
               <Button
                 variant="ghost"
@@ -565,15 +774,15 @@ export default function EventOverview({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {currentEvents.map((event) => {
-            const eventParticipants = event.participants || [];
-            const maleCount = eventParticipants.filter(
-              (p) => p.sex === "Male"
-            ).length;
-            const femaleCount = eventParticipants.filter(
-              (p) => p.sex === "Female"
-            ).length;
-            const totalCount = eventParticipants.length;
+          {sortedEvents.map((event) => {
+            const {
+              total: totalCount,
+              male: maleCount,
+              female: femaleCount,
+              students: studentCount,
+              staffFaculty: staffFacultyCount,
+              community: communityCount,
+            } = getParticipantCounts(event.$id);
 
             return (
               <TableRow key={event.$id}>
@@ -582,12 +791,64 @@ export default function EventOverview({
                   {format(parseISO(event.eventDate), "MMMM d, yyyy")}
                 </TableCell>
                 <TableCell>{event.eventVenue}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {event.source === "imported" ? (
+                      <Upload className="h-4 w-4 text-blue-500" />
+                    ) : (
+                      <Plus className="h-4 w-4 text-green-500" />
+                    )}
+                    <span className="capitalize">
+                      {event.source || "created"}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span className="text-sm">
+                      {format(parseISO(event.$createdAt), "MMM d, yyyy h:mm a")}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(parseISO(event.$createdAt), { addSuffix: true })}
+                    </span>
+                  </div>
+                </TableCell>
                 <TableCell className="text-center">
                   <div className="flex flex-col items-center">
-                    <div>Total: {totalCount}</div>
-                    <div className="text-sm text-muted-foreground">
-                      <span className="text-blue-600">{maleCount}</span>/
-                      <span className="text-pink-600">{femaleCount}</span>
+                    <div className="font-medium">Total: {totalCount}</div>
+                    <div className="text-sm">
+                      <span className="text-blue-600 font-medium">
+                        {maleCount}
+                      </span>
+                      <span className="mx-1">/</span>
+                      <span className="text-pink-600 font-medium">
+                        {femaleCount}
+                      </span>
+                    </div>
+                    <div className="text-xs space-x-1 text-muted-foreground">
+                      <span
+                        title="Students"
+                        className="inline-flex items-center"
+                      >
+                        <GraduationCap className="h-3 w-3 mr-0.5" />
+                        {studentCount}
+                      </span>
+                      <span>|</span>
+                      <span
+                        title="Staff/Faculty"
+                        className="inline-flex items-center"
+                      >
+                        <Users className="h-3 w-3 mr-0.5" />
+                        {staffFacultyCount}
+                      </span>
+                      <span>|</span>
+                      <span
+                        title="Community"
+                        className="inline-flex items-center"
+                      >
+                        <UsersRound className="h-3 w-3 mr-0.5" />
+                        {communityCount}
+                      </span>
                     </div>
                   </div>
                 </TableCell>
@@ -596,36 +857,6 @@ export default function EventOverview({
           })}
         </TableBody>
       </Table>
-      <Pagination>
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
-              onClick={() => paginate(currentPage - 1)}
-              disabled={currentPage === 1}
-            />
-          </PaginationItem>
-          {Array.from({
-            length: Math.ceil(sortedEvents.length / eventsPerPage),
-          }).map((_, index) => (
-            <PaginationItem key={index}>
-              <PaginationLink
-                onClick={() => paginate(index + 1)}
-                isActive={currentPage === index + 1}
-              >
-                {index + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-          <PaginationItem>
-            <PaginationNext
-              onClick={() => paginate(currentPage + 1)}
-              disabled={
-                currentPage === Math.ceil(sortedEvents.length / eventsPerPage)
-              }
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
     </div>
   );
 }
