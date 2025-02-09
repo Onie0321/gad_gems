@@ -6,7 +6,7 @@ import {
   eventCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
-  participantCollectionId,
+  studentsCollectionId,
   getCurrentUser,
 } from "@/lib/appwrite";
 
@@ -347,40 +347,7 @@ export const importEventAndParticipants = async (file, academicPeriodId) => {
   try {
     const data = await handleFileChange(file);
     const currentUser = await getCurrentUser();
-
-    if (!currentUser) {
-      throw new Error("No authenticated user found");
-    }
-
-    const eventData = formatEventData(data.eventMetadata);
-
-    // Ensure numberOfHours is properly formatted before saving
-    if (!eventData.numberOfHours || eventData.numberOfHours.includes('NaN')) {
-      eventData.numberOfHours = '0 hours 0 minutes';
-    }
-
-    // Create event with academicPeriodId
     const eventId = ID.unique();
-    const eventDataToSave = {
-      eventName: eventData.eventName,
-      eventDate: eventData.eventDate,
-      eventTimeFrom: eventData.eventTimeFrom,
-      eventTimeTo: eventData.eventTimeTo,
-      eventVenue: eventData.eventVenue,
-      eventType: eventData.eventType,
-      eventCategory: eventData.eventCategory,
-      numberOfHours: eventData.numberOfHours,
-      participants: [],
-      createdBy: currentUser.$id,
-      showOnHomepage: false,
-      isArchived: false,
-      academicPeriodId: academicPeriodId, // Make sure this is set
-      archivedAt: '',
-      createdAt: new Date().toISOString(),
-      source: 'imported'
-    };
-
-    // Create participants first to get their IDs
     const participantIds = [];
 
     // Create student participants
@@ -405,7 +372,7 @@ export const importEventAndParticipants = async (file, academicPeriodId) => {
 
       await databases.createDocument(
         databaseId,
-        participantCollectionId,
+        studentsCollectionId,
         participantId,
         participantData
       );
@@ -466,10 +433,26 @@ export const importEventAndParticipants = async (file, academicPeriodId) => {
       participantIds.push(`community_${memberId}`);
     }
 
-    // Update event data with participant IDs array
-    eventData.participants = participantIds;
+    // Create the event with the formatted participant IDs
+    const eventDataToSave = {
+      eventName: data.eventMetadata.eventName,
+      eventDate: data.eventMetadata.eventDate,
+      eventTimeFrom: data.eventMetadata.eventTimeFrom,
+      eventTimeTo: data.eventMetadata.eventTimeTo,
+      eventVenue: data.eventMetadata.eventVenue,
+      eventType: data.eventMetadata.eventType,
+      eventCategory: data.eventMetadata.eventCategory,
+      numberOfHours: data.eventMetadata.numberOfHours,
+      participants: participantIds, // Array of formatted participant IDs
+      createdBy: currentUser.$id,
+      showOnHomepage: false,
+      isArchived: false,
+      academicPeriodId: academicPeriodId,
+      archivedAt: '',
+      createdAt: new Date().toISOString(),
+      source: 'imported'
+    };
 
-    // Create the event with all participants
     const createdEvent = await databases.createDocument(
       databaseId,
       eventCollectionId,

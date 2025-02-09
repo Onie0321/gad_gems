@@ -37,7 +37,7 @@ import {
 import {
   databases,
   databaseId,
-  participantCollectionId,
+  studentsCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
 } from "@/lib/appwrite";
@@ -82,7 +82,7 @@ export function DetailedAnalysis({
         try {
           const [participantsResponse, staffResponse, communityResponse] =
             await Promise.all([
-              databases.listDocuments(databaseId, participantCollectionId),
+              databases.listDocuments(databaseId, studentsCollectionId),
               databases.listDocuments(databaseId, staffFacultyCollectionId),
               databases.listDocuments(databaseId, communityCollectionId),
             ]);

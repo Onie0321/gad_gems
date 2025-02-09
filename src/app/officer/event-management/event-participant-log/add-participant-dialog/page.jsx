@@ -48,7 +48,7 @@ import {
 } from "@/lib/appwrite";
 import { toast } from "react-toastify";
 import { debounce } from 'lodash';
-import { databases, databaseId, participantCollectionId } from "@/lib/appwrite";
+import { databases, databaseId, studentsCollectionId } from "@/lib/appwrite";
 import { Query } from "appwrite";
 
 const AddParticipant = ({

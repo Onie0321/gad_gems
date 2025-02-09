@@ -33,7 +33,7 @@ import {
   databases,
   userCollectionId,
   eventCollectionId,
-  participantCollectionId,
+  studentsCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
   getCurrentAcademicPeriod,
@@ -161,7 +161,7 @@ export default function AdminDashboard() {
               Query.limit(100),
             ]),
             // Fetch students
-            databases.listDocuments(databaseId, participantCollectionId, [
+            databases.listDocuments(databaseId, studentsCollectionId, [
               Query.limit(100),
             ]),
             // Fetch staff/faculty

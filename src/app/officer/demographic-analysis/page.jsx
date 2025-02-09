@@ -55,7 +55,7 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  participantCollectionId,
+  studentsCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
   academicPeriodCollectionId,

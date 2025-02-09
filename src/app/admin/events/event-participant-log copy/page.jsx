@@ -32,7 +32,7 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  participantCollectionId,
+  studentsCollectionId,
   userCollectionId,
   client,
   getCurrentAcademicPeriod,
@@ -79,7 +79,7 @@ export default function EventParticipantLog() {
 
     // Subscribe to participant changes
     const participantUnsubscribe = client.subscribe(
-      `databases.${databaseId}.collections.${participantCollectionId}.documents`,
+      `databases.${databaseId}.collections.${studentsCollectionId}.documents`,
       (response) => {
         console.log("Participant update received:", response);
         fetchData(); // Refresh all data when any participant changes
@@ -119,7 +119,7 @@ export default function EventParticipantLog() {
       // Fetch all participants for these events in one query
       const allParticipantsResponse = await databases.listDocuments(
         databaseId,
-        participantCollectionId,
+        studentsCollectionId,
         [Query.equal("isArchived", false), Query.equal("eventId", eventIds)]
       );
 
@@ -225,7 +225,7 @@ export default function EventParticipantLog() {
       // Create the new participant document
       const response = await databases.createDocument(
         databaseId,
-        participantCollectionId,
+        studentsCollectionId,
         ID.unique(),
         {
           ...newParticipant,

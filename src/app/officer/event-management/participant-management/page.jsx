@@ -87,7 +87,7 @@ import {
   checkDuplicateParticipant,
   databases,
   databaseId,
-  participantCollectionId,
+  studentsCollectionId,
   eventCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
@@ -240,7 +240,7 @@ export default function ParticipantManagement({
       // Fetch participants from all collections
       const [studentsResponse, staffResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, participantCollectionId, [
+          databases.listDocuments(databaseId, studentsCollectionId, [
             Query.equal("eventId", eventId),
           ]),
           databases.listDocuments(databaseId, staffFacultyCollectionId, [
@@ -499,7 +499,7 @@ export default function ParticipantManagement({
 
       switch (participantType) {
         case "student":
-          collectionId = participantCollectionId;
+          collectionId = studentsCollectionId;
           participantToAdd = {
             ...baseParticipantData,
             studentId: cleanedData.studentId || "",
@@ -530,16 +530,35 @@ export default function ParticipantManagement({
       console.log("Using collection ID:", collectionId);
 
       // Create the participant document
+      const participantId = ID.unique();
       const response = await databases.createDocument(
         databaseId,
         collectionId,
-        ID.unique(),
+        participantId,
         participantToAdd
       );
 
-      console.log("Database response:", response);
-
       if (response) {
+        // Format the participant ID with type prefix
+        const formattedParticipantId = `${participantType}_${participantId}`;
+
+        // Get current event
+        const event = await databases.getDocument(
+          databaseId,
+          eventCollectionId,
+          currentEventId
+        );
+
+        // Update event's participants array
+        await databases.updateDocument(
+          databaseId,
+          eventCollectionId,
+          currentEventId,
+          {
+            participants: [...(event.participants || []), formattedParticipantId]
+          }
+        );
+
         toast.success("Participant added successfully!");
         setParticipantData(getInitialParticipantData(participantType));
         setErrors({});
@@ -606,7 +625,7 @@ export default function ParticipantManagement({
       let collectionId;
       switch (editedParticipant.type) {
         case "student":
-          collectionId = participantCollectionId;
+          collectionId = studentsCollectionId;
           break;
         case "staff":
           collectionId = staffFacultyCollectionId;
@@ -668,7 +687,7 @@ export default function ParticipantManagement({
       let collectionId;
       switch (participantType) {
         case "student":
-          collectionId = participantCollectionId;
+          collectionId = studentsCollectionId;
           break;
         case "staff":
           collectionId = staffFacultyCollectionId;
@@ -707,32 +726,36 @@ export default function ParticipantManagement({
         case "student":
           if (field === "studentId" && value) {
             const formattedId = formatStudentId(value);
-
-            // Debounced validation for incomplete student ID
+            
+            // Only show validation error if ID is not in correct format
+            const isValidFormat = /^\d{2}-\d{2}-\d{4}$/.test(formattedId);
+            
+            // Debounced validation for student ID
             const debouncedValidation = debounce(async () => {
-              // Check for duplicate student ID first
-              const { error: idError, participant: existingStudent } =
-                await checkDuplicates(
-                  "studentId",
-                  formattedId,
-                  currentEventId,
-                  participantType
-                );
+              // Only check for duplicates if format is valid
+              if (isValidFormat) {
+                const { error: idError, participant: existingStudent } =
+                  await checkDuplicates(
+                    "studentId",
+                    formattedId,
+                    currentEventId,
+                    participantType
+                  );
 
-              if (idError) {
-                setDuplicateErrors((prev) => ({ ...prev, studentId: idError }));
-              } else if (!existingStudent) {
-                if (!isStudentIdComplete(formattedId)) {
-                  setErrors((prev) => ({
-                    ...prev,
-                    studentId: "Please enter a complete Student ID",
-                  }));
+                if (idError) {
+                  setDuplicateErrors((prev) => ({ ...prev, studentId: idError }));
+                } else if (existingStudent) {
+                  setAutofillData(existingStudent);
+                  setShowAutofillDialog(true);
                 } else {
                   setSuccessMessage("This Student ID is available");
                 }
-              } else {
-                setAutofillData(existingStudent);
-                setShowAutofillDialog(true);
+              } else if (value && !isValidFormat) {
+                // Only show format error if there's a value and format is invalid
+                setErrors((prev) => ({
+                  ...prev,
+                  studentId: "Please enter a complete Student ID (00-00-0000)",
+                }));
               }
             }, 1000);
 

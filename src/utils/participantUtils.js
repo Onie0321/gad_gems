@@ -5,7 +5,7 @@ import {
   fetchParticipantData,
   databases,
   databaseId,
-  participantCollectionId,
+  studentsCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
 } from "@/lib/appwrite";
@@ -212,7 +212,7 @@ export const checkDuplicates = async (field, value, currentEventId, participantT
 
     switch (participantType) {
       case "student":
-        collectionId = participantCollectionId;
+        collectionId = studentsCollectionId;
         query = field === "studentId" ? 
           Query.equal("studentId", value) : 
           Query.equal("name", value);
@@ -570,7 +570,7 @@ export const checkDuplicateParticipantInEvent = async (
   try {
     const participants = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [
         Query.notEqual("eventId", eventId),
         type === "student"

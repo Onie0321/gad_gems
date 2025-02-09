@@ -7,7 +7,7 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  participantCollectionId,
+  studentsCollectionId,
   getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
@@ -97,7 +97,7 @@ export default function EventAnalysis() {
       // Fetch all participants in one query
       const participantsResponse = await databases.listDocuments(
         databaseId,
-        participantCollectionId,
+        studentsCollectionId,
         [
           Query.equal("isArchived", false),
           Query.equal("eventId", eventIds),

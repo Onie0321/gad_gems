@@ -49,15 +49,33 @@ export default function SignInPage() {
     setIsMounted(true);
     const checkSession = async () => {
       try {
+        // Show loading state immediately
+        setLoading(true);
+        
+        // Check localStorage first for a faster initial check
+        const wasLoggedOut = localStorage.getItem('wasLoggedOut') === 'true';
+        if (wasLoggedOut) {
+          setLoading(false);
+          return;
+        }
+
         const user = await getCurrentUser();
         if (user && user.role !== "guest" && !isRedirected) {
-          handleUserStatus(user);
-          setIsRedirected(true);
+          if (user.approvalStatus === 'approved') {
+            const redirectPath = user.role === 'admin' ? '/admin' : '/officer';
+            // Use replace instead of push for smoother transition
+            router.replace(redirectPath + '?login=success');
+            setIsRedirected(true);
+          }
         }
       } catch (error) {
         console.error("Error checking existing session:", error);
+      } finally {
+        setLoading(false);
       }
     };
+
+    // Run check immediately
     checkSession();
   }, [isRedirected]);
 
@@ -189,6 +207,7 @@ export default function SignInPage() {
     }
   };
 
+  // Don't render anything while checking session
   if (loading) {
     return null; // Let the layout handle loading state
   }
