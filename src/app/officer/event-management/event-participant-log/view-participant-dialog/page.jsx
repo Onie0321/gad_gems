@@ -19,7 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import EditParticipantDialog from "./edit-participant-dialog/page";
 import AddParticipant from "../add-participant-dialog/page";
-import { databases, databaseId, participantCollectionId, staffFacultyCollectionId, communityCollectionId } from "@/lib/appwrite";
+import {
+  databases,
+  databaseId,
+  studentsCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
+} from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { Loader2 } from "lucide-react";
 
@@ -60,7 +66,7 @@ const ViewParticipants = ({
         const [studentsResponse, staffResponse, communityResponse] = await Promise.all([
           databases.listDocuments(
             databaseId,
-            participantCollectionId,
+            studentsCollectionId,
             [
               Query.equal("eventId", selectedEvent.$id),
               Query.equal("isArchived", false) // Add this if needed

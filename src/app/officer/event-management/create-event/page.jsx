@@ -41,6 +41,7 @@ import {
   checkDuplicateEvent,
   checkTimeConflict,
   getCurrentAcademicPeriod,
+  studentsCollectionId,
 } from "@/lib/appwrite";
 import { schoolOptions, getNonAcademicCategories } from "@/utils/eventUtils";
 import { useTabContext } from "@/context/TabContext"; // Import the context hook

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { databases, databaseId, participantCollectionId } from "@/lib/appwrite";
+import { databases, databaseId, studentsCollectionId } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import debounce from "lodash/debounce";
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
@@ -29,7 +29,7 @@ export default function AdvancedSearch({ onFilterChange }) {
 
       const response = await databases.listDocuments(
         databaseId,
-        participantCollectionId,
+        studentsCollectionId,
         queries
       );
 

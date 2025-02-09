@@ -22,8 +22,6 @@ export const userCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID;
 export const eventCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID;
-export const participantCollectionId =
-  process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID;
 export const studentsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID;
 export const questionsCollectionId =
@@ -449,7 +447,7 @@ export const getParticipants = async (eventId = null, userId = null) => {
 
     const response = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       query
     );
 
@@ -619,7 +617,7 @@ export const createParticipant = async (participantData) => {
 
     const response = await databases.createDocument(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       ID.unique(),
       participantData
     );
@@ -646,7 +644,7 @@ export async function getAllEventsAndParticipants() {
     // Then fetch all participants
     const participantsResponse = await databases.listDocuments(
       databaseId,
-      participantCollectionId
+      studentsCollectionId
     );
 
     return {
@@ -663,7 +661,7 @@ export const updateParticipant = async (participantId, updatedData) => {
   try {
     const response = await databases.updateDocument(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       participantId,
       updatedData
     );
@@ -722,7 +720,7 @@ export const deleteParticipant = async (participantId, userId) => {
     // Fetch the participant to check ownership
     const participant = await databases.getDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
-      process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID,
       participantId
     );
 
@@ -737,7 +735,7 @@ export const deleteParticipant = async (participantId, userId) => {
     // Proceed with deletion
     await databases.deleteDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
-      process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID,
       participantId
     );
 
@@ -752,7 +750,7 @@ export async function getParticipantByStudentId(studentId) {
   try {
     const response = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [Query.equal("studentId", studentId)]
     );
 
@@ -788,7 +786,7 @@ export async function fetchParticipantData(
   }
 
   try {
-    // For students, we only need to check the participantCollectionId
+    // For students, we only need to check the studentsCollectionId
     const query = [
       Query.equal(
         participantType === "student"
@@ -803,13 +801,13 @@ export async function fetchParticipantData(
 
     console.log("Querying with:", {
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       query,
     });
 
     const response = await databases.listDocuments(
       databaseId,
-      participantCollectionId, // Always use participantCollectionId for all types
+      studentsCollectionId, // Always use studentsCollectionId for all types
       query
     );
 
@@ -869,7 +867,7 @@ export const checkDuplicateParticipant = async (eventId, identifier) => {
   try {
     const response = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [Query.equal("eventId", eventId), Query.equal("$id", identifier)]
     );
 
@@ -955,7 +953,7 @@ export async function fetchTrendData(startDate, endDate) {
 
     const participants = await Promise.all(
       events.documents.map((event) =>
-        databases.listDocuments(databaseId, participantCollectionId, [
+        databases.listDocuments(databaseId, studentsCollectionId, [
           Query.equal("eventId", event.$id),
         ])
       )
@@ -1052,7 +1050,7 @@ export async function fetchReportData() {
     const events = await databases.listDocuments(databaseId, eventCollectionId);
     const participants = await databases.listDocuments(
       databaseId,
-      participantCollectionId
+      studentsCollectionId
     );
 
     return {
@@ -1800,7 +1798,7 @@ export const fetchTotals = async (academicPeriodId) => {
     if (eventIds.length > 0) {
       const participantsResponse = await databases.listDocuments(
         databaseId,
-        participantCollectionId,
+        studentsCollectionId,
         [Query.equal("eventId", eventIds), Query.equal("isArchived", false)]
       );
       participants = participantsResponse.documents;
@@ -1987,7 +1985,7 @@ export const listEvents = async () => {
         try {
           const participants = await databases.listDocuments(
             databaseId,
-            participantCollectionId,
+            studentsCollectionId,
             [
               Query.equal("eventId", event.$id),
               Query.limit(100), // Adjust limit as needed
@@ -2209,7 +2207,7 @@ export const archiveCurrentPeriodData = async (oldPeriodId, newPeriodId) => {
     // Archive events and participants
     const [eventsResponse, participantsResponse] = await Promise.all([
       databases.listDocuments(databaseId, eventCollectionId),
-      databases.listDocuments(databaseId, participantCollectionId, [
+      databases.listDocuments(databaseId, studentsCollectionId, [
         Query.equal("isArchived", false),
       ]),
     ]);
@@ -2228,7 +2226,7 @@ export const archiveCurrentPeriodData = async (oldPeriodId, newPeriodId) => {
       (participant) =>
         databases.updateDocument(
           databaseId,
-          participantCollectionId,
+          studentsCollectionId,
           participant.$id,
           {
             isArchived: true,
@@ -2362,7 +2360,7 @@ export const fetchEventParticipants = async (eventIds, academicPeriodId) => {
   try {
     const participantsResponse = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [
         Query.equal("isArchived", false),
         Query.equal("academicPeriodId", academicPeriodId),
@@ -2417,7 +2415,7 @@ export const fetchEventOverviewData = async (userId) => {
     // Fetch participants with createdBy filter
     const participantsResponse = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [
         Query.equal("academicPeriodId", currentPeriod.$id),
         Query.equal("eventId", eventIds),
@@ -2474,7 +2472,7 @@ export const fetchEventLogData = async (userId) => {
 
     const participantsResponse = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [
         Query.equal("isArchived", false),
         Query.equal("academicPeriodId", currentPeriod.$id),
@@ -2509,7 +2507,7 @@ export const fetchEventParticipantLogData = async () => {
       communityResponse,
     ] = await Promise.all([
       databases.listDocuments(databaseId, eventCollectionId),
-      databases.listDocuments(databaseId, participantCollectionId, [
+      databases.listDocuments(databaseId, studentsCollectionId, [
         Query.equal("isArchived", false),
       ]),
       databases.listDocuments(databaseId, staffFacultyCollectionId),

@@ -30,7 +30,7 @@ import {
   databaseId,
   academicPeriodCollectionId,
   eventCollectionId,
-  participantCollectionId,
+  studentsCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 
@@ -86,7 +86,7 @@ export default function Archives() {
         eventsResponse.documents.map(async (event) => {
           const participantsResponse = await databases.listDocuments(
             databaseId,
-            participantCollectionId,
+            studentsCollectionId,
             [
               Query.equal("eventId", event.$id),
               Query.equal("isArchived", true),

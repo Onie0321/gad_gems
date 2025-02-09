@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search } from 'lucide-react';
-import { getEvents, getParticipants, databases, databaseId, eventCollectionId, participantCollectionId } from "@/lib/appwrite";
+import { getEvents, getParticipants, databases, databaseId, eventCollectionId, studentsCollectionId } from "@/lib/appwrite";
 import { Query } from 'appwrite';
 
 const schools = [
@@ -49,9 +49,10 @@ export function SchoolsSection() {
       // Fetch participants for the selected school
       const participantsResponse = await databases.listDocuments(
         databaseId,
-        participantCollectionId, // your participants collection ID
+        studentsCollectionId, // your participants collection ID
         [Query.equal('school', schoolCode)]
       );
+
 
       setEvents(eventsResponse.documents);
       setParticipants(participantsResponse.documents);

@@ -29,20 +29,18 @@ import {
   updateParticipant,
   deleteParticipant,
   getCurrentAcademicPeriod,
+  databases,
+  databaseId,
+  eventCollectionId,
+  studentsCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
 } from "@/lib/appwrite";
 import EditEvent from "./edit-event-dialog/page";
 import ViewParticipants from "./view-participant-dialog/page";
 import ExportEventsButton from "./export-event/page";
 import GenerateReportButton from "./import-event/page";
 import { Query } from "appwrite";
-import { databases } from "@/lib/appwrite";
-import {
-  databaseId,
-  eventCollectionId,
-  participantCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
 import { ColorfulSpinner } from "@/components/ui/loader";
 import { NetworkStatus } from "@/components/ui/network-status";
 
@@ -168,10 +166,9 @@ export default function EventParticipantLog() {
 
       if (!currentPeriod) {
         throw new Error("No active academic period found");
-        return;
       }
 
-      // First fetch events
+      // Fetch events
       const eventsResponse = await databases.listDocuments(
         databaseId,
         eventCollectionId,
@@ -194,10 +191,10 @@ export default function EventParticipantLog() {
       // Get all event IDs
       const eventIds = eventsResponse.documents.map((event) => event.$id);
 
-      // Fetch participants, staffFaculty, and community members for all events
-      const [participantsResponse, staffFacultyResponse, communityResponse] =
+      // Fetch participants for all events
+      const [studentsResponse, staffFacultyResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, participantCollectionId, [
+          databases.listDocuments(databaseId, studentsCollectionId, [
             Query.equal("eventId", eventIds),
             Query.equal("isArchived", false),
             Query.equal("createdBy", user.$id),
@@ -216,7 +213,7 @@ export default function EventParticipantLog() {
 
       // Set the state with the fetched data
       setEvents(eventsResponse.documents);
-      setParticipants(participantsResponse.documents);
+      setParticipants(studentsResponse.documents);
       setStaffFaculty(staffFacultyResponse.documents);
       setCommunity(communityResponse.documents);
     } catch (err) {
@@ -458,7 +455,7 @@ export default function EventParticipantLog() {
       // Update the participant in the database
       const response = await databases.updateDocument(
         databaseId,
-        participantCollectionId,
+        studentsCollectionId,
         editedParticipant.$id,
         editedParticipant
       );
