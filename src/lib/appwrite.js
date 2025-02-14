@@ -5,7 +5,6 @@ import {
   Databases,
   ID,
   Query,
-  Realtime,
   Storage,
   Permission,
   Role,
@@ -13,9 +12,15 @@ import {
   RealtimeResponseEvent,
 } from "appwrite";
 
-export const client = new Client()
-  .setEndpoint("https://cloud.appwrite.io/v1")
-  .setProject("670e7a740019d9d38739");
+const client = new Client()
+  .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
+  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+
+export const account = new Account(client);
+export const databases = new Databases(client);
+
+// Export the client for realtime subscriptions
+export { client };
 
 export const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID;
 export const userCollectionId =
@@ -48,35 +53,9 @@ export const communityCollectionId =
 export const academicPeriodCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_ACADEMIC_PERIOD_COLLECTION_ID;
 
-export const account = new Account(client);
 //const avatars = new Avatars(client);
-export const databases = new Databases(client);
 export const storage = new Storage(client);
 export const teams = new Teams(client);
-
-export async function createGoogleUser(userId, email, name) {
-  try {
-    // Create the user document in the database
-    const newUser = await databases.createDocument(
-      databaseId,
-      userCollectionId,
-      userId,
-      {
-        email: email,
-        name: name,
-        role: "user", // Default role for Google sign-ins
-      }
-    );
-
-    return newUser;
-  } catch (error) {
-    console.error("Error creating Google user:", error.message);
-    throw new Error("Error creating Google user");
-  }
-}
-// src/lib/appwrite.js
-
-// ... other imports and configurations ...
 
 export const updateUserFirstLogin = async (userId) => {
   try {
@@ -149,12 +128,15 @@ export async function createUser(email, password, name, role = "user") {
 
 export async function getAllUsers(email) {
   try {
+    console.log("Checking for existing user with email:", email);
     const response = await databases.listDocuments(
       databaseId,
       userCollectionId,
       [Query.equal("email", email)]
     );
-    return response.documents.length > 0;
+
+    console.log("Database response:", response);
+    return response.total > 0;
   } catch (error) {
     console.error("Error checking existing users:", error);
     throw error;
@@ -1002,10 +984,11 @@ function processAgeData(participants) {
   };
 
   participants.forEach((participant) => {
-    const age = participant.age;
-    const sex = participant.sex;
-    let ageGroup;
+    const age = parseInt(participant.age);
+    const sex = participant.sex?.toLowerCase() || "unknown";
+    if (isNaN(age)) return; // Skip if age is not a valid number
 
+    let ageGroup;
     if (age < 18) ageGroup = "Below 18";
     else if (age <= 24) ageGroup = "18-24";
     else if (age <= 34) ageGroup = "25-34";
@@ -1013,15 +996,17 @@ function processAgeData(participants) {
     else if (age <= 54) ageGroup = "45-54";
     else ageGroup = "Above 55";
 
-    ageGroups[ageGroup][sex.toLowerCase()]++;
+    if (sex === "male") ageGroups[ageGroup].male++;
+    else if (sex === "female") ageGroups[ageGroup].female++;
     ageGroups[ageGroup].total++;
   });
 
+  // Convert to array format for the chart
   return Object.entries(ageGroups).map(([name, counts]) => ({
     name,
+    value: counts.total,
     male: counts.male,
     female: counts.female,
-    total: counts.total,
   }));
 }
 
@@ -1704,6 +1689,7 @@ const calculateSexDistribution = (participants) => {
 };
 
 const calculateAgeDistribution = (participants) => {
+  // Initialize age groups with counts
   const ageGroups = {
     "Below 18": { male: 0, female: 0, total: 0 },
     "18-24": { male: 0, female: 0, total: 0 },
@@ -1713,11 +1699,13 @@ const calculateAgeDistribution = (participants) => {
     "Above 55": { male: 0, female: 0, total: 0 },
   };
 
+  // Count participants in each age group
   participants.forEach((participant) => {
-    const age = participant.age;
-    const sex = participant.sex;
-    let ageGroup;
+    const age = parseInt(participant.age);
+    const sex = participant.sex?.toLowerCase() || "unknown";
+    if (isNaN(age)) return; // Skip if age is not a valid number
 
+    let ageGroup;
     if (age < 18) ageGroup = "Below 18";
     else if (age <= 24) ageGroup = "18-24";
     else if (age <= 34) ageGroup = "25-34";
@@ -1725,15 +1713,17 @@ const calculateAgeDistribution = (participants) => {
     else if (age <= 54) ageGroup = "45-54";
     else ageGroup = "Above 55";
 
-    ageGroups[ageGroup][sex.toLowerCase()]++;
+    if (sex === "male") ageGroups[ageGroup].male++;
+    else if (sex === "female") ageGroups[ageGroup].female++;
     ageGroups[ageGroup].total++;
   });
 
+  // Convert to array format for the chart
   return Object.entries(ageGroups).map(([name, counts]) => ({
     name,
+    value: counts.total,
     male: counts.male,
     female: counts.female,
-    total: counts.total,
   }));
 };
 
@@ -1741,8 +1731,8 @@ const calculateLocationDistribution = (participants) => {
   const locations = {};
 
   participants.forEach((participant) => {
-    const location = participant.homeAddress || "Not Specified";
-    const sex = participant.sex.toLowerCase();
+    const location = participant.address || "Not Specified";
+    const sex = participant.sex?.toLowerCase() || "unknown";
 
     // Clean up the location string and capitalize first letter of each word
     const formattedLocation = location
@@ -1757,21 +1747,22 @@ const calculateLocationDistribution = (participants) => {
       locations[formattedLocation] = {
         male: 0,
         female: 0,
-        value: 0,
+        total: 0,
       };
     }
 
-    locations[formattedLocation][sex]++;
-    locations[formattedLocation].value++;
+    if (sex === "male") locations[formattedLocation].male++;
+    else if (sex === "female") locations[formattedLocation].female++;
+    locations[formattedLocation].total++;
   });
 
   // Convert to array format and sort by count
   return Object.entries(locations)
     .map(([name, counts]) => ({
       name,
+      value: counts.total,
       male: counts.male,
       female: counts.female,
-      value: counts.value,
     }))
     .sort((a, b) => b.value - a.value) // Sort by total count in descending order
     .slice(0, 10); // Only take top 10 locations
@@ -1779,7 +1770,7 @@ const calculateLocationDistribution = (participants) => {
 
 export const fetchTotals = async (academicPeriodId) => {
   try {
-    // Fetch events
+    // Fetch all events
     const eventsResponse = await databases.listDocuments(
       databaseId,
       eventCollectionId,
@@ -1789,22 +1780,17 @@ export const fetchTotals = async (academicPeriodId) => {
         Query.orderDesc("createdAt"),
       ]
     );
-
     const events = eventsResponse.documents;
-    const eventIds = events.map((event) => event.$id);
 
-    // Fetch participants only if there are events
-    let participants = [];
-    if (eventIds.length > 0) {
-      const participantsResponse = await databases.listDocuments(
-        databaseId,
-        studentsCollectionId,
-        [Query.equal("eventId", eventIds), Query.equal("isArchived", false)]
-      );
-      participants = participantsResponse.documents;
-    }
+    // Fetch all participants
+    const participantsResponse = await databases.listDocuments(
+      databaseId,
+      studentsCollectionId,
+      [Query.equal("isArchived", false)]
+    );
+    const participants = participantsResponse.documents;
 
-    // Calculate totals
+    // Calculate event totals
     const totalEvents = events.length;
     const academicEvents = events.filter(
       (event) => event.eventType === "Academic"
@@ -2658,6 +2644,24 @@ export const notifyOfficersAboutAcademicPeriod = async (type, periodData) => {
     await Promise.all(notificationPromises.filter(Boolean));
   } catch (error) {
     console.error("Error notifying officers about academic period:", error);
+    throw error;
+  }
+};
+
+export const createOAuthSession = async (provider) => {
+  try {
+    const currentUrl = window.location.origin;
+    return await account.createOAuth2Session(
+      provider,
+      `${currentUrl}/auth-callback`,
+      currentUrl,
+      [
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+      ]
+    );
+  } catch (error) {
+    console.error("OAuth session creation error:", error);
     throw error;
   }
 };

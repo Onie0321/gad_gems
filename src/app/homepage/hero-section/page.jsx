@@ -59,6 +59,7 @@ export default function HeroSection() {
                 alt="Hero Image"
                 width={500}
                 height={500}
+                priority
                 className="relative w-full h-auto object-cover rounded-2xl shadow-2xl transform hover:scale-105 transition-transform duration-300"
               />
             </div>

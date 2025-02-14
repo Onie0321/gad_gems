@@ -181,7 +181,11 @@ export default function ParticipantManagement({
     studentId: "",
     name: "",
   });
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState({
+    studentId: "",
+    staffFacultyId: "",
+    name: "",
+  });
   const [hasAddedParticipants, setHasAddedParticipants] = useState(false);
   const [foundParticipant, setFoundParticipant] = useState(null);
   const router = useRouter();
@@ -213,7 +217,11 @@ export default function ParticipantManagement({
     staff: 0,
     community: 0,
   });
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState({
+    studentId: "",
+    staffFacultyId: "",
+    name: "",
+  });
   const [error, setError] = useState(null);
 
   // 2. useCallback hooks
@@ -555,7 +563,10 @@ export default function ParticipantManagement({
           eventCollectionId,
           currentEventId,
           {
-            participants: [...(event.participants || []), formattedParticipantId]
+            participants: [
+              ...(event.participants || []),
+              formattedParticipantId,
+            ],
           }
         );
 
@@ -714,7 +725,12 @@ export default function ParticipantManagement({
   const handleInputChange = async (field, value) => {
     let fieldError = "";
     setParticipantData((prev) => ({ ...prev, [field]: value }));
-    setSuccessMessage(""); // Clear success message on any input change
+
+    // Clear only the specific field's success message
+    setSuccessMessage((prev) => ({
+      ...prev,
+      [field]: "", // Clear only the current field's message
+    }));
 
     try {
       // Clear previous errors for the field
@@ -726,10 +742,10 @@ export default function ParticipantManagement({
         case "student":
           if (field === "studentId" && value) {
             const formattedId = formatStudentId(value);
-            
+
             // Only show validation error if ID is not in correct format
             const isValidFormat = /^\d{2}-\d{2}-\d{4}$/.test(formattedId);
-            
+
             // Debounced validation for student ID
             const debouncedValidation = debounce(async () => {
               // Only check for duplicates if format is valid
@@ -743,15 +759,20 @@ export default function ParticipantManagement({
                   );
 
                 if (idError) {
-                  setDuplicateErrors((prev) => ({ ...prev, studentId: idError }));
+                  setDuplicateErrors((prev) => ({
+                    ...prev,
+                    studentId: idError,
+                  }));
                 } else if (existingStudent) {
                   setAutofillData(existingStudent);
                   setShowAutofillDialog(true);
                 } else {
-                  setSuccessMessage("This Student ID is available");
+                  setSuccessMessage((prev) => ({
+                    ...prev,
+                    studentId: "This Student ID is available",
+                  }));
                 }
               } else if (value && !isValidFormat) {
-                // Only show format error if there's a value and format is invalid
                 setErrors((prev) => ({
                   ...prev,
                   studentId: "Please enter a complete Student ID (00-00-0000)",
@@ -768,7 +789,6 @@ export default function ParticipantManagement({
           if (field === "staffFacultyId" && value) {
             const formattedId = formatStaffFacultyId(value);
 
-            // Debounced validation for staff ID
             const debouncedValidation = debounce(async () => {
               const { error: idError, participant: existingStaff } =
                 await checkDuplicates(
@@ -783,18 +803,14 @@ export default function ParticipantManagement({
                   ...prev,
                   staffFacultyId: idError,
                 }));
-              } else if (!existingStaff) {
-                if (formattedId.length !== 3) {
-                  setErrors((prev) => ({
-                    ...prev,
-                    staffFacultyId: "Please enter exactly 3 digits",
-                  }));
-                } else {
-                  setSuccessMessage("This Staff/Faculty ID is available");
-                }
-              } else {
+              } else if (existingStaff) {
                 setAutofillData(existingStaff);
                 setShowAutofillDialog(true);
+              } else {
+                setSuccessMessage((prev) => ({
+                  ...prev,
+                  staffFacultyId: "This Staff/Faculty ID is available",
+                }));
               }
             }, 1000);
 
@@ -806,7 +822,6 @@ export default function ParticipantManagement({
 
       // Handle name validation for all participant types
       if (field === "name" && value.trim()) {
-        // Debounced name validation
         const debouncedNameValidation = debounce(async () => {
           const { error: nameError } = await checkDuplicates(
             "name",
@@ -824,7 +839,10 @@ export default function ParticipantManagement({
               staff: "This staff/faculty name is available",
               community: "This community member name is available",
             };
-            setSuccessMessage(messages[participantType]);
+            setSuccessMessage((prev) => ({
+              ...prev,
+              name: messages[participantType],
+            }));
           }
         }, 1000);
 
@@ -873,7 +891,7 @@ export default function ParticipantManagement({
                   className={cn(
                     errors.studentId
                       ? "border-red-500"
-                      : successMessage
+                      : successMessage.studentId
                       ? "border-green-500"
                       : ""
                   )}
@@ -889,11 +907,11 @@ export default function ParticipantManagement({
                     {duplicateErrors.studentId}
                   </p>
                 )}
-                {successMessage &&
+                {successMessage.studentId &&
                   !errors.studentId &&
                   !duplicateErrors.studentId && (
                     <p className="text-green-500 text-sm mt-1">
-                      {successMessage}
+                      {successMessage.studentId}
                     </p>
                   )}
               </div>
@@ -917,7 +935,7 @@ export default function ParticipantManagement({
                   className={cn(
                     errors.staffFacultyId
                       ? "border-red-500"
-                      : successMessage && participantData.staffFacultyId
+                      : successMessage.staffFacultyId
                       ? "border-green-500"
                       : ""
                   )}
@@ -933,12 +951,11 @@ export default function ParticipantManagement({
                     {duplicateErrors.staffFacultyId}
                   </p>
                 )}
-                {successMessage &&
-                  participantData.staffFacultyId &&
+                {successMessage.staffFacultyId &&
                   !errors.staffFacultyId &&
                   !duplicateErrors.staffFacultyId && (
                     <p className="text-green-500 text-sm mt-1">
-                      {successMessage}
+                      {successMessage.staffFacultyId}
                     </p>
                   )}
               </div>
@@ -963,7 +980,7 @@ export default function ParticipantManagement({
             className={cn(
               errors.name
                 ? "border-red-500"
-                : successMessage && participantData.name
+                : successMessage.name
                 ? "border-green-500"
                 : ""
             )}
@@ -975,12 +992,9 @@ export default function ParticipantManagement({
           {duplicateErrors.name && (
             <p className="text-red-500 text-sm mt-1">{duplicateErrors.name}</p>
           )}
-          {successMessage &&
-            participantData.name &&
-            !errors.name &&
-            !duplicateErrors.name && (
-              <p className="text-green-500 text-sm mt-1">{successMessage}</p>
-            )}
+          {successMessage.name && !errors.name && !duplicateErrors.name && (
+            <p className="text-green-500 text-sm mt-1">{successMessage.name}</p>
+          )}
         </div>
 
         <div>
@@ -1274,16 +1288,16 @@ export default function ParticipantManagement({
                     >
                       <SelectTrigger className="w-[300px]">
                         <SelectValue placeholder="Select an event" />
-                         <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Select an event to manage participants</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Select an event to manage participants</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </SelectTrigger>
                       <SelectContent>
                         {events.map((event) => (
@@ -1291,11 +1305,8 @@ export default function ParticipantManagement({
                             {event.eventName}
                           </SelectItem>
                         ))}
-                        
                       </SelectContent>
-                      
                     </Select>
-                   
                   </div>
                 </div>
               )}
@@ -1439,7 +1450,7 @@ export default function ParticipantManagement({
                             className={cn(
                               errors.name
                                 ? "border-red-500"
-                                : successMessage && participantData.name
+                                : successMessage.name
                                 ? "border-green-500"
                                 : ""
                             )}
@@ -1455,12 +1466,11 @@ export default function ParticipantManagement({
                               {duplicateErrors.name}
                             </p>
                           )}
-                          {successMessage &&
-                            participantData.name &&
+                          {successMessage.name &&
                             !errors.name &&
                             !duplicateErrors.name && (
                               <p className="text-green-500 text-sm mt-1">
-                                {successMessage}
+                                {successMessage.name}
                               </p>
                             )}
                         </div>
@@ -1709,7 +1719,7 @@ export default function ParticipantManagement({
                             className={cn(
                               errors.name
                                 ? "border-red-500"
-                                : successMessage && participantData.name
+                                : successMessage.name
                                 ? "border-green-500"
                                 : ""
                             )}
@@ -1725,12 +1735,11 @@ export default function ParticipantManagement({
                               {duplicateErrors.name}
                             </p>
                           )}
-                          {successMessage &&
-                            participantData.name &&
+                          {successMessage.name &&
                             !errors.name &&
                             !duplicateErrors.name && (
                               <p className="text-green-500 text-sm mt-1">
-                                {successMessage}
+                                {successMessage.name}
                               </p>
                             )}
                         </div>

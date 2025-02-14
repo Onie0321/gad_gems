@@ -37,6 +37,7 @@ import {
   staffFacultyCollectionId,
   communityCollectionId,
   getCurrentAcademicPeriod,
+  signOut,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -53,6 +54,7 @@ import HomepageSettings from "./homepage-settings/page";
 import { useToast } from "@/hooks/use-toast";
 import AcademicPeriodManagement from "./academic-period/page";
 import Archives from "./archives/page";
+import TimeoutWarningModal from "@/components/modals/TimeoutWarningModal";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
@@ -72,6 +74,11 @@ export default function AdminDashboard() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+
+  const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+  const WARNING_DURATION = 60; // 60 seconds
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -106,33 +113,72 @@ export default function AdminDashboard() {
     checkUserRole();
   }, []);
 
-  const handleActivity = React.useCallback(() => {
-    setLastActivity(Date.now());
-    if (isLocked) {
-      return;
-    }
-  }, [isLocked]);
+  useEffect(() => {
+    let inactivityTimer;
+    let warningTimer;
 
-  React.useEffect(() => {
-    const events = ["mousedown", "keydown", "touchstart", "scroll"];
-    events.forEach((event) => document.addEventListener(event, handleActivity));
+    const resetTimers = () => {
+      setLastActivity(Date.now());
+      setShowTimeoutWarning(false);
+      clearTimeout(inactivityTimer);
+      clearTimeout(warningTimer);
 
-    return () => {
-      events.forEach((event) =>
-        document.removeEventListener(event, handleActivity)
-      );
+      // Set new timers
+      inactivityTimer = setTimeout(() => {
+        setShowTimeoutWarning(true);
+        warningTimer = setTimeout(handleSessionTimeout, WARNING_DURATION * 1000);
+      }, INACTIVITY_TIMEOUT - WARNING_DURATION * 1000);
     };
-  }, [handleActivity]);
 
-  React.useEffect(() => {
-    const checkInactivity = setInterval(() => {
-      if (Date.now() - lastActivity > inactivityTimeout && !isLocked) {
-        setIsLocked(true);
+    // Monitor user activity
+    const handleActivity = () => {
+      if (!isSessionExpired && !showTimeoutWarning) {
+        resetTimers();
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(checkInactivity);
-  }, [lastActivity, inactivityTimeout, isLocked]);
+    // Add event listeners for user activity
+    const events = [
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "mousemove",
+      "scroll",
+      "click",
+    ];
+    
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity);
+    });
+
+    // Initial timer setup
+    resetTimers();
+
+    // Cleanup
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity);
+      });
+      clearTimeout(inactivityTimer);
+      clearTimeout(warningTimer);
+    };
+  }, [isSessionExpired, showTimeoutWarning]);
+
+  const handleSessionTimeout = async () => {
+    setIsSessionExpired(true);
+    setShowTimeoutWarning(false);
+    try {
+      await signOut();
+      router.push("/sign-in");
+    } catch (error) {
+      console.error("Error during session timeout:", error);
+    }
+  };
+
+  const handleExtendSession = () => {
+    setShowTimeoutWarning(false);
+    setLastActivity(Date.now());
+  };
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -285,6 +331,13 @@ export default function AdminDashboard() {
         onUnlock={handleUnlock}
         inactivityTimeout={inactivityTimeout}
         setInactivityTimeout={setInactivityTimeout}
+      />
+      <TimeoutWarningModal
+        isOpen={showTimeoutWarning}
+        onExtendSession={handleExtendSession}
+        onClose={handleSessionTimeout}
+        onTimeout={handleSessionTimeout}
+        warningDuration={WARNING_DURATION}
       />
       {/* Sidebar */}
       <aside className="hidden w-64 overflow-y-auto bg-white dark:bg-gray-800 md:block">

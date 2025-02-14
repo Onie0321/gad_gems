@@ -91,14 +91,9 @@ export default function RecentEvents() {
   }
 
   const NoEventsDisplay = () => (
-    <div className="min-h-[400px] flex flex-col items-center justify-center p-8 bg-gradient-to-br from-violet-50 to-blue-50 rounded-2xl">
+    <div className="min-h-[400px] flex flex-col items-center justify-center p-8 rounded-2xl">
       <div className="relative w-24 h-24 mb-6">
-        <Image
-          src="/logo/gad.png"
-          alt="GAD Logo"
-          fill
-          className="object-contain opacity-50"
-        />
+    
       </div>
       <h3 className="text-2xl font-semibold text-gray-700 mb-2">No Events Currently</h3>
       <p className="text-gray-500 text-center max-w-md">
