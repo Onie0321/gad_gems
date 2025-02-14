@@ -736,6 +736,7 @@ const validateParticipants = (participants) => {
 // Update the checkForDuplicateEvent function
 const checkForDuplicateEvent = async (eventMetadata) => {
   try {
+    // Check for exact match of name, date, and venue combination
     const response = await databases.listDocuments(
       databaseId,
       eventCollectionId,
@@ -746,6 +747,7 @@ const checkForDuplicateEvent = async (eventMetadata) => {
       ]
     );
 
+    // Return true if an exact match is found
     return response.documents.length > 0;
   } catch (error) {
     console.error("Error checking for duplicate event:", error);

@@ -81,6 +81,43 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  databases,
+  databaseId,
+  eventCollectionId,
+  client,
+} from "@/lib/appwrite";
+import { Query } from "appwrite";
+
+const checkForDuplicateEvent = async (eventData) => {
+  try {
+    // Check for exact match of name, date, and venue combination
+    const response = await databases.listDocuments(
+      databaseId,
+      eventCollectionId,
+      [
+        Query.equal("eventName", eventData.eventName),
+        Query.equal("eventDate", eventData.eventDate),
+        Query.equal("eventVenue", eventData.eventVenue),
+      ]
+    );
+
+    if (response.documents.length > 0) {
+      return {
+        isDuplicate: true,
+        message: "An event with the same name, date, and venue already exists.",
+      };
+    }
+
+    return {
+      isDuplicate: false,
+      message: "",
+    };
+  } catch (error) {
+    console.error("Error checking for duplicate event:", error);
+    throw new Error("Failed to check for duplicate event");
+  }
+};
 
 export default function CreateEvent({
   onEventCreated,
@@ -89,12 +126,6 @@ export default function CreateEvent({
   setActiveTab,
   setCurrentEventId,
 }) {
-  // Add debug logging
-  console.log(
-    "CreateEvent component - currentAcademicPeriod:",
-    currentAcademicPeriod
-  );
-
   // Update the validation to properly check the period
   if (!currentAcademicPeriod || !currentAcademicPeriod.$id) {
     console.log("No valid academic period provided to CreateEvent component");
@@ -313,20 +344,39 @@ export default function CreateEvent({
     e.preventDefault();
 
     if (!currentAcademicPeriod) {
-      toast.error("No active academic period found. Please set up an academic period first.");
+      toast.error(
+        "No active academic period found. Please set up an academic period first."
+      );
       return;
     }
 
     // Validate form
     if (!validateEventForm()) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    try {
-      setLoading(true);
+    setLoading(true);
 
-      // Format the date
-      const formattedDate = format(new Date(eventDate), "yyyy-MM-dd");
+    try {
+      // Get the first date from selectedDates for the initial check
+      const firstDate = selectedDates[0];
+
+      // Check for duplicate before creating
+      const duplicateCheck = await checkForDuplicateEvent({
+        eventName,
+        eventDate: format(firstDate, "yyyy-MM-dd"),
+        eventVenue,
+      });
+
+      if (duplicateCheck.isDuplicate) {
+        toast.error(duplicateCheck.message);
+        setLoading(false);
+        return;
+      }
+
+      // Format the first date for the main event
+      const formattedDate = format(firstDate, "yyyy-MM-dd");
 
       // Create event document
       const eventData = {
@@ -343,27 +393,56 @@ export default function CreateEvent({
         showOnHomepage: false,
         isArchived: false,
         academicPeriodId: currentAcademicPeriod.$id,
-        archivedAt: '',
+        archivedAt: "",
         createdAt: new Date().toISOString(),
-        source: 'created'
+        source: "created",
       };
 
       const createdEvent = await createEvent(eventData);
 
       if (createdEvent) {
+        // Create notification for event creation
+        await createNotification({
+          title: "New Event Created",
+          message: `A new event "${eventName}" has been created for ${format(
+            firstDate,
+            "MMMM d, yyyy"
+          )}${
+            selectedDates.length > 1 || dateRanges.length > 0
+              ? " and additional dates"
+              : ""
+          }`,
+          type: "event",
+          actionType: "event_creation",
+          read: false,
+          additionalData: {
+            eventId: createdEvent.$id,
+            eventName: eventName,
+            eventDate: formattedDate,
+            eventVenue: eventVenue,
+            eventType: eventType,
+            eventCategory: selectedCategories,
+            createdBy: user.$id,
+            createdByName: user.name || user.email,
+          },
+        });
+
         // Clear form data from storage
         clearFormData(STORAGE_KEYS.CREATE_EVENT);
-        
+
         // Call the parent's event handler
         await handleEventCreated(createdEvent);
-        
+
         // Reset the form
         resetForm();
-        
+
         // Show success message
-        toast.success(`Event "${createdEvent.eventName}" created successfully!`, {
-          autoClose: 2000 // 2 seconds
-        });
+        toast.success(
+          `Event "${createdEvent.eventName}" created successfully!`,
+          {
+            autoClose: 2000, // 2 seconds
+          }
+        );
       }
     } catch (error) {
       console.error("Error creating event:", error);
@@ -518,14 +597,14 @@ export default function CreateEvent({
       try {
         ("Checking academic period...");
         const period = await getCurrentAcademicPeriod();
-        ("Retrieved academic period:", period);
+        "Retrieved academic period:", period;
         if (!period) {
           ("No active academic period found");
           // You might want to show a toast here
           toast.error("No active academic period found");
         }
       } catch (error) {
-        ("Error checking academic period:", error);
+        "Error checking academic period:", error;
       }
     };
 
@@ -603,7 +682,8 @@ export default function CreateEvent({
                   <TooltipTrigger asChild>
                     <Label>
                       Event Date(s){" "}
-                      {getTotalDays() > 0 && `(${getTotalDays()} days selected)`}
+                      {getTotalDays() > 0 &&
+                        `(${getTotalDays()} days selected)`}
                     </Label>
                   </TooltipTrigger>
                   <TooltipContent>

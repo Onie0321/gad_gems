@@ -4,14 +4,11 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import Script from "next/script";
 
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "GAD - Gender and Development",
-  description: "Gender and Development Initiatives",
+  description: "Gender and Development",
 };
 
 export default function RootLayout({ children }) {
