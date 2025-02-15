@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { ToastContainer } from "react-toastify";
 
-export default function HeroSection() {
+export default function HeroSection({ onExploreClick }) {
   const [showLearnMorePopup, setShowLearnMorePopup] = useState(false);
   return (
     <motion.section
@@ -40,7 +40,10 @@ export default function HeroSection() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/sign-in">
-                <Button className="px-8 py-6 text-lg font-semibold rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300">
+                <Button 
+                  onClick={onExploreClick}
+                  className="px-8 py-6 text-lg font-semibold rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                >
                   Explore Events
                 </Button>
               </Link>

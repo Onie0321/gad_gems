@@ -11,8 +11,9 @@ import RecentEvents from "./homepage/event-section/page";
 import NewsSection from "./homepage/news-section/page";
 import FeedbackSection from "./homepage/feedback-section/page";
 import FAQSection from "./homepage/faq-section/page";
-import { getCurrentUser, handleAuthRedirect } from "@/lib/appwrite";
+import { getCurrentUser } from "@/lib/appwrite";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 
 // Separator Component
 const SectionSeparator = () => (
@@ -25,28 +26,8 @@ const SectionSeparator = () => (
 
 export default function LandingPage() {
   const router = useRouter();
-  const [isDataReady, setIsDataReady] = useState(false);
-  const [authStatus, setAuthStatus] = useState(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
-
-  useEffect(() => {
-    const checkAuthAndFetchData = async () => {
-      try {
-        // Check auth status and get redirect info
-        const authResult = await handleAuthRedirect();
-        setAuthStatus(authResult);
-
-        // If authenticated, mark data as ready
-        if (authResult) {
-          setIsDataReady(true);
-        }
-      } catch (error) {
-        console.error("Error checking auth status:", error);
-      }
-    };
-
-    checkAuthAndFetchData();
-  }, []);
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -58,11 +39,14 @@ export default function LandingPage() {
   }, []);
 
   const handleExploreClick = () => {
-    if (isDataReady && authStatus?.authenticated) {
-      // If data is ready and user is authenticated, redirect to their dashboard
-      router.push(authStatus.redirectTo);
+    if (loading) return; // Don't do anything while auth is loading
+
+    if (user) {
+      // If user is logged in, redirect based on role
+      const redirectPath = user.role === "admin" ? "/admin" : "/officer";
+      router.push(redirectPath);
     } else {
-      // Otherwise, redirect to sign in
+      // If no user is logged in, redirect to sign-in
       router.push("/sign-in");
     }
   };
@@ -74,11 +58,12 @@ export default function LandingPage() {
     });
   };
 
+
   return (
     <div className="bg-background min-h-screen relative">
       <main className="flex-grow">
         <Header />
-        <HeroSection />
+        <HeroSection onExploreClick={handleExploreClick} />
         <SectionSeparator />
         <AboutSection />
         <SectionSeparator />

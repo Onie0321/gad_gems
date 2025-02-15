@@ -1630,6 +1630,12 @@ export async function fetchNotifications(filters = []) {
 
 // Add these helper functions for dashboard calculations
 const calculateSexDistribution = (participants) => {
+  console.log("Starting sex distribution calculation with participants:", {
+    totalParticipants: participants.length,
+    participantTypes: participants.map(p => p.participantType),
+    sexValues: participants.map(p => p.sex)
+  });
+
   // Count all participants by sex, including all participant types
   const maleCount = participants.filter(
     (p) => p.sex?.toLowerCase() === "male"
@@ -1641,51 +1647,67 @@ const calculateSexDistribution = (participants) => {
 
   const total = maleCount + femaleCount;
 
+  console.log("Initial sex counts:", {
+    maleCount,
+    femaleCount,
+    total,
+    unaccountedFor: participants.length - total
+  });
+
+  // Calculate detailed breakdowns
+  const maleDetails = {
+    students: participants.filter(
+      (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Student"
+    ).length,
+    staffFaculty: participants.filter(
+      (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Staff/Faculty"
+    ).length,
+    community: participants.filter(
+      (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Community Member"
+    ).length,
+  };
+
+  const femaleDetails = {
+    students: participants.filter(
+      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Student"
+    ).length,
+    staffFaculty: participants.filter(
+      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Staff/Faculty"
+    ).length,
+    community: participants.filter(
+      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Community Member"
+    ).length,
+  };
+
+  console.log("Detailed breakdown:", {
+    male: maleDetails,
+    female: femaleDetails,
+    totals: {
+      students: maleDetails.students + femaleDetails.students,
+      staffFaculty: maleDetails.staffFaculty + femaleDetails.staffFaculty,
+      community: maleDetails.community + femaleDetails.community
+    }
+  });
+
   // Return the distribution with detailed counts and total
-  return [
+  const distribution = [
     {
       name: "Male",
       value: maleCount,
-      total: total, // Add total for the center label
-      details: {
-        students: participants.filter(
-          (p) =>
-            p.sex?.toLowerCase() === "male" && p.participantType === "Student"
-        ).length,
-        staffFaculty: participants.filter(
-          (p) =>
-            p.sex?.toLowerCase() === "male" &&
-            p.participantType === "Staff/Faculty"
-        ).length,
-        community: participants.filter(
-          (p) =>
-            p.sex?.toLowerCase() === "male" &&
-            p.participantType === "Community Member"
-        ).length,
-      },
+      total: total,
+      details: maleDetails,
     },
     {
       name: "Female",
       value: femaleCount,
-      total: total, // Add total for the center label
-      details: {
-        students: participants.filter(
-          (p) =>
-            p.sex?.toLowerCase() === "female" && p.participantType === "Student"
-        ).length,
-        staffFaculty: participants.filter(
-          (p) =>
-            p.sex?.toLowerCase() === "female" &&
-            p.participantType === "Staff/Faculty"
-        ).length,
-        community: participants.filter(
-          (p) =>
-            p.sex?.toLowerCase() === "female" &&
-            p.participantType === "Community Member"
-        ).length,
-      },
+      total: total,
+      details: femaleDetails,
     },
   ];
+
+  console.log("Final distribution data:", distribution);
+
+  return distribution;
 };
 
 const calculateAgeDistribution = (participants) => {
