@@ -2,7 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Calendar, Users, TrendingUp, Filter } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   databases,
   databaseId,
@@ -35,6 +43,60 @@ import {
   Line,
 } from "recharts";
 
+// Loading Skeleton Component
+const AnalyticsSkeleton = () => (
+  <div className="space-y-6">
+    {/* Summary Cards Skeleton */}
+    <div className="grid gap-4 md:grid-cols-4">
+      {[...Array(4)].map((_, i) => (
+        <Card key={i} className="p-6">
+          <Skeleton className="h-8 w-24 mb-2" />
+          <Skeleton className="h-10 w-32" />
+        </Card>
+      ))}
+    </div>
+
+    {/* Filter Section Skeleton */}
+    <Card className="p-6">
+      <Skeleton className="h-8 w-32 mb-4" />
+      <div className="flex gap-4">
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={i} className="h-10 w-40" />
+        ))}
+      </div>
+    </Card>
+
+    {/* Charts Skeleton */}
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card className="p-6">
+        <Skeleton className="h-8 w-32 mb-4" />
+        <Skeleton className="h-[300px] w-full" />
+      </Card>
+      <Card className="p-6">
+        <Skeleton className="h-8 w-32 mb-4" />
+        <Skeleton className="h-[300px] w-full" />
+      </Card>
+    </div>
+  </div>
+);
+
+// Custom Tooltip Component
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-4 rounded-lg shadow border">
+        <p className="font-semibold">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} style={{ color: entry.color }}>
+            {entry.name}: {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function EventAnalysis() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -51,6 +113,21 @@ export default function EventAnalysis() {
     participantsBySchool: [],
   });
   const [currentPeriod, setCurrentPeriod] = useState(null);
+  const [filters, setFilters] = useState({
+    eventType: "all",
+    school: "all",
+    gender: "all",
+    timeRange: "year",
+  });
+  const [trendData, setTrendData] = useState([]);
+
+  // Add summary metrics state
+  const [summary, setSummary] = useState({
+    totalEvents: 0,
+    totalParticipants: 0,
+    averageAttendance: 0,
+    participationGrowth: 0,
+  });
 
   const GENDER_COLORS = {
     Male: "#2196F3",
@@ -71,6 +148,70 @@ export default function EventAnalysis() {
     "#E74C3C",
   ];
 
+  // Function to calculate trend data
+  const calculateTrendData = (events, participants) => {
+    const eventsByMonth = events.reduce((acc, event) => {
+      const date = new Date(event.eventDate);
+      const monthYear = date.toLocaleString("default", {
+        month: "short",
+        year: "numeric",
+      });
+
+      if (!acc[monthYear]) {
+        acc[monthYear] = {
+          date: monthYear,
+          events: 0,
+          participants: 0,
+          male: 0,
+          female: 0,
+        };
+      }
+
+      const eventParticipants = participants.filter(
+        (p) => p.eventId === event.$id
+      );
+      acc[monthYear].events += 1;
+      acc[monthYear].participants += eventParticipants.length;
+      acc[monthYear].male += eventParticipants.filter(
+        (p) => p.sex === "Male"
+      ).length;
+      acc[monthYear].female += eventParticipants.filter(
+        (p) => p.sex === "Female"
+      ).length;
+
+      return acc;
+    }, {});
+
+    return Object.values(eventsByMonth).sort(
+      (a, b) => new Date(a.date) - new Date(b.date)
+    );
+  };
+
+  // Function to calculate summary metrics
+  const calculateSummary = (events, participants) => {
+    const totalEvents = events.length;
+    const totalParticipants = participants.length;
+    const averageAttendance =
+      totalEvents > 0 ? totalParticipants / totalEvents : 0;
+
+    // Calculate growth (compare last 2 months)
+    const monthlyData = calculateTrendData(events, participants);
+    const lastTwo = monthlyData.slice(-2);
+    const participationGrowth =
+      lastTwo.length === 2
+        ? ((lastTwo[1].participants - lastTwo[0].participants) /
+            lastTwo[0].participants) *
+          100
+        : 0;
+
+    return {
+      totalEvents,
+      totalParticipants,
+      averageAttendance: Math.round(averageAttendance),
+      participationGrowth: Math.round(participationGrowth),
+    };
+  };
+
   const fetchEventStats = async () => {
     try {
       setLoading(true);
@@ -81,7 +222,7 @@ export default function EventAnalysis() {
       }
       setCurrentPeriod(period);
 
-      // First fetch all events for current period
+      // First fetch all events
       const eventsResponse = await databases.listDocuments(
         databaseId,
         eventCollectionId,
@@ -92,28 +233,49 @@ export default function EventAnalysis() {
       );
 
       // Get all event IDs
-      const eventIds = eventsResponse.documents.map(event => event.$id);
+      const eventIds = eventsResponse.documents.map((event) => event.$id);
 
-      // Fetch all participants in one query
-      const participantsResponse = await databases.listDocuments(
-        databaseId,
-        studentsCollectionId,
-        [
-          Query.equal("isArchived", false),
-          Query.equal("eventId", eventIds),
-        ]
-      );
+      // Fetch all types of participants in parallel
+      const [studentsResponse, staffResponse, communityResponse] =
+        await Promise.all([
+          databases.listDocuments(databaseId, studentsCollectionId, [
+            Query.equal("isArchived", false),
+            Query.equal("eventId", eventIds),
+          ]),
+          databases.listDocuments(databaseId, staffFacultyCollectionId, [
+            Query.equal("isArchived", false),
+            Query.equal("eventId", eventIds),
+          ]),
+          databases.listDocuments(databaseId, communityCollectionId, [
+            Query.equal("isArchived", false),
+            Query.equal("eventId", eventIds),
+          ]),
+        ]);
 
-      // Map participants to their respective events
-      const events = eventsResponse.documents.map(event => ({
+      // Combine all participants with their types
+      const allParticipants = [
+        ...studentsResponse.documents.map((p) => ({
+          ...p,
+          participantType: "Student",
+        })),
+        ...staffResponse.documents.map((p) => ({
+          ...p,
+          participantType: "Staff/Faculty",
+        })),
+        ...communityResponse.documents.map((p) => ({
+          ...p,
+          participantType: "Community Member",
+        })),
+      ];
+
+      // Map events with their participants
+      const events = eventsResponse.documents.map((event) => ({
         ...event,
-        participants: participantsResponse.documents.filter(
-          p => p.eventId === event.$id
-        ),
+        participants: allParticipants.filter((p) => p.eventId === event.$id),
       }));
 
-      // Calculate gender counts across all events
-      const genderStats = participantsResponse.documents.reduce(
+      // Calculate gender counts across all participants
+      const genderStats = allParticipants.reduce(
         (acc, participant) => {
           const gender = participant.sex.toLowerCase();
           acc[gender] = (acc[gender] || 0) + 1;
@@ -124,41 +286,47 @@ export default function EventAnalysis() {
 
       // Calculate basic stats
       const totalEvents = events.length;
-      const totalParticipants = participantsResponse.documents.length;
-      const averageParticipants = totalEvents > 0 
-        ? (totalParticipants / totalEvents).toFixed(1) 
-        : 0;
+      const totalParticipants = allParticipants.length;
+      const averageParticipants =
+        totalEvents > 0 ? (totalParticipants / totalEvents).toFixed(1) : 0;
 
-      // Process participants by event with gender breakdown
+      // Process participants by event with detailed breakdown
       const participantsByEvent = events.map((event) => {
         const eventParticipants = event.participants || [];
-        const genderCounts = eventParticipants.reduce(
-          (acc, participant) => {
-            const gender = participant.sex.toLowerCase();
-            acc[gender] = (acc[gender] || 0) + 1;
-            return acc;
-          },
-          { male: 0, female: 0 }
-        );
-
-        return {
+        const breakdown = {
           name: event.eventName,
-          male: genderCounts.male,
-          female: genderCounts.female,
+          date: event.eventDate,
           total: eventParticipants.length,
+          male: eventParticipants.filter((p) => p.sex?.toLowerCase() === "male")
+            .length,
+          female: eventParticipants.filter(
+            (p) => p.sex?.toLowerCase() === "female"
+          ).length,
+          students: eventParticipants.filter(
+            (p) => p.participantType === "Student"
+          ).length,
+          staffFaculty: eventParticipants.filter(
+            (p) => p.participantType === "Staff/Faculty"
+          ).length,
+          community: eventParticipants.filter(
+            (p) => p.participantType === "Community Member"
+          ).length,
         };
+        return breakdown;
       });
 
-      // Process participants by school with gender breakdown
-      const schoolData = participantsResponse.documents.reduce((acc, participant) => {
-        const school = participant.school || 'Not Specified';
-        const gender = participant.sex.toLowerCase();
-
-        if (!acc[school]) {
-          acc[school] = { male: 0, female: 0, total: 0 };
+      // Process school distribution
+      const schoolData = allParticipants.reduce((acc, participant) => {
+        if (participant.participantType === "Student") {
+          const school = participant.school || "Not Specified";
+          if (!acc[school]) {
+            acc[school] = { male: 0, female: 0, total: 0 };
+          }
+          const gender = participant.sex?.toLowerCase();
+          if (gender === "male") acc[school].male++;
+          if (gender === "female") acc[school].female++;
+          acc[school].total++;
         }
-        acc[school][gender]++;
-        acc[school].total++;
         return acc;
       }, {});
 
@@ -173,17 +341,22 @@ export default function EventAnalysis() {
 
       // Process event types
       const eventTypeCount = events.reduce((acc, event) => {
-        const type = event.eventType || 'Not Specified';
+        const type = event.eventType || "Not Specified";
         acc[type] = (acc[type] || 0) + 1;
         return acc;
       }, {});
 
       const eventTypes = Object.entries(eventTypeCount)
-        .map(([name, value]) => ({
-          name,
-          value,
-        }))
+        .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
+
+      // Calculate trend data
+      const trendData = calculateTrendData(events, allParticipants);
+      setTrendData(trendData);
+
+      // Calculate summary metrics
+      const summaryMetrics = calculateSummary(events, allParticipants);
+      setSummary(summaryMetrics);
 
       setStats({
         totalParticipants,
@@ -193,6 +366,17 @@ export default function EventAnalysis() {
         eventTypes,
         participantsByEvent,
         participantsBySchool,
+        participantTypes: {
+          students: allParticipants.filter(
+            (p) => p.participantType === "Student"
+          ).length,
+          staffFaculty: allParticipants.filter(
+            (p) => p.participantType === "Staff/Faculty"
+          ).length,
+          community: allParticipants.filter(
+            (p) => p.participantType === "Community Member"
+          ).length,
+        },
       });
     } catch (error) {
       console.error("Error fetching event statistics:", error);
@@ -205,329 +389,287 @@ export default function EventAnalysis() {
     fetchEventStats();
   }, []);
 
+  if (loading) {
+    return <AnalyticsSkeleton />;
+  }
+
   return (
-    <div className="space-y-8 p-6 bg-gray-50">
-      {/* Academic Period Indicator */}
-      {currentPeriod && (
-        <div className="bg-blue-50 p-4 rounded-lg mb-6">
-          <h2 className="text-lg font-semibold text-blue-800">
-            Current Academic Period: {currentPeriod.schoolYear} -{" "}
-            {currentPeriod.periodType}
-          </h2>
-        </div>
-      )}
+    <div className="space-y-6">
+      {/* Summary Section */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4 text-blue-500" />
+              <h3 className="text-sm font-medium">Total Events</h3>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold">{summary.totalEvents}</p>
+              <p className="text-xs text-muted-foreground">
+                From {currentPeriod?.schoolYear}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Stats Cards with Enhanced Design */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-lg">
-            <CardTitle className="text-lg font-bold text-blue-800">
-              Total Events
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="space-y-4">
-              <div className="text-2xl font-bold">
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  stats.totalEvents
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Male }}
-                  ></div>
-                  <span>Male: {stats.genderStats.male}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Female }}
-                  ></div>
-                  <span>Female: {stats.genderStats.female}</span>
-                </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4 text-green-500" />
+              <h3 className="text-sm font-medium">Total Participants</h3>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold">{summary.totalParticipants}</p>
+              <div className="text-xs text-muted-foreground">
+                <span className="text-blue-500">
+                  ♂ {stats.genderStats.male}
+                </span>
+                {" / "}
+                <span className="text-pink-500">
+                  ♀ {stats.genderStats.female}
+                </span>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Participants
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="text-2xl font-bold">
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  stats.totalParticipants
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Male }}
-                  ></div>
-                  <span>Male: {stats.genderStats.male}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Female }}
-                  ></div>
-                  <span>Female: {stats.genderStats.female}</span>
-                </div>
-              </div>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4 text-purple-500" />
+              <h3 className="text-sm font-medium">Average Attendance</h3>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold">{summary.averageAttendance}</p>
+              <p className="text-xs text-muted-foreground">Per Event</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Average Participants/Event
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="text-2xl font-bold">
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  stats.averageParticipants
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Male }}
-                  ></div>
-                  <span>Male: {stats.genderStats.male}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: GENDER_COLORS.Female }}
-                  ></div>
-                  <span>Female: {stats.genderStats.female}</span>
-                </div>
-              </div>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <TrendingUp className="h-4 w-4 text-orange-500" />
+              <h3 className="text-sm font-medium">Growth Rate</h3>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold">
+                {summary.participationGrowth > 0 ? "+" : ""}
+                {summary.participationGrowth}%
+              </p>
+              <p className="text-xs text-muted-foreground">Month over Month</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Single Column Layout for Charts */}
-      <div className="space-y-8">
-        {/* Participants by Event - Interactive Bar Chart */}
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-t-lg">
-            <CardTitle className="text-lg font-bold text-purple-800">
-              Participants by Event
-            </CardTitle>
+      {/* Filter Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex gap-4">
+          <Select
+            value={filters.eventType}
+            onValueChange={(value) =>
+              setFilters((prev) => ({ ...prev, eventType: value }))
+            }
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Event Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="academic">Academic</SelectItem>
+              <SelectItem value="non-academic">Non-Academic</SelectItem>
+            </SelectContent>
+          </Select>
+          {/* Add similar Select components for school and gender filters */}
+        </CardContent>
+      </Card>
+
+      {/* Trend Line Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Participation Trends</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="participants"
+                  stroke="#8884d8"
+                  name="Total Participants"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="male"
+                  stroke="#2196F3"
+                  name="Male"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="female"
+                  stroke="#E91E63"
+                  name="Female"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Event Type Distribution */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Event Type Distribution</CardTitle>
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="h-[400px]">
+          <CardContent>
+            <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.participantsByEvent}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <PieChart>
+                  <Pie
+                    data={stats.eventTypes}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label={({ name, percent }) =>
+                      `${name} (${(percent * 100).toFixed(0)}%)`
+                    }
+                  >
+                    {stats.eventTypes.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={SCHOOL_COLORS[index % SCHOOL_COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Gender Distribution by School */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Gender Distribution by School</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.participantsBySchool}>
+                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="name"
                     angle={-45}
                     textAnchor="end"
-                    height={100}
-                    interval={0}
-                    tick={{ fontSize: 12 }}
+                    height={70}
                   />
                   <YAxis />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(255, 255, 255, 0.95)",
-                      borderRadius: "8px",
-                      border: "none",
-                      boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                    }}
-                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Bar
-                    dataKey="male"
-                    name="Male"
-                    fill={GENDER_COLORS.Male}
-                    stackId="a"
-                  />
+                  <Bar dataKey="male" name="Male" fill={GENDER_COLORS.Male} />
                   <Bar
                     dataKey="female"
                     name="Female"
                     fill={GENDER_COLORS.Female}
-                    stackId="a"
                   />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
-
-        {/* School Distribution Overview - Now with Two Pie Charts */}
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="bg-gradient-to-r from-green-50 to-green-100 rounded-t-lg">
-            <CardTitle className="text-lg font-bold text-green-800">
-              School Distribution Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-16">
-              {/* Total Participants by School Pie Chart */}
-              <div className="h-[500px]">
-                <h3 className="text-center font-semibold text-gray-700 mb-4">
-                  Total Participants by School
-                </h3>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={stats.participantsBySchool}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={140}
-                      fill="#8884d8"
-                      paddingAngle={5}
-                      dataKey="total"
-                      label={({ name, value, percent }) =>
-                        `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
-                      }
-                    >
-                      {stats.participantsBySchool.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={SCHOOL_COLORS[index % SCHOOL_COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Gender Distribution by School Pie Chart */}
-              <div className="h-[500px]">
-                <h3 className="text-center font-semibold text-gray-700 mb-4">
-                  Gender Distribution by School
-                </h3>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={stats.participantsBySchool
-                        .map((school) => [
-                          {
-                            name: `${school.name} (Male)`,
-                            value: school.male,
-                            color: GENDER_COLORS.Male,
-                          },
-                          {
-                            name: `${school.name} (Female)`,
-                            value: school.female,
-                            color: GENDER_COLORS.Female,
-                          },
-                        ])
-                        .flat()}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={140}
-                      fill="#8884d8"
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, value, percent }) =>
-                        value > 0
-                          ? `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
-                          : ""
-                      }
-                    >
-                      {stats.participantsBySchool
-                        .map((school) => [
-                          <Cell
-                            key={`${school.name}-male`}
-                            fill={GENDER_COLORS.Male}
-                          />,
-                          <Cell
-                            key={`${school.name}-female`}
-                            fill={GENDER_COLORS.Female}
-                          />,
-                        ])
-                        .flat()}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Detailed School Distribution Table */}
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-t-lg">
-            <CardTitle className="text-lg font-bold text-indigo-800">
-              Detailed School Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="overflow-x-auto">
-              <Table className="w-full">
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="font-bold">School</TableHead>
-                    <TableHead
-                      className="text-right font-bold"
-                      style={{ color: GENDER_COLORS.Male }}
-                    >
-                      Male
-                    </TableHead>
-                    <TableHead
-                      className="text-right font-bold"
-                      style={{ color: GENDER_COLORS.Female }}
-                    >
-                      Female
-                    </TableHead>
-                    <TableHead className="text-right font-bold">
-                      Total
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats.participantsBySchool.map((school, index) => (
-                    <TableRow
-                      key={index}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <TableCell className="font-medium">
-                        {school.name || "Not Specified"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {school.male || 0}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {school.female || 0}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {school.total}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Participants by Event */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Participants by Event</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.participantsByEvent}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  interval={0}
+                />
+                <YAxis />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Bar
+                  dataKey="male"
+                  name="Male"
+                  stackId="a"
+                  fill={GENDER_COLORS.Male}
+                />
+                <Bar
+                  dataKey="female"
+                  name="Female"
+                  stackId="a"
+                  fill={GENDER_COLORS.Female}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Detailed Statistics Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Detailed Event Statistics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Event Name</TableHead>
+                <TableHead className="text-right">Total Participants</TableHead>
+                <TableHead className="text-right">Male</TableHead>
+                <TableHead className="text-right">Female</TableHead>
+                <TableHead className="text-right">Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stats.participantsByEvent.map((event, index) => (
+                <TableRow key={index}>
+                  <TableCell className="font-medium">{event.name}</TableCell>
+                  <TableCell className="text-right">{event.total}</TableCell>
+                  <TableCell className="text-right text-blue-600">
+                    {event.male}
+                  </TableCell>
+                  <TableCell className="text-right text-pink-600">
+                    {event.female}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {new Date(event.date).toLocaleDateString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

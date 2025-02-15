@@ -2,12 +2,23 @@
 
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { DemographicsOverview } from "./overview/page";
 import { DetailedAnalysis } from "./detailed-analysis/page";
-import { databases, databaseId, academicPeriodCollectionId } from "@/lib/appwrite";
+import {
+  databases,
+  databaseId,
+  academicPeriodCollectionId,
+} from "@/lib/appwrite";
 import { Query } from "appwrite";
+import ParticipantList from "./participant-list/page";
 
 export default function DemographicAnalysis() {
   const [loading, setLoading] = useState(true);
@@ -82,10 +93,15 @@ export default function DemographicAnalysis() {
         </Select>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="detailed">Detailed Analysis</TabsTrigger>
+          <TabsTrigger value="participants">Participant List</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -93,11 +109,15 @@ export default function DemographicAnalysis() {
         </TabsContent>
 
         <TabsContent value="detailed">
-          <DetailedAnalysis 
-            selectedPeriod={selectedPeriod} 
+          <DetailedAnalysis
+            selectedPeriod={selectedPeriod}
             setLoading={setLoading}
             setHasParticipants={setHasParticipants}
           />
+        </TabsContent>
+
+        <TabsContent value="participants">
+          <ParticipantList selectedPeriod={selectedPeriod} />
         </TabsContent>
       </Tabs>
     </div>
