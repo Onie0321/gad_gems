@@ -55,6 +55,7 @@ import { useToast } from "@/hooks/use-toast";
 import AcademicPeriodManagement from "./academic-period/page";
 import Archives from "./archives/page";
 import TimeoutWarningModal from "@/components/modals/TimeoutWarningModal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
@@ -126,7 +127,10 @@ export default function AdminDashboard() {
       // Set new timers
       inactivityTimer = setTimeout(() => {
         setShowTimeoutWarning(true);
-        warningTimer = setTimeout(handleSessionTimeout, WARNING_DURATION * 1000);
+        warningTimer = setTimeout(
+          handleSessionTimeout,
+          WARNING_DURATION * 1000
+        );
       }, INACTIVITY_TIMEOUT - WARNING_DURATION * 1000);
     };
 
@@ -146,8 +150,8 @@ export default function AdminDashboard() {
       "scroll",
       "click",
     ];
-    
-    events.forEach(event => {
+
+    events.forEach((event) => {
       document.addEventListener(event, handleActivity);
     });
 
@@ -156,7 +160,7 @@ export default function AdminDashboard() {
 
     // Cleanup
     return () => {
-      events.forEach(event => {
+      events.forEach((event) => {
         document.removeEventListener(event, handleActivity);
       });
       clearTimeout(inactivityTimer);
@@ -301,8 +305,51 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+        {/* Sidebar Skeleton */}
+        <aside className="hidden w-64 overflow-y-auto bg-white dark:bg-gray-800 md:block">
+          <div className="flex h-full flex-col">
+            <div className="p-5">
+              <Skeleton className="h-8 w-32 mx-auto" />
+            </div>
+            <div className="space-y-4 p-5">
+              {[...Array(7)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content Skeleton */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Top Bar Skeleton */}
+          <header className="flex h-16 items-center justify-between border-b bg-white px-6 dark:border-gray-700 dark:bg-gray-800">
+            <Skeleton className="h-8 w-48" />
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
+            </div>
+          </header>
+
+          {/* Main Content Skeleton */}
+          <main className="flex-1 overflow-y-auto p-6">
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+
+            {/* Charts/Tables Skeleton */}
+            <div className="grid gap-4 md:grid-cols-2 mb-6">
+              <Skeleton className="h-[300px] w-full" />
+              <Skeleton className="h-[300px] w-full" />
+            </div>
+
+            {/* Table Skeleton */}
+            <Skeleton className="h-[400px] w-full" />
+          </main>
+        </div>
       </div>
     );
   }
@@ -318,8 +365,45 @@ export default function AdminDashboard() {
 
   if (!currentUser) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+        {/* Sidebar Skeleton */}
+        <aside className="hidden w-64 overflow-y-auto bg-white dark:bg-gray-800 md:block">
+          <div className="flex h-full flex-col">
+            <div className="p-5">
+              <Skeleton className="h-8 w-32 mx-auto" />
+            </div>
+            <div className="space-y-4 p-5">
+              {[...Array(7)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content Skeleton */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Top Bar Skeleton */}
+          <header className="flex h-16 items-center justify-between border-b bg-white px-6 dark:border-gray-700 dark:bg-gray-800">
+            <Skeleton className="h-8 w-48" />
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
+            </div>
+          </header>
+
+          {/* Main Content Skeleton */}
+          <main className="flex-1 overflow-y-auto p-6">
+            {/* User Profile Skeleton */}
+            <div className="mb-6">
+              <Skeleton className="h-20 w-full max-w-sm rounded-lg" />
+            </div>
+
+            {/* Loading Message */}
+            <div className="flex items-center justify-center">
+              <Skeleton className="h-6 w-48" />
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
