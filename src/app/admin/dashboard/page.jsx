@@ -64,6 +64,7 @@ export default function DashboardOverview({
   const [verifiedUsers, setVerifiedUsers] = useState(0);
   const [unverifiedUsers, setUnverifiedUsers] = useState(0);
   const [chartData, setChartData] = useState([]);
+  const [ethnicDistribution, setEthnicDistribution] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -169,45 +170,315 @@ export default function DashboardOverview({
 
   useEffect(() => {
     // Calculate total male/female counts across all participants
+    if (!participants || participants.length === 0) {
+      return;
+    }
+
     const maleCount = participants.filter((p) => p.sex === "Male").length;
     const femaleCount = participants.filter((p) => p.sex === "Female").length;
+
+    // Calculate all the detailed counts at once
+    const maleStudents = participants.filter(
+      (p) => p.participantType === "Student" && p.sex === "Male"
+    ).length;
+    const maleStaffFaculty = participants.filter(
+      (p) => p.participantType === "Staff/Faculty" && p.sex === "Male"
+    ).length;
+    const maleCommunity = participants.filter(
+      (p) => p.participantType === "Community Member" && p.sex === "Male"
+    ).length;
+    const femaleStudents = participants.filter(
+      (p) => p.participantType === "Student" && p.sex === "Female"
+    ).length;
+    const femaleStaffFaculty = participants.filter(
+      (p) => p.participantType === "Staff/Faculty" && p.sex === "Female"
+    ).length;
+    const femaleCommunity = participants.filter(
+      (p) => p.participantType === "Community Member" && p.sex === "Female"
+    ).length;
 
     const newSexDistribution = [
       {
         name: "Male",
         value: maleCount,
         details: {
-          students: participants.filter(
-            (p) => p.participantType === "Student" && p.sex === "Male"
-          ).length,
-          staffFaculty: participants.filter(
-            (p) => p.participantType === "Staff/Faculty" && p.sex === "Male"
-          ).length,
-          community: participants.filter(
-            (p) => p.participantType === "Community Member" && p.sex === "Male"
-          ).length,
+          students: maleStudents,
+          staffFaculty: maleStaffFaculty,
+          community: maleCommunity,
         },
       },
       {
         name: "Female",
         value: femaleCount,
         details: {
-          students: participants.filter(
-            (p) => p.participantType === "Student" && p.sex === "Female"
-          ).length,
-          staffFaculty: participants.filter(
-            (p) => p.participantType === "Staff/Faculty" && p.sex === "Female"
-          ).length,
-          community: participants.filter(
-            (p) =>
-              p.participantType === "Community Member" && p.sex === "Female"
-          ).length,
+          students: femaleStudents,
+          staffFaculty: femaleStaffFaculty,
+          community: femaleCommunity,
         },
       },
     ];
 
     setSexDistribution(newSexDistribution);
   }, [participants]);
+
+  const calculateAgeDistribution = (participants) => {
+    // Initialize age groups with counts
+    const ageGroups = {
+      "Below 18": { male: 0, female: 0, total: 0 },
+      "18-24": { male: 0, female: 0, total: 0 },
+      "25-34": { male: 0, female: 0, total: 0 },
+      "35-44": { male: 0, female: 0, total: 0 },
+      "45-54": { male: 0, female: 0, total: 0 },
+      "Above 55": { male: 0, female: 0, total: 0 },
+    };
+
+    // Count participants in each age group
+    let totalMale = 0;
+    let totalFemale = 0;
+    let grandTotal = 0;
+
+    participants.forEach((participant) => {
+      const age = parseInt(participant.age);
+      const sex = participant.sex?.toLowerCase() || "unknown";
+
+      if (isNaN(age)) return;
+
+      let ageGroup;
+      if (age < 18) ageGroup = "Below 18";
+      else if (age <= 24) ageGroup = "18-24";
+      else if (age <= 34) ageGroup = "25-34";
+      else if (age <= 44) ageGroup = "35-44";
+      else if (age <= 54) ageGroup = "45-54";
+      else ageGroup = "Above 55";
+
+      // Update totals
+      if (sex === "male") {
+        totalMale++;
+        ageGroups[ageGroup].male++;
+      } else if (sex === "female") {
+        totalFemale++;
+        ageGroups[ageGroup].female++;
+      }
+      ageGroups[ageGroup].total++;
+      grandTotal++;
+    });
+
+    const distribution = Object.entries(ageGroups).map(([name, counts]) => ({
+      name,
+      value: counts.total,
+      male: counts.male,
+      female: counts.female,
+    }));
+
+    // Add total row
+    distribution.push({
+      name: "Total",
+      value: grandTotal,
+      male: totalMale,
+      female: totalFemale,
+    });
+
+    return distribution;
+  };
+
+  const calculateLocationDistribution = (participants) => {
+    // Create a map to store location counts
+    const locationCounts = new Map();
+    let totalMale = 0;
+    let totalFemale = 0;
+    let grandTotal = 0;
+
+    participants.forEach((participant) => {
+      const location = participant.address?.trim() || "Unknown";
+      const sex = participant.sex?.toLowerCase() || "unknown";
+      const type = participant.participantType;
+
+      if (!locationCounts.has(location)) {
+        locationCounts.set(location, {
+          male: 0,
+          female: 0,
+          total: 0,
+          students: 0,
+          staffFaculty: 0,
+          community: 0,
+        });
+      }
+
+      const counts = locationCounts.get(location);
+      counts.total++;
+      grandTotal++;
+
+      if (sex === "male") {
+        counts.male++;
+        totalMale++;
+      } else if (sex === "female") {
+        counts.female++;
+        totalFemale++;
+      }
+
+      // Count by participant type
+      if (type === "Student") counts.students++;
+      else if (type === "Staff/Faculty") counts.staffFaculty++;
+      else if (type === "Community Member") counts.community++;
+    });
+
+    const distribution = Array.from(locationCounts, ([name, counts]) => ({
+      name,
+      value: counts.total,
+      male: counts.male,
+      female: counts.female,
+      details: {
+        students: counts.students,
+        staffFaculty: counts.staffFaculty,
+        community: counts.community,
+      },
+    }));
+
+    // Add total row
+    distribution.push({
+      name: "Total",
+      value: grandTotal,
+      male: totalMale,
+      female: totalFemale,
+      details: {
+        students: distribution.reduce(
+          (sum, item) => sum + item.details.students,
+          0
+        ),
+        staffFaculty: distribution.reduce(
+          (sum, item) => sum + item.details.staffFaculty,
+          0
+        ),
+        community: distribution.reduce(
+          (sum, item) => sum + item.details.community,
+          0
+        ),
+      },
+    });
+
+    return distribution;
+  };
+
+  const calculateEthnicDistribution = (participants) => {
+    // Create a map to store ethnic group counts
+    const ethnicCounts = new Map();
+    let totalMale = 0;
+    let totalFemale = 0;
+    let grandTotal = 0;
+
+    participants.forEach((participant) => {
+      const ethnicGroup =
+        participant.ethnicGroup?.trim() ||
+        participant.otherEthnicGroup?.trim() ||
+        "Unspecified";
+      const sex = participant.sex?.toLowerCase() || "unknown";
+      const type = participant.participantType;
+
+      if (!ethnicCounts.has(ethnicGroup)) {
+        ethnicCounts.set(ethnicGroup, {
+          male: 0,
+          female: 0,
+          total: 0,
+          students: 0,
+          staffFaculty: 0,
+          community: 0,
+        });
+      }
+
+      const counts = ethnicCounts.get(ethnicGroup);
+      counts.total++;
+      grandTotal++;
+
+      if (sex === "male") {
+        counts.male++;
+        totalMale++;
+      } else if (sex === "female") {
+        counts.female++;
+        totalFemale++;
+      }
+
+      // Count by participant type
+      if (type === "Student") counts.students++;
+      else if (type === "Staff/Faculty") counts.staffFaculty++;
+      else if (type === "Community Member") counts.community++;
+    });
+
+    // Convert to array format for the chart
+    const distribution = Array.from(ethnicCounts, ([name, counts]) => ({
+      name,
+      value: counts.total,
+      male: counts.male,
+      female: counts.female,
+      details: {
+        students: counts.students,
+        staffFaculty: counts.staffFaculty,
+        community: counts.community,
+      },
+    }));
+
+    // Add total row
+    distribution.push({
+      name: "Total",
+      value: grandTotal,
+      male: totalMale,
+      female: totalFemale,
+      details: {
+        students: distribution.reduce(
+          (sum, item) => sum + item.details.students,
+          0
+        ),
+        staffFaculty: distribution.reduce(
+          (sum, item) => sum + item.details.staffFaculty,
+          0
+        ),
+        community: distribution.reduce(
+          (sum, item) => sum + item.details.community,
+          0
+        ),
+      },
+    });
+
+    return distribution;
+  };
+
+  useEffect(() => {
+    if (
+      !participants ||
+      participants.length === 0 ||
+      ageDistribution.length > 0
+    ) {
+      return;
+    }
+
+    const newAgeDistribution = calculateAgeDistribution(participants);
+    setAgeDistribution(newAgeDistribution);
+  }, [participants, ageDistribution]);
+
+  useEffect(() => {
+    if (
+      !participants ||
+      participants.length === 0 ||
+      locationDistribution.length > 0
+    ) {
+      return;
+    }
+
+    const newLocationDistribution = calculateLocationDistribution(participants);
+    setLocationDistribution(newLocationDistribution);
+  }, [participants, locationDistribution]);
+
+  useEffect(() => {
+    if (
+      !participants ||
+      participants.length === 0 ||
+      ethnicDistribution.length > 0
+    ) {
+      return;
+    }
+
+    const newEthnicDistribution = calculateEthnicDistribution(participants);
+    setEthnicDistribution(newEthnicDistribution);
+  }, [participants, ethnicDistribution]);
 
   const fetchDashboardData = async () => {
     try {
@@ -221,14 +492,8 @@ export default function DashboardOverview({
       }
 
       // Calculate statistics
-      const {
-        totalEvents,
-        academicEvents,
-        nonAcademicEvents,
-        sexDistribution,
-        ageDistribution,
-        locationDistribution,
-      } = await fetchTotals(currentPeriod.$id);
+      const { totalEvents, academicEvents, nonAcademicEvents } =
+        await fetchTotals(currentPeriod.$id);
 
       // Fetch user statistics
       const usersResponse = await databases.listDocuments(
@@ -251,28 +516,10 @@ export default function DashboardOverview({
       setTotalEvents(totalEvents);
       setAcademicEvents(academicEvents);
       setNonAcademicEvents(nonAcademicEvents);
-      setSexDistribution(sexDistribution);
-      setAgeDistribution(ageDistribution);
-      setLocationDistribution(locationDistribution);
 
-      // Ensure data is properly formatted and contains no NaN values
-      const validData = [
-        {
-          name: "Male",
-          value: Number.isNaN(sexDistribution[0].value)
-            ? 0
-            : sexDistribution[0].value,
-          details: sexDistribution[0].details,
-        },
-        {
-          name: "Female",
-          value: Number.isNaN(sexDistribution[1].value)
-            ? 0
-            : sexDistribution[1].value,
-          details: sexDistribution[1].details,
-        },
-      ];
-      setSexDistribution(validData);
+      // Calculate ethnic distribution
+      const ethnicDistribution = calculateEthnicDistribution(participants);
+      setEthnicDistribution(ethnicDistribution);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       setError(error.message);
@@ -280,17 +527,6 @@ export default function DashboardOverview({
       setIsLoading(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4">Loading dashboard data...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -567,7 +803,7 @@ export default function DashboardOverview({
           </CardHeader>
           <CardContent>
             <div className="h-[120px]">
-              {sexDistribution.length > 0 ? (
+              {sexDistribution && sexDistribution.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -593,7 +829,7 @@ export default function DashboardOverview({
                       ))}
                     </Pie>
                     <Tooltip
-                      content={({ active, payload, label }) => {
+                      content={({ active, payload }) => {
                         if (active && payload && payload.length > 0) {
                           const data = payload[0].payload;
                           return (
@@ -723,9 +959,9 @@ export default function DashboardOverview({
                           <div className="flex flex-col items-center">
                             <div>Total: {eventParticipants.length}</div>
                             <div className="text-xs text-muted-foreground space-x-2">
-                              <span>S: {counts.students}</span>
-                              <span>F: {counts.staffFaculty}</span>
-                              <span>C: {counts.community}</span>
+                              <span>S: {counts.students} |</span>
+                              <span>F: {counts.staffFaculty} |</span>
+                              <span>C: {counts.community} </span>
                             </div>
                           </div>
                         </TableCell>
@@ -789,7 +1025,11 @@ export default function DashboardOverview({
                 <div className="h-[300px]">
                   {ageDistribution.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={ageDistribution}>
+                      <BarChart
+                        data={ageDistribution.filter(
+                          (item) => item.name !== "Total"
+                        )}
+                      >
                         <XAxis
                           dataKey="name"
                           angle={-45}
@@ -817,18 +1057,30 @@ export default function DashboardOverview({
                           dataKey="value"
                           fill="#8884d8"
                           label={{
-                            position: "top",
+                            position: "inside",
                             formatter: (value) => Math.round(value),
+                            style: {
+                              fontSize: "16px",
+                              fontWeight: "bold",
+                              fill: "white",
+                              textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
+                            },
+                            content: (props) => {
+                              const { value } = props;
+                              return value > 0 ? Math.round(value) : "";
+                            },
                           }}
                         >
-                          {ageDistribution.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={`hsl(${
-                                index * (360 / ageDistribution.length)
-                              }, 70%, 60%)`}
-                            />
-                          ))}
+                          {ageDistribution
+                            .filter((item) => item.name !== "Total")
+                            .map((item, index) => (
+                              <Cell
+                                key={item.name}
+                                fill={`hsl(${
+                                  index * (360 / (ageDistribution.length - 1))
+                                }, 70%, 60%)`}
+                              />
+                            ))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -851,30 +1103,27 @@ export default function DashboardOverview({
                     </TableHeader>
                     <TableBody>
                       {ageDistribution.map((item, index) => {
-                        const total = ageDistribution.reduce(
-                          (sum, curr) => sum + curr.value,
-                          0
-                        );
-                        const percentage = ((item.value / total) * 100).toFixed(
-                          1
-                        );
+                        const isTotal = item.name === "Total";
                         return (
-                          <TableRow key={item.name}>
-                            <TableCell className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{
-                                  backgroundColor: `hsl(${
-                                    index * (360 / ageDistribution.length)
-                                  }, 70%, 60%)`,
-                                }}
-                              />
-                              {item.name}
-                            </TableCell>
+                          <TableRow
+                            key={item.name}
+                            className={isTotal ? "font-bold bg-muted/50" : ""}
+                          >
+                            <TableCell>{item.name}</TableCell>
                             <TableCell>{item.value}</TableCell>
                             <TableCell>{item.male}</TableCell>
                             <TableCell>{item.female}</TableCell>
-                            <TableCell>{percentage}%</TableCell>
+                            <TableCell>
+                              {isTotal
+                                ? "100%"
+                                : `${(
+                                    (item.value /
+                                      ageDistribution[
+                                        ageDistribution.length - 1
+                                      ].value) *
+                                    100
+                                  ).toFixed(1)}%`}
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -888,28 +1137,31 @@ export default function DashboardOverview({
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={locationDistribution}
+                          data={locationDistribution.filter(
+                            (item) => item.name !== "Total"
+                          )}
                           dataKey="value"
                           nameKey="name"
                           cx="50%"
                           cy="50%"
                           outerRadius={100}
-                          label={({ name, value, percent }) =>
-                            `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
-                          }
+                          label={({ name }) => name}
                           labelLine={true}
                         >
-                          {locationDistribution.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={`hsl(${
-                                index * (360 / locationDistribution.length)
-                              }, 70%, 60%)`}
-                            />
-                          ))}
+                          {locationDistribution
+                            .filter((item) => item.name !== "Total")
+                            .map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={`hsl(${
+                                  index *
+                                  (360 / (locationDistribution.length - 1))
+                                }, 70%, 60%)`}
+                              />
+                            ))}
                         </Pie>
                         <Tooltip
-                          content={({ active, payload, label }) => {
+                          content={({ active, payload }) => {
                             if (active && payload && payload.length > 0) {
                               const data = payload[0].payload;
                               return (
@@ -921,7 +1173,10 @@ export default function DashboardOverview({
                                   <p>
                                     Percentage:{" "}
                                     {(
-                                      (data.value / participants.length) *
+                                      (data.value /
+                                        locationDistribution[
+                                          locationDistribution.length - 1
+                                        ].value) *
                                       100
                                     ).toFixed(1)}
                                     %
@@ -941,44 +1196,60 @@ export default function DashboardOverview({
                   )}
                 </div>
                 <div className="mt-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Male</TableHead>
-                        <TableHead>Female</TableHead>
-                        <TableHead>Percentage</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {locationDistribution.map((item, index) => {
-                        const percentage = (
-                          (item.value / participants.length) *
-                          100
-                        ).toFixed(1);
-                        return (
-                          <TableRow key={item.name}>
-                            <TableCell className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{
-                                  backgroundColor: `hsl(${
-                                    index * (360 / locationDistribution.length)
-                                  }, 70%, 60%)`,
-                                }}
-                              />
-                              {item.name}
-                            </TableCell>
-                            <TableCell>{item.value}</TableCell>
-                            <TableCell>{item.male}</TableCell>
-                            <TableCell>{item.female}</TableCell>
-                            <TableCell>{percentage}%</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                  <div className="max-h-[300px] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead>Location</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Male</TableHead>
+                          <TableHead>Female</TableHead>
+                          <TableHead>Percentage</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {locationDistribution.map((item, index) => {
+                          const isTotal = item.name === "Total";
+                          return (
+                            <TableRow
+                              key={item.name}
+                              className={isTotal ? "font-bold bg-muted/50" : ""}
+                            >
+                              <TableCell className="flex items-center gap-2">
+                                {!isTotal && (
+                                  <div
+                                    className="w-3 h-3 rounded-full"
+                                    style={{
+                                      backgroundColor: `hsl(${
+                                        index *
+                                        (360 /
+                                          (locationDistribution.length - 1))
+                                      }, 70%, 60%)`,
+                                    }}
+                                  />
+                                )}
+                                {item.name}
+                              </TableCell>
+                              <TableCell>{item.value}</TableCell>
+                              <TableCell>{item.male}</TableCell>
+                              <TableCell>{item.female}</TableCell>
+                              <TableCell>
+                                {isTotal
+                                  ? "100%"
+                                  : `${(
+                                      (item.value /
+                                        locationDistribution[
+                                          locationDistribution.length - 1
+                                        ].value) *
+                                      100
+                                    ).toFixed(1)}%`}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
