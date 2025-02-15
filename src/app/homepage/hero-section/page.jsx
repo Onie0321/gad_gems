@@ -57,8 +57,8 @@ export default function HeroSection() {
               <Image
                 src="/logo/gadfb.png"
                 alt="Hero Image"
-                width={500}
-                height={500}
+                width={400}
+                height={400}
                 priority
                 className="relative w-full h-auto object-cover rounded-2xl shadow-2xl transform hover:scale-105 transition-transform duration-300"
               />
