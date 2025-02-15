@@ -14,6 +14,7 @@ import { CalendarIcon } from "lucide-react";
 import { databases, databaseId, newsCollectionId } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { motion } from "framer-motion";
+import { Newspaper } from "lucide-react";
 
 export default function NewsSection() {
   const [mounted, setMounted] = useState(false);
@@ -98,14 +99,23 @@ export default function NewsSection() {
       className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30"
     >
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600 mb-4">
-            Latest News
-          </h2>
+        <motion.div 
+          className="text-center mb-12"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Newspaper className="w-8 h-8 text-violet-600" />
+            <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+              Latest News
+            </h2>
+          </div>
           <p className="text-gray-600 max-w-2xl mx-auto">
             Stay updated with our latest announcements and developments
           </p>
-        </div>
+        </motion.div>
         {renderContent()}
         {mounted && visibleNews < news.length && (
           <div className="mt-12 text-center">

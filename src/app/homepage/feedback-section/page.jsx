@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { MapPin } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function FeedbackSection() {
   return (
@@ -9,25 +11,34 @@ export default function FeedbackSection() {
       className="py-24 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30"
     >
       <div className="container mx-auto px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600 mb-6">
-            Our Office
-          </h2>
+        <motion.div
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <MapPin className="w-8 h-8 text-violet-600" />
+            <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+              Our Office
+            </h2>
+          </div>
           <p className="text-gray-600 max-w-2xl mx-auto">
             Visit us at our main campus or reach out through our various
             communication channels.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-16 items-start">
+        <div className="grid md:grid-cols-2 gap-8 items-start">
           {/* Contact Information */}
-          <div className="space-y-8 order-2 md:order-1">
-            <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 ring-1 ring-gray-200/50 transform hover:-translate-y-1">
-              <div className="space-y-6 text-gray-600">
-                <div className="flex items-start space-x-4 group">
-                  <div className="bg-violet-100 p-3 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+          <div className="order-2 md:order-1 h-[432px]">
+            <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 ring-1 ring-gray-200/50 transform hover:-translate-y-1 h-full flex items-center justify-center">
+              <div className="space-y-12 text-gray-600 w-full max-w-md">
+                <div className="flex items-center space-x-6 group">
+                  <div className="bg-violet-100 p-4 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
                     <svg
-                      className="w-6 h-6 text-violet-600"
+                      className="w-8 h-8 text-violet-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -46,19 +57,19 @@ export default function FeedbackSection() {
                       />
                     </svg>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800 mb-1">
+                  <div className="text-center flex-1">
+                    <h3 className="font-semibold text-gray-800 mb-2 text-lg">
                       Address
                     </h3>
-                    <p>Brgy. Zabali, Baler, Aurora</p>
-                    <p>Gen Ed, Second Floor</p>
+                    <p className="text-base">Brgy. Zabali, Baler, Aurora</p>
+                    <p className="text-base">Gen Ed, Second Floor</p>
                   </div>
                 </div>
 
-                <div className="flex items-start space-x-4 group">
-                  <div className="bg-violet-100 p-3 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+                <div className="flex items-center space-x-6 group">
+                  <div className="bg-violet-100 p-4 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
                     <svg
-                      className="w-6 h-6 text-violet-600"
+                      className="w-8 h-8 text-violet-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -71,16 +82,18 @@ export default function FeedbackSection() {
                       />
                     </svg>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800 mb-1">Phone</h3>
-                    <p>+63 9123456789</p>
+                  <div className="text-center flex-1">
+                    <h3 className="font-semibold text-gray-800 mb-2 text-lg">
+                      Phone
+                    </h3>
+                    <p className="text-base">+63 9123456789</p>
                   </div>
                 </div>
 
-                <div className="flex items-start space-x-4 group">
-                  <div className="bg-violet-100 p-3 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+                <div className="flex items-center space-x-6 group">
+                  <div className="bg-violet-100 p-4 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
                     <svg
-                      className="w-6 h-6 text-violet-600"
+                      className="w-8 h-8 text-violet-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -93,11 +106,13 @@ export default function FeedbackSection() {
                       />
                     </svg>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800 mb-1">Email</h3>
+                  <div className="text-center flex-1">
+                    <h3 className="font-semibold text-gray-800 mb-2 text-lg">
+                      Email
+                    </h3>
                     <a
                       href="mailto:gad@ascot.edu.ph"
-                      className="text-violet-600 hover:text-violet-700 transition-colors duration-300"
+                      className="text-violet-600 hover:text-violet-700 transition-colors duration-300 text-base"
                     >
                       gad@ascot.edu.ph
                     </a>
