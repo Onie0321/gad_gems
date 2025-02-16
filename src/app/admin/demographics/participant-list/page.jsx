@@ -34,8 +34,6 @@ import {
   ArrowUpDown,
   Eye,
   Edit2,
-  Male,
-  Female,
 } from "lucide-react";
 import {
   databases,
@@ -45,11 +43,18 @@ import {
   communityCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const SortableTableHead = ({ children, onClick }) => (
   <TableHead
     onClick={onClick}
-    className="bg-gray-100 text-black font-bold cursor-pointer hover:bg-gray-200"
+    className="bg-gray-200 text-black font-bold cursor-pointer hover:bg-gray-300"
   >
     <div className="flex items-center gap-2">
       {children}
@@ -58,7 +63,7 @@ const SortableTableHead = ({ children, onClick }) => (
   </TableHead>
 );
 
-const ParticipantDetails = ({ data, title }) => (
+export const ParticipantDetails = ({ data, title }) => (
   <Dialog>
     <DialogTrigger asChild>
       <Button variant="ghost" size="icon">
@@ -69,54 +74,81 @@ const ParticipantDetails = ({ data, title }) => (
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
-      <div className="grid gap-4 py-4">
-        {Object.entries(data).map(([key, value]) =>
-          key !== "$id" ? (
-            <div key={key} className="grid grid-cols-2 gap-4">
-              <span className="font-semibold">{key}</span>
-              <span>{value?.toString() || ""}</span>
+      <div className="grid gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <div>
+              <strong>Name:</strong> {data.name}
             </div>
-          ) : null
-        )}
+            <div>
+              <strong>Sex:</strong> {data.sex}
+            </div>
+            <div>
+              <strong>Age:</strong> {data.age}
+            </div>
+            <div>
+              <strong>School:</strong> {data.school}
+            </div>
+            <div>
+              <strong>Year:</strong> {data.year}
+            </div>
+            <div>
+              <strong>Section:</strong> {data.section}
+            </div>
+
+            <div>
+              <strong>Address:</strong> {data.address}
+            </div>
+            <div>
+              <strong>Ethnic Group:</strong>{" "}
+              {data.ethnicGroup?.toLowerCase() === "other"
+                ? data.otherEthnicGroup || "Other"
+                : data.ethnicGroup}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DialogContent>
   </Dialog>
 );
 
-export default function ParticipantList({ selectedPeriod }) {
+export function ParticipantList({ selectedPeriod }) {
   const [loading, setLoading] = useState(true);
   const [participants, setParticipants] = useState({
     students: [],
     staffFaculty: [],
     community: [],
   });
-  const [activeParticipantTab, setActiveParticipantTab] = useState("students");
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-  const [selectedParticipant, setSelectedParticipant] = useState(null);
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: "asc",
+  });
+  const [pageSize, setPageSize] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchParticipants = async () => {
       if (!selectedPeriod) return;
 
       try {
-        const [students, staff, community] = await Promise.all([
+        const [students, staffFaculty, community] = await Promise.all([
           databases.listDocuments(databaseId, studentsCollectionId, [
             Query.equal("academicPeriodId", selectedPeriod),
-            Query.equal("isArchived", false),
           ]),
           databases.listDocuments(databaseId, staffFacultyCollectionId, [
             Query.equal("academicPeriodId", selectedPeriod),
-            Query.equal("isArchived", false),
           ]),
           databases.listDocuments(databaseId, communityCollectionId, [
             Query.equal("academicPeriodId", selectedPeriod),
-            Query.equal("isArchived", false),
           ]),
         ]);
 
         setParticipants({
           students: students.documents,
-          staffFaculty: staff.documents,
+          staffFaculty: staffFaculty.documents,
           community: community.documents,
         });
         setLoading(false);
@@ -152,324 +184,470 @@ export default function ParticipantList({ selectedPeriod }) {
   };
 
   const handleEdit = (participant) => {
-    setSelectedParticipant(participant);
-    // Add your edit logic here
+    // Implement edit functionality
+    console.log("Edit participant:", participant);
+  };
+
+  const truncateText = (text, maxLength = 20) => {
+    if (!text) return ""; // Handle null/undefined values
+    return text.length > maxLength
+      ? `${text.substring(0, maxLength)}...`
+      : text;
+  };
+
+  const getPaginatedData = (data) => {
+    const sorted = getSortedData(data);
+    const startIndex = (currentPage - 1) * pageSize;
+    return sorted.slice(startIndex, startIndex + pageSize);
+  };
+
+  const getTotalPages = (dataLength) => {
+    return Math.ceil(dataLength / pageSize);
+  };
+
+  const getEthnicGroupDisplay = (participant) => {
+    if (participant.ethnicGroup?.toLowerCase() === "other") {
+      return participant.otherEthnicGroup || "Other";
+    }
+    return participant.ethnicGroup;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
-  const participantCounts = {
-    students: participants.students.length,
-    staffFaculty: participants.staffFaculty.length,
-    community: participants.community.length,
-    total:
-      participants.students.length +
-      participants.staffFaculty.length +
-      participants.community.length,
-    maleCounts: {
-      students: participants.students.filter(
-        (p) => p.sex?.toLowerCase() === "male"
-      ).length,
-      staffFaculty: participants.staffFaculty.filter(
-        (p) => p.sex?.toLowerCase() === "male"
-      ).length,
-      community: participants.community.filter(
-        (p) => p.sex?.toLowerCase() === "male"
-      ).length,
-    },
-    femaleCounts: {
-      students: participants.students.filter(
-        (p) => p.sex?.toLowerCase() === "female"
-      ).length,
-      staffFaculty: participants.staffFaculty.filter(
-        (p) => p.sex?.toLowerCase() === "female"
-      ).length,
-      community: participants.community.filter(
-        (p) => p.sex?.toLowerCase() === "female"
-      ).length,
-    },
-  };
-
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-lg border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Total Participants</h3>
-              <p className="text-2xl font-bold">{participantCounts.total}</p>
-              <div className="flex gap-4 mt-2 text-sm">
-                <span className="flex items-center gap-1">
-                  <Male className="h-4 w-4" />
-                  {participantCounts.maleCounts.students +
-                    participantCounts.maleCounts.staffFaculty +
-                    participantCounts.maleCounts.community}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Female className="h-4 w-4" />
-                  {participantCounts.femaleCounts.students +
-                    participantCounts.femaleCounts.staffFaculty +
-                    participantCounts.femaleCounts.community}
-                </span>
-              </div>
-            </div>
-            <Users className="h-8 w-8 text-gray-400" />
-          </div>
-        </div>
-        <div className="rounded-lg border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Students</h3>
-              <p className="text-2xl font-bold">{participantCounts.students}</p>
-              <div className="flex gap-4 mt-2 text-sm">
-                <span className="flex items-center gap-1">
-                  <Male className="h-4 w-4" />
-                  {participantCounts.maleCounts.students}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Female className="h-4 w-4" />
-                  {participantCounts.femaleCounts.students}
-                </span>
-              </div>
-            </div>
-            <GraduationCap className="h-8 w-8 text-gray-400" />
-          </div>
-        </div>
-        <div className="rounded-lg border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Staff/Faculty</h3>
-              <p className="text-2xl font-bold">
-                {participantCounts.staffFaculty}
-              </p>
-              <div className="flex gap-4 mt-2 text-sm">
-                <span className="flex items-center gap-1">
-                  <Male className="h-4 w-4" />
-                  {participantCounts.maleCounts.staffFaculty}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Female className="h-4 w-4" />
-                  {participantCounts.femaleCounts.staffFaculty}
-                </span>
-              </div>
-            </div>
-            <Briefcase className="h-8 w-8 text-gray-400" />
-          </div>
-        </div>
-        <div className="rounded-lg border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Community</h3>
-              <p className="text-2xl font-bold">
-                {participantCounts.community}
-              </p>
-              <div className="flex gap-4 mt-2 text-sm">
-                <span className="flex items-center gap-1">
-                  <Male className="h-4 w-4" />
-                  {participantCounts.maleCounts.community}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Female className="h-4 w-4" />
-                  {participantCounts.femaleCounts.community}
-                </span>
-              </div>
-            </div>
-            <Home className="h-8 w-8 text-gray-400" />
-          </div>
-        </div>
-      </div>
-
-      {/* Participant Tables */}
-      <Tabs
-        value={activeParticipantTab}
-        onValueChange={setActiveParticipantTab}
-      >
+      <Tabs defaultValue="students" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="students">Students</TabsTrigger>
-          <TabsTrigger value="staffFaculty">Staff/Faculty</TabsTrigger>
-          <TabsTrigger value="community">Community</TabsTrigger>
+          <TabsTrigger value="students" className="flex items-center gap-2">
+            <GraduationCap className="h-4 w-4" />
+            Students ({participants.students.length})
+          </TabsTrigger>
+          <TabsTrigger value="staffFaculty" className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            Staff/Faculty ({participants.staffFaculty.length})
+          </TabsTrigger>
+          <TabsTrigger value="community" className="flex items-center gap-2">
+            <Home className="h-4 w-4" />
+            Community ({participants.community.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="students">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead onClick={() => handleSort("name")}>
-                  Name
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("studentId")}>
-                  Student ID
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("sex")}>
-                  Sex
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("age")}>
-                  Age
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("school")}>
-                  School
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("year")}>
-                  Year
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("section")}>
-                  Section
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("ethnicGroup")}>
-                  Ethnic Group
-                </SortableTableHead>
-                <TableHead className="bg-gray-100 text-black font-bold">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {getSortedData(participants.students).map((student) => (
-                <TableRow key={student.$id}>
-                  <TableCell>{student.name}</TableCell>
-                  <TableCell>{student.studentId}</TableCell>
-                  <TableCell>{student.sex}</TableCell>
-                  <TableCell>{student.age}</TableCell>
-                  <TableCell>{student.school}</TableCell>
-                  <TableCell>{student.year}</TableCell>
-                  <TableCell>{student.section}</TableCell>
-                  <TableCell>{student.ethnicGroup}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <ParticipantDetails
-                        data={student}
-                        title="Student Details"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(student)}
+          <Card>
+            <CardHeader>
+              <CardTitle>Student List</CardTitle>
+              <CardDescription>
+                Manage and view all student participants
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-end gap-2">
+                  <span className="text-sm">Rows per page:</span>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="15">15</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableTableHead
+                        onClick={() => handleSort("studentId")}
                       >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        Student ID
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("name")}>
+                        Name
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("sex")}>
+                        Sex
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("age")}>
+                        Age
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("school")}>
+                        School
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("year")}>
+                        Year
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("section")}>
+                        Section
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("address")}>
+                        Address
+                      </SortableTableHead>
+                      <SortableTableHead
+                        onClick={() => handleSort("ethnicGroup")}
+                      >
+                        Ethnic Group
+                      </SortableTableHead>
+                      <TableHead className="bg-gray-200 text-black font-bold">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getPaginatedData(participants.students).map((student) => (
+                      <TableRow key={student.$id}>
+                        <TableCell>{student.studentId}</TableCell>
+                        <TableCell>{truncateText(student.name)}</TableCell>
+                        <TableCell>{student.sex}</TableCell>
+                        <TableCell>{student.age}</TableCell>
+                        <TableCell>{truncateText(student.year)}</TableCell>
+                        <TableCell>{truncateText(student.school)}</TableCell>
+                        <TableCell className="text-center">
+                          {student.section}
+                        </TableCell>
+                        <TableCell>{truncateText(student.address)}</TableCell>
+                        <TableCell>
+                          {truncateText(getEthnicGroupDisplay(student))}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <ParticipantDetails
+                              data={student}
+                              title="Student Details"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(student)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-500">
+                    Showing {(currentPage - 1) * pageSize + 1} to{" "}
+                    {Math.min(
+                      currentPage * pageSize,
+                      participants.students.length
+                    )}{" "}
+                    of {participants.students.length} entries
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) =>
+                          Math.min(
+                            getTotalPages(participants.students.length),
+                            p + 1
+                          )
+                        )
+                      }
+                      disabled={
+                        currentPage ===
+                        getTotalPages(participants.students.length)
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="staffFaculty">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead onClick={() => handleSort("name")}>
-                  Name
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("staffFacultyId")}>
-                  Staff/Faculty ID
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("sex")}>
-                  Sex
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("age")}>
-                  Age
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("address")}>
-                  Address
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("ethnicGroup")}>
-                  Ethnic Group
-                </SortableTableHead>
-                <TableHead className="bg-gray-100 text-black font-bold">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {getSortedData(participants.staffFaculty).map((staff) => (
-                <TableRow key={staff.$id}>
-                  <TableCell>{staff.name}</TableCell>
-                  <TableCell>{staff.staffFacultyId}</TableCell>
-                  <TableCell>{staff.sex}</TableCell>
-                  <TableCell>{staff.age}</TableCell>
-                  <TableCell>{staff.address}</TableCell>
-                  <TableCell>{staff.ethnicGroup}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <ParticipantDetails
-                        data={staff}
-                        title="Staff/Faculty Details"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(staff)}
+          <Card>
+            <CardHeader>
+              <CardTitle>Staff and Faculty List</CardTitle>
+              <CardDescription>
+                Manage and view all staff and faculty participants
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-end gap-2">
+                  <span className="text-sm">Rows per page:</span>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="15">15</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableTableHead
+                        onClick={() => handleSort("staffFacultyId")}
                       >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        Staff/Faculty ID
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("name")}>
+                        Name
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("sex")}>
+                        Sex
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("age")}>
+                        Age
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("address")}>
+                        Address
+                      </SortableTableHead>
+                      <SortableTableHead
+                        onClick={() => handleSort("ethnicGroup")}
+                      >
+                        Ethnic Group
+                      </SortableTableHead>
+                      <TableHead className="bg-gray-200 text-black font-bold">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getPaginatedData(participants.staffFaculty).map(
+                      (staff) => (
+                        <TableRow key={staff.$id}>
+                          <TableCell>{staff.staffFacultyId}</TableCell>
+                          <TableCell>{truncateText(staff.name)}</TableCell>
+                          <TableCell>{staff.sex}</TableCell>
+                          <TableCell>{staff.age}</TableCell>
+                          <TableCell>{truncateText(staff.address)}</TableCell>
+                          <TableCell>
+                            {truncateText(getEthnicGroupDisplay(staff))}
+                          </TableCell>{" "}
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <ParticipantDetails
+                                data={staff}
+                                title="Staff/Faculty Details"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(staff)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-500">
+                    Showing {(currentPage - 1) * pageSize + 1} to{" "}
+                    {Math.min(
+                      currentPage * pageSize,
+                      participants.staffFaculty.length
+                    )}{" "}
+                    of {participants.staffFaculty.length} entries
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) =>
+                          Math.min(
+                            getTotalPages(participants.staffFaculty.length),
+                            p + 1
+                          )
+                        )
+                      }
+                      disabled={
+                        currentPage ===
+                        getTotalPages(participants.staffFaculty.length)
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="community">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead onClick={() => handleSort("name")}>
-                  Name
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("sex")}>
-                  Sex
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("age")}>
-                  Age
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("address")}>
-                  Address
-                </SortableTableHead>
-                <SortableTableHead onClick={() => handleSort("ethnicGroup")}>
-                  Ethnic Group
-                </SortableTableHead>
-                <TableHead className="bg-gray-100 text-black font-bold">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {getSortedData(participants.community).map((member) => (
-                <TableRow key={member.$id}>
-                  <TableCell>{member.name}</TableCell>
-                  <TableCell>{member.sex}</TableCell>
-                  <TableCell>{member.age}</TableCell>
-                  <TableCell>{member.address}</TableCell>
-                  <TableCell>{member.ethnicGroup}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <ParticipantDetails
-                        data={member}
-                        title="Community Member Details"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(member)}
+          <Card>
+            <CardHeader>
+              <CardTitle>Community Members List</CardTitle>
+              <CardDescription>
+                Manage and view all community participants
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-end gap-2">
+                  <span className="text-sm">Rows per page:</span>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="15">15</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableTableHead onClick={() => handleSort("name")}>
+                        Name
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("sex")}>
+                        Sex
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("age")}>
+                        Age
+                      </SortableTableHead>
+                      <SortableTableHead onClick={() => handleSort("address")}>
+                        Address
+                      </SortableTableHead>
+                      <SortableTableHead
+                        onClick={() => handleSort("ethnicGroup")}
                       >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        Ethnic Group
+                      </SortableTableHead>
+                      <TableHead className="bg-gray-200 text-black font-bold">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getPaginatedData(participants.community).map((member) => (
+                      <TableRow key={member.$id}>
+                        <TableCell>{truncateText(member.name)}</TableCell>
+                        <TableCell>{member.sex}</TableCell>
+                        <TableCell>{member.age}</TableCell>
+                        <TableCell>{truncateText(member.address)}</TableCell>
+                        <TableCell>
+                          {truncateText(getEthnicGroupDisplay(member))}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <ParticipantDetails
+                              data={member}
+                              title="Community Member Details"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(member)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-500">
+                    Showing {(currentPage - 1) * pageSize + 1} to{" "}
+                    {Math.min(
+                      currentPage * pageSize,
+                      participants.community.length
+                    )}{" "}
+                    of {participants.community.length} entries
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) =>
+                          Math.min(
+                            getTotalPages(participants.community.length),
+                            p + 1
+                          )
+                        )
+                      }
+                      disabled={
+                        currentPage ===
+                        getTotalPages(participants.community.length)
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
