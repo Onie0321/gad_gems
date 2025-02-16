@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Card,
@@ -18,10 +18,15 @@ import {
   CartesianGrid,
 } from "recharts";
 import { UserIcon as Male, UserIcon as Female } from "lucide-react";
-import DataTable from "../data-table/page";
+import DataTable from "./DataTable";
 import { Maximize2 } from "lucide-react";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const COLORS = {
   male: "#2196F3",
@@ -34,21 +39,32 @@ export default function EducationLevel({ data, colors }) {
   console.log("Educational Level Data:", data);
   console.log("Educational Level Data Length:", data?.length);
   console.log("Raw Data Values:", data);
-  console.log("Individual Values Check:", data?.map(item => ({
-    name: item.name,
-    value: item.value,
-    male: item.male,
-    female: item.female,
-    isZero: item.male === 0 && item.female === 0
-  })));
+  console.log(
+    "Individual Values Check:",
+    data?.map((item) => ({
+      name: item.name,
+      value: item.value,
+      male: item.male,
+      female: item.female,
+      isZero: item.male === 0 && item.female === 0,
+    }))
+  );
 
-  if (!data || 
-      data.length === 0 || 
-      data.every(item => (item.male === 0 || !item.male) && (item.female === 0 || !item.female))) {
+  if (
+    !data ||
+    data.length === 0 ||
+    data.every(
+      (item) =>
+        (item.male === 0 || !item.male) && (item.female === 0 || !item.female)
+    )
+  ) {
     console.log("Triggering empty state because:", {
       noData: !data,
       emptyLength: data?.length === 0,
-      allZeros: data?.every(item => (item.male === 0 || !item.male) && (item.female === 0 || !item.female))
+      allZeros: data?.every(
+        (item) =>
+          (item.male === 0 || !item.male) && (item.female === 0 || !item.female)
+      ),
     });
     return (
       <Card className="w-full">
@@ -100,7 +116,7 @@ export default function EducationLevel({ data, colors }) {
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis 
+        <XAxis
           dataKey="name"
           tick={({ x, y, payload }) => (
             <g transform={`translate(${x},${y})`}>
@@ -122,9 +138,7 @@ export default function EducationLevel({ data, colors }) {
         <Legend
           iconType="circle"
           formatter={(value) => (
-            <span style={{ color: COLORS[value.toLowerCase()] }}>
-              {value}
-            </span>
+            <span style={{ color: COLORS[value.toLowerCase()] }}>{value}</span>
           )}
         />
         <Bar
@@ -149,7 +163,9 @@ export default function EducationLevel({ data, colors }) {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Educational Level</CardTitle>
-            <CardDescription>Distribution of participants by educational level</CardDescription>
+            <CardDescription>
+              Distribution of participants by educational level
+            </CardDescription>
           </div>
           <button
             onClick={() => setShowMaximized(true)}

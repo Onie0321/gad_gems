@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Card,
@@ -17,11 +17,16 @@ import {
   Legend,
 } from "recharts";
 import { UserIcon as Male, UserIcon as Female, Maximize2 } from "lucide-react";
-import DataTable from "../data-table/page";
+import DataTable from "./DataTable";
 import { CartesianGrid } from "recharts";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const COLORS = {
   male: "#2196F3",
@@ -49,22 +54,25 @@ const ChartContent = ({ data, height = 300 }) => (
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis type="number" />
       <YAxis dataKey="name" type="category" width={150} />
-      <Tooltip content={({ active, payload, label }) => {
-        if (active && payload && payload.length) {
-          const male = payload.find((p) => p.dataKey === "male")?.value || 0;
-          const female = payload.find((p) => p.dataKey === "female")?.value || 0;
-          const total = male + female;
-          return (
-            <div className="bg-white p-2 border rounded shadow">
-              <p className="font-bold">{label}</p>
-              <p>Male: {male}</p>
-              <p>Female: {female}</p>
-              <p className="font-bold">Total: {total}</p>
-            </div>
-          );
-        }
-        return null;
-      }} />
+      <Tooltip
+        content={({ active, payload, label }) => {
+          if (active && payload && payload.length) {
+            const male = payload.find((p) => p.dataKey === "male")?.value || 0;
+            const female =
+              payload.find((p) => p.dataKey === "female")?.value || 0;
+            const total = male + female;
+            return (
+              <div className="bg-white p-2 border rounded shadow">
+                <p className="font-bold">{label}</p>
+                <p>Male: {male}</p>
+                <p>Female: {female}</p>
+                <p className="font-bold">Total: {total}</p>
+              </div>
+            );
+          }
+          return null;
+        }}
+      />
       <Legend
         iconType="circle"
         formatter={(value, entry) => (

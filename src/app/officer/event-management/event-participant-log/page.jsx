@@ -36,10 +36,10 @@ import {
   staffFacultyCollectionId,
   communityCollectionId,
 } from "@/lib/appwrite";
-import EditEvent from "./edit-event-dialog/page";
+import EditEvent from "./EditEventDialog";
 import ViewParticipants from "./view-participant-dialog/page";
-import ExportEventsButton from "./export-event/page";
-import GenerateReportButton from "./import-event/page";
+import ExportEventsButton from "./ExportEvent";
+import GenerateReportButton from "./ImportEvent";
 import { Query } from "appwrite";
 import { ColorfulSpinner } from "@/components/ui/loader";
 import { NetworkStatus } from "@/components/ui/network-status";

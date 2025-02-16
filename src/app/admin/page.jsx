@@ -19,8 +19,8 @@ import {
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "./user-menu/page";
-import NotificationButton from "./notifications/page";
-import DashboardOverview from "./dashboard/page";
+import NotificationButton from "./Notifications";
+
 import EventsSection from "./events/page";
 import DemographicAnalysis from "./demographics/page";
 import UserManagement from "./user-management/page";
@@ -50,12 +50,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import HomepageSettings from "./homepage-settings/page";
+import HomepageSettings from "./HomepageSetting";
 import { useToast } from "@/hooks/use-toast";
-import AcademicPeriodManagement from "./academic-period/page";
-import Archives from "./archives/page";
+import AcademicPeriodManagement from "./Academic-Period";
+import Archives from "./Archives";
 import TimeoutWarningModal from "@/components/modals/TimeoutWarningModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import DashboardOverview from "./Dashboard";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");

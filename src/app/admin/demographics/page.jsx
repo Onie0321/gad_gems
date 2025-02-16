@@ -10,15 +10,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { DemographicsOverview } from "./overview/page";
-import { DetailedAnalysis } from "./detailed-analysis/page";
+import { DemographicsOverview } from "./Overview";
+import { DetailedAnalysis } from "./DetailedAnalysis";
 import {
   databases,
   databaseId,
   academicPeriodCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
-import { ParticipantList } from "./participant-list/page";
+import { ParticipantList } from "./ParticipantList";
 import { DemographicsSearch } from "./search/page";
 
 export default function DemographicAnalysis() {

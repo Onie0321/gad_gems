@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import EditParticipantDialog from "./edit-participant-dialog/page";
-import AddParticipant from "../add-participant-dialog/page";
+import EditParticipantDialog from "./EditParticipantDialog";
+import AddParticipant from "../AddParticipantDialog";
 import {
   databases,
   databaseId,

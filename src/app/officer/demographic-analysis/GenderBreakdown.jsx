@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState } from "react";
 import {
@@ -18,7 +18,7 @@ import {
   Cell,
 } from "recharts";
 import { UserIcon as Male, UserIcon as Female, Maximize2 } from "lucide-react";
-import DataTable from "../data-table/page";
+import DataTable from "./DataTable";
 import {
   Dialog,
   DialogContent,
@@ -154,12 +154,19 @@ export default function SexBreakdown({ data }) {
   console.log("Sex Breakdown Data:", data);
   console.log("Sex Breakdown Data Length:", data?.length);
   console.log("Sex Breakdown Values:", {
-    male: data?.find(d => d.name === "Male")?.value || 0,
-    female: data?.find(d => d.name === "Female")?.value || 0
+    male: data?.find((d) => d.name === "Male")?.value || 0,
+    female: data?.find((d) => d.name === "Female")?.value || 0,
   });
-  console.log("All Zero Check:", data?.[0]?.value === 0 && data?.[1]?.value === 0);
+  console.log(
+    "All Zero Check:",
+    data?.[0]?.value === 0 && data?.[1]?.value === 0
+  );
 
-  if (!data || data.length === 0 || (data[0].value === 0 && data[1].value === 0)) {
+  if (
+    !data ||
+    data.length === 0 ||
+    (data[0].value === 0 && data[1].value === 0)
+  ) {
     console.log("No Sex Breakdown Data Available - Showing Empty State");
     return (
       <Card className="w-full">
@@ -196,7 +203,9 @@ export default function SexBreakdown({ data }) {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Sex Breakdown</CardTitle>
-            <CardDescription>Distribution of participants by Sex</CardDescription>
+            <CardDescription>
+              Distribution of participants by Sex
+            </CardDescription>
           </div>
           <button
             onClick={() => setShowMaximized(true)}
@@ -219,11 +228,13 @@ export default function SexBreakdown({ data }) {
         <DialogContent className="max-w-[80vw] w-[800px] my-6">
           <DialogHeader className="mb-4">
             <DialogTitle>Sex Distribution</DialogTitle>
-            <CardDescription>Distribution of participants by Sex</CardDescription>
+            <CardDescription>
+              Distribution of participants by Sex
+            </CardDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="h-[350px]">
-              <ChartContent 
+              <ChartContent
                 data={data}
                 activeIndex={activeIndex}
                 onPieEnter={onPieEnter}

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import EventsPage from "./event-management/page";
 import DemographicAnalysis from "./demographic-analysis/page";
-import { Notifications } from "./notifications/page";
+import { Notifications } from "./Notifications";
 import UserMenu from "./user-menu/page";
 import { getCurrentUser } from "@/lib/appwrite";
 import { useRouter, useSearchParams } from "next/navigation";
