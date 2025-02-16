@@ -80,7 +80,9 @@ export default function ImportEventData({ onSuccess }) {
     try {
       const currentPeriod = await getCurrentAcademicPeriod();
       if (!currentPeriod) {
-        throw new Error("No active academic period found. Please set up an academic period first.");
+        throw new Error(
+          "No active academic period found. Please set up an academic period first."
+        );
       }
 
       validateFileType(file);
@@ -93,11 +95,13 @@ export default function ImportEventData({ onSuccess }) {
       const duplicateCheck = await importUtils.checkForDuplicateEvent({
         eventName: eventMetadata.eventName,
         eventDate: eventMetadata.eventDate,
-        eventVenue: eventMetadata.eventVenue
+        eventVenue: eventMetadata.eventVenue,
       });
 
       if (duplicateCheck.isDuplicate) {
-        throw new Error("An event with the same name, date, and venue already exists.");
+        throw new Error(
+          "An event with the same name, date, and venue already exists."
+        );
       }
 
       // Continue with import if no duplicate found
@@ -139,7 +143,8 @@ export default function ImportEventData({ onSuccess }) {
         );
       }
     } catch (error) {
-      const errorMessage = error?.message || "Failed to import data. Please try again.";
+      const errorMessage =
+        error?.message || "Failed to import data. Please try again.";
       setError(errorMessage);
       toast.error(errorMessage);
       console.error("Import error:", error);

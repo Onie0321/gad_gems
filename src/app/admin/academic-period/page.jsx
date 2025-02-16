@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -47,11 +47,7 @@ export default function AcademicPeriodManagement() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadCurrentPeriod();
-  }, []);
-
-  const loadCurrentPeriod = async () => {
+  const loadCurrentPeriod = useCallback(async () => {
     try {
       const period = await getCurrentAcademicPeriod();
       setCurrentPeriod(period);
@@ -63,7 +59,11 @@ export default function AcademicPeriodManagement() {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadCurrentPeriod();
+  }, [loadCurrentPeriod]);
 
   const resetForm = () => {
     setSchoolYear("");
