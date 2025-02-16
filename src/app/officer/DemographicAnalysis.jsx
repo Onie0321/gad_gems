@@ -22,12 +22,12 @@ import {
   getCurrentUser,
   getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
-import GenderBreakdown from "./GenderBreakdown";
-import AgeDistribution from "./AgeDistribution";
-import EducationLevel from "./EducationalLevel";
-import EthnicGroupAnalysis from "./EthnicGroupAnalysis";
-import SchoolDistribution from "./SchoolDistribution";
-import SectionDistribution from "./SectionDistribution";
+import GenderBreakdown from "./demographic-analysis/GenderBreakdown";
+import AgeDistribution from "./demographic-analysis/AgeDistribution";
+import EducationLevel from "./demographic-analysis/EducationalLevel";
+import EthnicGroupAnalysis from "./demographic-analysis/EthnicGroupAnalysis";
+import SchoolDistribution from "./demographic-analysis/SchoolDistribution";
+import SectionDistribution from "./demographic-analysis/SectionDistribution";
 import { ColorfulSpinner } from "@/components/ui/loader";
 import { Label } from "@/components/ui/label";
 import {

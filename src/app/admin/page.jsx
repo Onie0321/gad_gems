@@ -21,11 +21,11 @@ import { Button } from "@/components/ui/button";
 import UserMenu from "./user-menu/UserMenu";
 import NotificationButton from "./Notifications";
 
-import EventsSection from "./events/page";
-import DemographicAnalysis from "./demographics/page";
-import UserManagement from "./user-management/page";
+import EventsSection from "./Events";
+import DemographicAnalysis from "./Demographics";
+import UserManagement from "./UserManagement";
 import InactivityLock from "@/components/loading/InactivityLock";
-import DataImportAnalytics from "./data-import/page";
+import DataImportAnalytics from "./DataImport";
 import {
   getCurrentUser,
   getAccount,

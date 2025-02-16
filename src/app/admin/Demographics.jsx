@@ -10,16 +10,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { DemographicsOverview } from "./Overview";
-import { DetailedAnalysis } from "./DetailedAnalysis";
+import { DemographicsOverview } from "./demographics/Overview";
+import { DetailedAnalysis } from "./demographics/DetailedAnalysis";
 import {
   databases,
   databaseId,
   academicPeriodCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
-import { ParticipantList } from "./ParticipantList";
-import { DemographicsSearch } from "./Search";
+import { ParticipantList } from "./demographics/ParticipantList";
+import { DemographicsSearch } from "./demographics/Search";
 
 export default function DemographicAnalysis() {
   const [loading, setLoading] = useState(true);
