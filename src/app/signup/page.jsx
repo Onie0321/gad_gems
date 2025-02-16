@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,7 +43,7 @@ const calculatePasswordStrength = (password) => {
   return Math.min(score, 100);
 };
 
-export default function () {
+export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState("");
@@ -373,15 +374,19 @@ export default function () {
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center p-8">
               <div className="flex items-center justify-center space-x-4">
-                <img
+                <Image
                   src="/logo/gad.png"
                   alt="GAD Nexus Logo"
-                  className="w-32 h-32"
+                  width={128}
+                  height={128}
+                  priority
                 />
-                <img
+                <Image
                   src="/logo/ascot.png"
                   alt="ASCOT Logo"
-                  className="w-32 h-32"
+                  width={128}
+                  height={128}
+                  priority
                 />
               </div>
             </CardContent>
@@ -391,3 +396,5 @@ export default function () {
     </>
   );
 }
+
+SignUpPage.displayName = "SignUpPage";
