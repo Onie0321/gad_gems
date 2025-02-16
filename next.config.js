@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    domains: ["cloud.appwrite.io"],
+  swcMinify: false,
+  webpack: (config, { isServer }) => {
+    config.externals.push("canvas");
+
+    return config;
   },
 };
 
