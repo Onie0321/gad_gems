@@ -9,6 +9,7 @@ import {
   studentsCollectionId,
   getCurrentUser,
 } from "@/lib/appwrite";
+import { databaseId as appwriteDatabaseId, eventCollectionId as appwriteEventCollectionId } from '@/lib/appwrite-config';
 
 // Utility to format dates for database storage
 export const formatDateForDatabase = (dateString) => {
@@ -733,8 +734,8 @@ const validateParticipants = (participants) => {
   });
 };
 
-// Update the checkForDuplicateEvent function
-const checkForDuplicateEvent = async (eventMetadata) => {
+// Export the checkForDuplicateEvent function
+export const checkForDuplicateEvent = async (eventMetadata) => {
   try {
     // Check for exact match of name, date, and venue combination
     const response = await databases.listDocuments(
@@ -747,8 +748,10 @@ const checkForDuplicateEvent = async (eventMetadata) => {
       ]
     );
 
-    // Return true if an exact match is found
-    return response.documents.length > 0;
+    return {
+      isDuplicate: response.documents.length > 0,
+      existingEvent: response.documents[0] || null
+    };
   } catch (error) {
     console.error("Error checking for duplicate event:", error);
     throw new Error("Failed to check for duplicate event: " + error.message);
