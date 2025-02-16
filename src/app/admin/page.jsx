@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import UserMenu from "./user-menu/page";
+import UserMenu from "./user-menu/UserMenu";
 import NotificationButton from "./Notifications";
 
 import EventsSection from "./events/page";

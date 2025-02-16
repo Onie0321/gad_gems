@@ -19,7 +19,7 @@ import {
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { ParticipantList } from "./ParticipantList";
-import { DemographicsSearch } from "./search/page";
+import { DemographicsSearch } from "./Search";
 
 export default function DemographicAnalysis() {
   const [loading, setLoading] = useState(true);

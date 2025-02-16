@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { EventParticipationTrends } from "./EventParticipation"
-import { DemographicTrends } from "./DemographicTrends"
-import { ActionableInsights } from "./ActionableInsights"
+import { EventParticipationTrends } from "./trends/EventParticipation"
+import { DemographicTrends } from "./trends/DemographicTrends"
+import { ActionableInsights } from "./trends/ActionableInsights"
 import { databases, databaseId, studentsCollectionId, eventCollectionId } from '@/lib/appwrite'
 import { Query } from 'appwrite'
 import { DateRangePicker } from "@/components/ui/date-range-picker"

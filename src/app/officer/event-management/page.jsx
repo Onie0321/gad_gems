@@ -6,8 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToastContainer, toast } from "react-toastify";
 import EventOverview from "./EventOverview";
 import CreateEvent from "./CreateEvent";
-import ParticipantManagement from "./participant-management/page";
-import EventParticipantLog from "./event-participant-log/page";
+import ParticipantManagement from "./ParticipantManagement";
+import EventParticipantLog from "./event-participant-log/EventParticipantLog";
 import {
   subscribeToRealTimeUpdates,
   getCurrentUser,
@@ -305,7 +305,7 @@ export default function EventsManagement() {
 
   if (!networkStatus.isOnline) {
     return (
-      <NetworkStatus 
+      <NetworkStatus
         title="No Internet Connection"
         message="Please check your internet connection and try again."
         onRetry={() => window.location.reload()}
@@ -316,7 +316,7 @@ export default function EventsManagement() {
 
   if (error) {
     return (
-      <NetworkStatus 
+      <NetworkStatus
         title="Connection Error"
         message={error}
         onRetry={() => fetchEvents(userIdRef.current)}
@@ -362,7 +362,8 @@ export default function EventsManagement() {
                   <CardHeader>
                     <CardTitle>Welcome to Event Management</CardTitle>
                     <CardDescription>
-                      Get started by creating your first event or importing an existing one.
+                      Get started by creating your first event or importing an
+                      existing one.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center gap-4">
@@ -389,9 +390,12 @@ export default function EventsManagement() {
                       <Button
                         variant="default"
                         className="bg-blue-600 hover:bg-blue-700"
-                        onClick={() => document.getElementById("welcomeImportFile").click()}
+                        onClick={() =>
+                          document.getElementById("welcomeImportFile").click()
+                        }
                       >
-                        <Upload className="mr-2 h-4 w-4" /> Import Your First Event
+                        <Upload className="mr-2 h-4 w-4" /> Import Your First
+                        Event
                       </Button>
                     </div>
                   </CardContent>
