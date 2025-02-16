@@ -18,7 +18,8 @@ import {
   academicPeriodCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
-import ParticipantList from "./participant-list/page";
+import { ParticipantList } from "./participant-list/page";
+import { DemographicsSearch } from "./search/page";
 
 export default function DemographicAnalysis() {
   const [loading, setLoading] = useState(true);
@@ -102,6 +103,7 @@ export default function DemographicAnalysis() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="detailed">Detailed Analysis</TabsTrigger>
           <TabsTrigger value="participants">Participant List</TabsTrigger>
+          <TabsTrigger value="search">Search</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -118,6 +120,10 @@ export default function DemographicAnalysis() {
 
         <TabsContent value="participants">
           <ParticipantList selectedPeriod={selectedPeriod} />
+        </TabsContent>
+
+        <TabsContent value="search">
+          <DemographicsSearch selectedPeriod={selectedPeriod} />
         </TabsContent>
       </Tabs>
     </div>

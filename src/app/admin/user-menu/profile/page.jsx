@@ -44,7 +44,7 @@ export default function ProfilePage() {
         <CardContent className="space-y-6">
           <div className="flex items-center space-x-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={user.avatar || "/placeholder-avatar.jpg"} alt={user.name} />
+              <AvatarImage src={user.avatar } alt={user.name} />
               <AvatarFallback>{user.name ? user.name.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
             </Avatar>
             <div>
