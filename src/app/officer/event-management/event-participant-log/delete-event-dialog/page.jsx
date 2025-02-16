@@ -1,3 +1,4 @@
+"use client";
 import React, { useState } from "react";
 import {
   Dialog,
@@ -40,7 +41,10 @@ const DeleteEvent = ({ eventId, onDeleteEvent }) => {
         <DialogHeader>
           <DialogTitle>Delete Event</DialogTitle>
         </DialogHeader>
-        <p>Are you sure you want to delete this event? This action cannot be undone.</p>
+        <p>
+          Are you sure you want to delete this event? This action cannot be
+          undone.
+        </p>
         <DialogFooter>
           <Button
             onClick={handleDelete}

@@ -1,5 +1,12 @@
+"use client";
 import { useState } from "react";
-import { databases, databaseId, studentsCollectionId, staffFacultyCollectionId, communityCollectionId } from "@/lib/appwrite";
+import {
+  databases,
+  databaseId,
+  studentsCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
+} from "@/lib/appwrite";
 import { Query } from "appwrite";
 
 export const useParticipantSearch = (selectedPeriod) => {
@@ -114,4 +121,4 @@ export const useParticipantSearch = (selectedPeriod) => {
     handleSearch,
     setResults,
   };
-}; 
+};
