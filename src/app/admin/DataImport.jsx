@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ImportTab } from "./ImportTab";
-import { EmployeeDataTab } from "./EmployeeDataLab";
-import { AnalyticsTab } from "./AnalyticTab";
+import { ImportTab } from "./data-import/ImportTab";
+import { EmployeeDataTab } from "./data-import/EmployeeDataLab";
+import { AnalyticsTab } from "./data-import/AnalyticTab";
 import { getAllEmployeeData } from "@/lib/appwrite";
 
 export default function DataImportAnalytics() {

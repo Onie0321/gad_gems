@@ -4,10 +4,10 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToastContainer, toast } from "react-toastify";
-import EventOverview from "./EventOverview";
-import CreateEvent from "./CreateEvent";
-import ParticipantManagement from "./ParticipantManagement";
-import EventParticipantLog from "./event-participant-log/EventParticipantLog";
+import EventOverview from "./event-management/EventOverview";
+import CreateEvent from "./event-management/CreateEvent";
+import ParticipantManagement from "./event-management/ParticipantManagement";
+import EventParticipantLog from "./event-management/event-participant-log/EventParticipantLog";
 import {
   subscribeToRealTimeUpdates,
   getCurrentUser,
