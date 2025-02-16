@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Bar,
   BarChart,
@@ -66,9 +66,58 @@ export default function DashboardOverview({
   const [chartData, setChartData] = useState([]);
   const [ethnicDistribution, setEthnicDistribution] = useState([]);
 
+  // Move fetchDashboardData into useCallback to prevent infinite loops
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get current academic period
+      const currentPeriod = await getCurrentAcademicPeriod();
+      if (!currentPeriod) {
+        throw new Error("No active academic period found");
+      }
+
+      // Calculate statistics
+      const { totalEvents, academicEvents, nonAcademicEvents } =
+        await fetchTotals(currentPeriod.$id);
+
+      // Fetch user statistics
+      const usersResponse = await databases.listDocuments(
+        databaseId,
+        userCollectionId
+      );
+
+      const pendingCount = usersResponse.documents.filter(
+        (user) => user.approvalStatus === "pending"
+      ).length;
+
+      const approvedCount = usersResponse.documents.filter(
+        (user) => user.approvalStatus === "approved"
+      ).length;
+
+      // Update states
+      setTotalUsers(usersResponse.total);
+      setPendingUsers(pendingCount);
+      setApprovedUsers(approvedCount);
+      setTotalEvents(totalEvents);
+      setAcademicEvents(academicEvents);
+      setNonAcademicEvents(nonAcademicEvents);
+
+      // Calculate ethnic distribution
+      const ethnicDistribution = calculateEthnicDistribution(participants);
+      setEthnicDistribution(ethnicDistribution);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [participants]); // Add participants as a dependency since it's used in the function
+
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [fetchDashboardData]); // Add fetchDashboardData as a dependency
 
   useEffect(() => {
     const counts = {
@@ -479,54 +528,6 @@ export default function DashboardOverview({
     const newEthnicDistribution = calculateEthnicDistribution(participants);
     setEthnicDistribution(newEthnicDistribution);
   }, [participants, ethnicDistribution]);
-
-  const fetchDashboardData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Get current academic period
-      const currentPeriod = await getCurrentAcademicPeriod();
-      if (!currentPeriod) {
-        throw new Error("No active academic period found");
-      }
-
-      // Calculate statistics
-      const { totalEvents, academicEvents, nonAcademicEvents } =
-        await fetchTotals(currentPeriod.$id);
-
-      // Fetch user statistics
-      const usersResponse = await databases.listDocuments(
-        databaseId,
-        userCollectionId
-      );
-
-      const pendingCount = usersResponse.documents.filter(
-        (user) => user.approvalStatus === "pending"
-      ).length;
-
-      const approvedCount = usersResponse.documents.filter(
-        (user) => user.approvalStatus === "approved"
-      ).length;
-
-      // Update states
-      setTotalUsers(usersResponse.total);
-      setPendingUsers(pendingCount);
-      setApprovedUsers(approvedCount);
-      setTotalEvents(totalEvents);
-      setAcademicEvents(academicEvents);
-      setNonAcademicEvents(nonAcademicEvents);
-
-      // Calculate ethnic distribution
-      const ethnicDistribution = calculateEthnicDistribution(participants);
-      setEthnicDistribution(ethnicDistribution);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   if (error) {
     return (
