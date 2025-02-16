@@ -30,7 +30,7 @@ import {
   capitalizeWords,
   validateEditParticipantForm,
   schoolOptions,
-} from "../../../../utils/participantUtils";
+} from "../../../utils/participantUtils";
 import { updateParticipant } from "@/lib/appwrite"; // Adjust import based on your file structure
 
 export default function EditParticipantDialog({

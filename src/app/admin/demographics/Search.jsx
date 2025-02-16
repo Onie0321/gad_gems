@@ -28,9 +28,9 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Loader2, Search, X } from "lucide-react";
-import { schools, years, ethnicGroups } from "./constants";
-import { truncateText, getEthnicGroupDisplay } from "./utils";
-import { useParticipantSearch } from "./useParticipantSearch";
+import { schools, years, ethnicGroups } from "./search/constants";
+import { truncateText, getEthnicGroupDisplay } from "./search/utils";
+import { useParticipantSearch } from "./search/useParticipantSearch";
 import {
   Table,
   TableBody,
@@ -40,7 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Eye } from "lucide-react";
-import { ParticipantDetails } from "../ParticipantList";
+import { ParticipantDetails } from "./ParticipantList";
 
 export function DemographicsSearch({ selectedPeriod }) {
   const { loading, results, handleSearch, setResults } =

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import EventsPage from "./event-management/page";
 import DemographicAnalysis from "./demographic-analysis/page";
 import { Notifications } from "./Notifications";
-import UserMenu from "./user-menu/page";
+import UserMenu from "./user-menu/UserMenu";
 import { getCurrentUser } from "@/lib/appwrite";
 import { useRouter, useSearchParams } from "next/navigation";
 import WelcomeModal from "@/components/modals/welcome";
