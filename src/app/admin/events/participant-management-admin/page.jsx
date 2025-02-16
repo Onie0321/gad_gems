@@ -65,8 +65,8 @@ import {
   checkDuplicates,
 } from "@/utils/participantUtils";
 import { createParticipant } from "@/lib/appwrite";
-import EditParticipantDialog from "./edit-participant-dialog/page";
-import DeleteParticipantDialog from "./delete-participant-dialog/page";
+import EditParticipantDialog from "./EditParticipantDialog";
+import DeleteParticipantDialog from "./DeleteParticipantLog";
 import { debounce } from "lodash";
 import ViewParticipants from "@/app/officer/event-management/event-participant-log/view-participant-dialog/page";
 

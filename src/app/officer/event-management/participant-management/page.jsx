@@ -96,7 +96,7 @@ import {
 } from "@/lib/appwrite";
 import { usePathname, useRouter } from "next/navigation";
 import { ID } from "appwrite";
-import ParticipantTables from "./participant-tables/page";
+import ParticipantTables from "./ParticipantTables";
 import {
   saveFormData,
   loadFormData,
@@ -108,7 +108,7 @@ import { debounce } from "lodash";
 import { cn } from "@/lib/utils";
 import { ColorfulSpinner } from "@/components/ui/loader";
 import { NetworkStatus } from "@/components/ui/network-status";
-import EditParticipantDialog from "./edit-participant-dialog/page";
+import EditParticipantDialog from "./EditParticipantDialog";
 import { ColorfulLoader } from "@/components/ui/loader";
 import { PreviewDialog } from "@/components/ui/preview-dialog";
 

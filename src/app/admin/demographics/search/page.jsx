@@ -40,7 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Eye } from "lucide-react";
-import { ParticipantDetails } from "../participant-list/page";
+import { ParticipantDetails } from "../ParticipantList";
 
 export function DemographicsSearch({ selectedPeriod }) {
   const { loading, results, handleSearch, setResults } =

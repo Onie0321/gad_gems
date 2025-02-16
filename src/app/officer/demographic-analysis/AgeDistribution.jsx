@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Card,
@@ -17,7 +17,7 @@ import {
   Legend,
 } from "recharts";
 import { UserIcon as Male, UserIcon as Female } from "lucide-react";
-import DataTable from "../data-table/page";
+import DataTable from "./DataTable";
 import { CartesianGrid } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Maximize2 } from "lucide-react";
@@ -39,13 +39,20 @@ export default function AgeDistribution({ data }) {
 
   console.log("Age Distribution Data:", data);
   console.log("Age Distribution Data Length:", data?.length);
-  console.log("Age Distribution Values:", data?.map(item => ({ 
-    age: item.name, 
-    male: item.male, 
-    female: item.female 
-  })));
+  console.log(
+    "Age Distribution Values:",
+    data?.map((item) => ({
+      age: item.name,
+      male: item.male,
+      female: item.female,
+    }))
+  );
 
-  if (!data || data.length === 0 || data.every(item => item.male === 0 && item.female === 0)) {
+  if (
+    !data ||
+    data.length === 0 ||
+    data.every((item) => item.male === 0 && item.female === 0)
+  ) {
     console.log("No Age Distribution Data Available - Showing Empty State");
     return (
       <Card className="w-full">
@@ -70,8 +77,10 @@ export default function AgeDistribution({ data }) {
         <Tooltip
           content={({ active, payload, label }) => {
             if (active && payload && payload.length) {
-              const male = payload.find((p) => p.dataKey === "male")?.value || 0;
-              const female = payload.find((p) => p.dataKey === "female")?.value || 0;
+              const male =
+                payload.find((p) => p.dataKey === "male")?.value || 0;
+              const female =
+                payload.find((p) => p.dataKey === "female")?.value || 0;
               const total = male + female;
               return (
                 <div className="bg-white p-2 border rounded shadow">
@@ -110,7 +119,9 @@ export default function AgeDistribution({ data }) {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Age Distribution</CardTitle>
-            <CardDescription>Distribution of participants by age</CardDescription>
+            <CardDescription>
+              Distribution of participants by age
+            </CardDescription>
           </div>
           <button
             onClick={() => setShowMaximized(true)}
@@ -129,7 +140,9 @@ export default function AgeDistribution({ data }) {
         <DialogContent className="max-w-[80vw] w-[800px] my-6">
           <DialogHeader className="mb-4">
             <DialogTitle>Age Distribution</DialogTitle>
-            <CardDescription>Distribution of participants by age</CardDescription>
+            <CardDescription>
+              Distribution of participants by age
+            </CardDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="h-[350px]">

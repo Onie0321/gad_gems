@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Card,
@@ -19,7 +19,7 @@ import {
   Legend,
 } from "recharts";
 import { UserIcon as Male, UserIcon as Female } from "lucide-react";
-import DataTable from "../data-table/page";
+import DataTable from "./DataTable";
 import { Maximize2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -28,10 +28,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-  
+
 const COLORS = {
-  male: "#2196F3",    // Update from #4299E1
-  female: "#E91E63",  // Update from #ED64A6
+  male: "#2196F3", // Update from #4299E1
+  female: "#E91E63", // Update from #ED64A6
 };
 
 export default function SectionDistribution({ data, colors }) {
@@ -74,14 +74,16 @@ export default function SectionDistribution({ data, colors }) {
       </g>
     );
   };
-  
+
   if (!data || data.length === 0) {
     return (
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Section Distribution</CardTitle>
-            <CardDescription>Distribution of participants by section</CardDescription>
+            <CardDescription>
+              Distribution of participants by section
+            </CardDescription>
           </div>
           <button
             onClick={() => setShowMaximized(true)}
@@ -197,7 +199,10 @@ export default function SectionDistribution({ data, colors }) {
                     <LabelList dataKey="male" content={renderCustomizedLabel} />
                   </Bar>
                   <Bar dataKey="female" fill={COLORS.female} minPointSize={10}>
-                    <LabelList dataKey="female" content={renderCustomizedLabel} />
+                    <LabelList
+                      dataKey="female"
+                      content={renderCustomizedLabel}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

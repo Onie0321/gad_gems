@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
-import EditParticipantDialog from "../edit-participant-dialog/page";
+import EditParticipantDialog from "./EditParticipantDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   GraduationCap,

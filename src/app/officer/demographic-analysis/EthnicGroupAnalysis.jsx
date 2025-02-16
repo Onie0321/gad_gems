@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState } from "react";
 import {
@@ -21,7 +21,7 @@ import {
 import { UserIcon as Male } from "lucide-react";
 import { UserIcon as Female } from "lucide-react";
 import { Maximize2 } from "lucide-react";
-import DataTable from "../data-table/page";
+import DataTable from "./DataTable";
 import {
   Dialog,
   DialogContent,
@@ -38,35 +38,37 @@ const COLORS = {
 
 export default function EthnicGroupAnalysis({ data }) {
   const [showMaximized, setShowMaximized] = useState(false);
-  
+
   // Process data to include otherEthnicGroup entries
   const processedData = React.useMemo(() => {
     if (!data) return [];
-    
+
     // First, get all regular ethnic groups
     const regularGroups = data
-      .filter(item => item.name !== 'Other')
-      .map(item => ({
+      .filter((item) => item.name !== "Other")
+      .map((item) => ({
         ...item,
-        id: `regular-${item.name}` // Add unique id
+        id: `regular-${item.name}`, // Add unique id
       }));
-    
+
     // Then, get all "Other" entries and their specific ethnic groups
-    const otherEntries = data.find(item => item.name === 'Other');
-    
+    const otherEntries = data.find((item) => item.name === "Other");
+
     if (otherEntries?.otherGroups) {
       // Add each other ethnic group as a separate entry
-      const otherGroups = Object.entries(otherEntries.otherEthnicGroup).map(([name, counts], index) => ({
-        id: `other-${name}`, // Add unique id
-        name,
-        male: counts.male || 0,
-        female: counts.female || 0,
-        value: (counts.male || 0) + (counts.female || 0)
-      }));
-      
+      const otherGroups = Object.entries(otherEntries.otherEthnicGroup).map(
+        ([name, counts], index) => ({
+          id: `other-${name}`, // Add unique id
+          name,
+          male: counts.male || 0,
+          female: counts.female || 0,
+          value: (counts.male || 0) + (counts.female || 0),
+        })
+      );
+
       return [...regularGroups, ...otherGroups];
     }
-    
+
     return regularGroups;
   }, [data]);
 
@@ -144,7 +146,9 @@ export default function EthnicGroupAnalysis({ data }) {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Ethnic Group Analysis</CardTitle>
-            <CardDescription>Distribution of participants by ethnic group</CardDescription>
+            <CardDescription>
+              Distribution of participants by ethnic group
+            </CardDescription>
           </div>
           <button
             onClick={() => setShowMaximized(true)}
@@ -167,9 +171,9 @@ export default function EthnicGroupAnalysis({ data }) {
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" />
-              <YAxis 
-                dataKey="name" 
-                type="category" 
+              <YAxis
+                dataKey="name"
+                type="category"
                 width={150}
                 tickFormatter={(value, index) => value}
                 key="yAxis"
@@ -188,15 +192,15 @@ export default function EthnicGroupAnalysis({ data }) {
                   </span>
                 )}
               />
-              <Bar 
-                dataKey="male" 
-                name="Male" 
+              <Bar
+                dataKey="male"
+                name="Male"
                 fill={COLORS.male}
                 key="male-bar"
               />
-              <Bar 
-                dataKey="female" 
-                name="Female" 
+              <Bar
+                dataKey="female"
+                name="Female"
                 fill={COLORS.female}
                 key="female-bar"
               />
@@ -229,9 +233,9 @@ export default function EthnicGroupAnalysis({ data }) {
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
+                  <YAxis
+                    dataKey="name"
+                    type="category"
                     width={150}
                     tickFormatter={(value, index) => value}
                     key="yAxis-max"
@@ -250,15 +254,15 @@ export default function EthnicGroupAnalysis({ data }) {
                       </span>
                     )}
                   />
-                  <Bar 
-                    dataKey="male" 
-                    name="Male" 
+                  <Bar
+                    dataKey="male"
+                    name="Male"
                     fill={COLORS.male}
                     key="male-bar-max"
                   />
-                  <Bar 
-                    dataKey="female" 
-                    name="Female" 
+                  <Bar
+                    dataKey="female"
+                    name="Female"
                     fill={COLORS.female}
                     key="female-bar-max"
                   />

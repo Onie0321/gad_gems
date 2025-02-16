@@ -2,8 +2,8 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EventParticipantLog from "./event-participant-log-admin/page";
-import EventAnalysis from "./event-analysis/page";
-import { SearchFilter } from "./search/page";
+import EventAnalysis from "./Event-Analysis";
+import { SearchFilter } from "./Search";
 import { useState, useEffect } from "react";
 import { getCurrentAcademicPeriod, databases } from "@/lib/appwrite";
 import { Query } from "appwrite";

@@ -57,10 +57,10 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-import EditEvent from "@/app/officer/event-management/event-participant-log/edit-event-dialog/page";
+import EditEvent from "@/app/officer/event-management/event-participant-log/EditEventDialog";
 import ViewParticipants from "@/app/officer/event-management/event-participant-log/view-participant-dialog/page";
-import ExportEventsButton from "@/app/officer/event-management/event-participant-log/export-event/page";
-import GenerateReportButton from "@/app/officer/event-management/event-participant-log/import-event/page";
+import ExportEventsButton from "@/app/officer/event-management/event-participant-log/ExportEvent";
+import GenerateReportButton from "@/app/officer/event-management/event-participant-log/ImportEvent";
 
 export default function EventParticipantLog() {
   const [events, setEvents] = useState([]);
