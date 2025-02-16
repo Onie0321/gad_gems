@@ -1,3 +1,4 @@
+"use client";
 import React, { useMemo, useEffect, useState } from "react";
 import {
   Dialog,
@@ -57,39 +58,28 @@ const ViewParticipants = ({
         console.log("No selected event");
         return;
       }
-      
+
       try {
         setLoading(true);
         console.log("Fetching participants for event:", selectedEvent.$id);
-        
+
         // Remove the participantType filter since it might not be set for created events
-        const [studentsResponse, staffResponse, communityResponse] = await Promise.all([
-          databases.listDocuments(
-            databaseId,
-            studentsCollectionId,
-            [
+        const [studentsResponse, staffResponse, communityResponse] =
+          await Promise.all([
+            databases.listDocuments(databaseId, studentsCollectionId, [
               Query.equal("eventId", selectedEvent.$id),
-              Query.equal("isArchived", false) // Add this if needed
-            ]
-          ),
-          databases.listDocuments(
-            databaseId,
-            staffFacultyCollectionId,
-            [
+              Query.equal("isArchived", false), // Add this if needed
+            ]),
+            databases.listDocuments(databaseId, staffFacultyCollectionId, [
               Query.equal("eventId", selectedEvent.$id),
-              Query.equal("isArchived", false) // Add this if needed
-            ]
-          ),
-          databases.listDocuments(
-            databaseId,
-            communityCollectionId,
-            [
+              Query.equal("isArchived", false), // Add this if needed
+            ]),
+            databases.listDocuments(databaseId, communityCollectionId, [
               Query.equal("eventId", selectedEvent.$id),
-              Query.equal("isArchived", false) // Add this if needed
-            ]
-          )
-        ]);
-        
+              Query.equal("isArchived", false), // Add this if needed
+            ]),
+          ]);
+
         // Store the fetched data in their respective state variables
         setEventParticipants(studentsResponse.documents);
         setStaffFacultyParticipants(staffResponse.documents);
@@ -99,11 +89,11 @@ const ViewParticipants = ({
           students: studentsResponse.documents.length,
           staff: staffResponse.documents.length,
           community: communityResponse.documents.length,
-          total: studentsResponse.documents.length + 
-                 staffResponse.documents.length + 
-                 communityResponse.documents.length
+          total:
+            studentsResponse.documents.length +
+            staffResponse.documents.length +
+            communityResponse.documents.length,
         });
-
       } catch (error) {
         console.error("Error fetching participants:", error);
       } finally {
@@ -119,12 +109,14 @@ const ViewParticipants = ({
     const allParticipants = [
       ...eventParticipants,
       ...staffFacultyParticipants,
-      ...communityParticipants
+      ...communityParticipants,
     ];
 
     const total = allParticipants.length;
-    const maleCount = allParticipants.filter(p => p.sex === "Male").length;
-    const femaleCount = allParticipants.filter(p => p.sex === "Female").length;
+    const maleCount = allParticipants.filter((p) => p.sex === "Male").length;
+    const femaleCount = allParticipants.filter(
+      (p) => p.sex === "Female"
+    ).length;
 
     return {
       total,
@@ -132,7 +124,7 @@ const ViewParticipants = ({
       femaleCount,
       studentCount: eventParticipants.length,
       staffCount: staffFacultyParticipants.length,
-      communityCount: communityParticipants.length
+      communityCount: communityParticipants.length,
     };
   }, [eventParticipants, staffFacultyParticipants, communityParticipants]);
 
@@ -157,20 +149,30 @@ const ViewParticipants = ({
             <div className="grid grid-cols-3 gap-4 mb-6">
               <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
                 <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-purple-700">{summary.total}</div>
-                  <div className="text-sm text-purple-600">Total Participants</div>
+                  <div className="text-2xl font-bold text-purple-700">
+                    {summary.total}
+                  </div>
+                  <div className="text-sm text-purple-600">
+                    Total Participants
+                  </div>
                 </CardContent>
               </Card>
               <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
                 <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-blue-700">{summary.maleCount}</div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {summary.maleCount}
+                  </div>
                   <div className="text-sm text-blue-600">Male Participants</div>
                 </CardContent>
               </Card>
               <Card className="bg-gradient-to-br from-pink-50 to-pink-100 border-pink-200">
                 <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-pink-700">{summary.femaleCount}</div>
-                  <div className="text-sm text-pink-600">Female Participants</div>
+                  <div className="text-2xl font-bold text-pink-700">
+                    {summary.femaleCount}
+                  </div>
+                  <div className="text-sm text-pink-600">
+                    Female Participants
+                  </div>
                 </CardContent>
               </Card>
             </div>

@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -151,7 +152,11 @@ const EditEvent = ({ event, onUpdateEvent }) => {
     <>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="sm" onClick={() => setIsDialogOpen(true)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsDialogOpen(true)}
+          >
             <Edit className="h-4 w-4" />
           </Button>
         </DialogTrigger>
@@ -374,37 +379,51 @@ const EditEvent = ({ event, onUpdateEvent }) => {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="space-y-2">
                       <p className="font-semibold">Event Name:</p>
-                      <p className="text-gray-600">{updatedEventDetails.eventName}</p>
+                      <p className="text-gray-600">
+                        {updatedEventDetails.eventName}
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <p className="font-semibold">Date:</p>
-                      <p className="text-gray-600">{updatedEventDetails.formattedDate}</p>
+                      <p className="text-gray-600">
+                        {updatedEventDetails.formattedDate}
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <p className="font-semibold">Time:</p>
                       <p className="text-gray-600">
-                        {updatedEventDetails.formattedTimeFrom} - {updatedEventDetails.formattedTimeTo}
+                        {updatedEventDetails.formattedTimeFrom} -{" "}
+                        {updatedEventDetails.formattedTimeTo}
                       </p>
                     </div>
                     <div className="space-y-2">
                       <p className="font-semibold">Venue:</p>
-                      <p className="text-gray-600">{updatedEventDetails.eventVenue}</p>
+                      <p className="text-gray-600">
+                        {updatedEventDetails.eventVenue}
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <p className="font-semibold">Type:</p>
-                      <p className="text-gray-600">{updatedEventDetails.eventType}</p>
+                      <p className="text-gray-600">
+                        {updatedEventDetails.eventType}
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <p className="font-semibold">Category:</p>
-                      <p className="text-gray-600">{updatedEventDetails.eventCategory}</p>
+                      <p className="text-gray-600">
+                        {updatedEventDetails.eventCategory}
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <p className="font-semibold">Duration:</p>
-                      <p className="text-gray-600">{updatedEventDetails.numberOfHours} hours</p>
+                      <p className="text-gray-600">
+                        {updatedEventDetails.numberOfHours} hours
+                      </p>
                     </div>
                   </div>
                   <p className="text-sm text-gray-500 mt-4">
-                    The event details have been successfully updated in the system.
+                    The event details have been successfully updated in the
+                    system.
                   </p>
                 </div>
               )}

@@ -1,3 +1,4 @@
+"use client";
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +64,7 @@ export default function EditParticipantDialog({
       delete cleanParticipant.$databaseId;
       delete cleanParticipant.$read;
       delete cleanParticipant.$write;
-      
+
       // Keep only the fields we want to update
       const updateData = {
         name: cleanParticipant.name,
@@ -77,7 +78,7 @@ export default function EditParticipantDialog({
         eventId: cleanParticipant.eventId,
         createdBy: cleanParticipant.createdBy,
         academicPeriodId: cleanParticipant.academicPeriodId,
-        isArchived: cleanParticipant.isArchived || false
+        isArchived: cleanParticipant.isArchived || false,
       };
 
       // Update the participant in the database

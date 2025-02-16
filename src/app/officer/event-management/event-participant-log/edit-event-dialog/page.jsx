@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -73,7 +74,7 @@ const EditEvent = ({ event, onUpdateEvent }) => {
     if (event?.eventTimeFrom && event?.eventTimeTo) {
       const start = new Date(event.eventTimeFrom);
       const end = new Date(event.eventTimeTo);
-      
+
       const startTime = start.toTimeString().slice(0, 5);
       const endTime = end.toTimeString().slice(0, 5);
       const calculatedDuration = calculateDuration(startTime, endTime);
@@ -104,9 +105,9 @@ const EditEvent = ({ event, onUpdateEvent }) => {
       setIsTimeValid(true);
       setDuration(calculatedDuration);
       const [hours, minutes] = calculatedDuration.match(/\d+/g).map(Number);
-      setEditingEvent(prev => ({
+      setEditingEvent((prev) => ({
         ...prev,
-        numberOfHours: hours + (minutes / 60)
+        numberOfHours: hours + minutes / 60,
       }));
     } else {
       setIsTimeValid(false);
@@ -120,7 +121,7 @@ const EditEvent = ({ event, onUpdateEvent }) => {
     editingEvent.eventTimeTo,
     isDialogOpen,
     isTimeValid,
-    duration
+    duration,
   ]);
 
   const handleSave = async () => {
@@ -144,11 +145,11 @@ const EditEvent = ({ event, onUpdateEvent }) => {
         isArchived: editingEvent.isArchived || false,
         academicPeriodId: editingEvent.academicPeriodId,
         createdBy: editingEvent.createdBy,
-        source: editingEvent.source || 'created'
+        source: editingEvent.source || "created",
       };
 
       // Remove any undefined or null values
-      Object.keys(updatedEvent).forEach(key => {
+      Object.keys(updatedEvent).forEach((key) => {
         if (updatedEvent[key] === undefined || updatedEvent[key] === null) {
           delete updatedEvent[key];
         }

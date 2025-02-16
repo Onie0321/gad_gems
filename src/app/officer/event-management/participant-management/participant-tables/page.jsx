@@ -1,4 +1,5 @@
-import { useState } from 'react';
+"use client";
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -55,33 +56,32 @@ export default function ParticipantTables({
   );
 
   const studentCounts = {
-    male: studentParticipants.filter(p => p.sex === "Male").length,
-    female: studentParticipants.filter(p => p.sex === "Female").length,
-    total: studentParticipants.length
+    male: studentParticipants.filter((p) => p.sex === "Male").length,
+    female: studentParticipants.filter((p) => p.sex === "Female").length,
+    total: studentParticipants.length,
   };
 
   const staffCounts = {
-    male: staffParticipants.filter(p => p.sex === "Male").length,
-    female: staffParticipants.filter(p => p.sex === "Female").length,
-    total: staffParticipants.length
+    male: staffParticipants.filter((p) => p.sex === "Male").length,
+    female: staffParticipants.filter((p) => p.sex === "Female").length,
+    total: staffParticipants.length,
   };
 
   const communityCounts = {
-    male: communityParticipants.filter(p => p.sex === "Male").length,
-    female: communityParticipants.filter(p => p.sex === "Female").length,
-    total: communityParticipants.length
+    male: communityParticipants.filter((p) => p.sex === "Male").length,
+    female: communityParticipants.filter((p) => p.sex === "Female").length,
+    total: communityParticipants.length,
   };
 
   return (
     <div id="participant-tables" className="space-y-6">
-
-      <Tabs 
-        defaultValue="students" 
+      <Tabs
+        defaultValue="students"
         value={activeSection}
         onValueChange={setActiveSection}
       >
         <TabsList className="grid w-full grid-cols-3 gap-4 rounded-lg p-2 bg-muted">
-          <TabsTrigger 
+          <TabsTrigger
             value="students"
             className={cn(
               "flex flex-col items-center gap-1 rounded-md transition-all",
@@ -92,10 +92,9 @@ export default function ParticipantTables({
               <GraduationCap className="h-4 w-4" />
               <span>Students ({studentCounts.total})</span>
             </div>
-           
           </TabsTrigger>
 
-          <TabsTrigger 
+          <TabsTrigger
             value="staff"
             className={cn(
               "flex flex-col items-center gap-1 rounded-md transition-all",
@@ -106,10 +105,9 @@ export default function ParticipantTables({
               <Users className="h-4 w-4" />
               <span>Staff/Faculty ({staffCounts.total})</span>
             </div>
-           
           </TabsTrigger>
 
-          <TabsTrigger 
+          <TabsTrigger
             value="community"
             className={cn(
               "flex flex-col items-center gap-1 rounded-md transition-all",
@@ -120,7 +118,6 @@ export default function ParticipantTables({
               <UsersRound className="h-4 w-4" />
               <span>Community ({communityCounts.total})</span>
             </div>
-           
           </TabsTrigger>
         </TabsList>
         <TabsContent value="students">
@@ -466,11 +463,11 @@ export default function ParticipantTables({
             setEditingParticipant(null); // Close dialog after update
           }}
           participantType={
-            editingParticipant.studentId 
-              ? 'student' 
-              : editingParticipant.staffFacultyId 
-                ? 'staff' 
-                : 'community'
+            editingParticipant.studentId
+              ? "student"
+              : editingParticipant.staffFacultyId
+              ? "staff"
+              : "community"
           }
           isOpen={!!editingParticipant}
           onClose={() => setEditingParticipant(null)}
