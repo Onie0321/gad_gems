@@ -109,6 +109,8 @@ import { cn } from "@/lib/utils";
 import { ColorfulSpinner } from "@/components/ui/loader";
 import { NetworkStatus } from "@/components/ui/network-status";
 import EditParticipantDialog from "./edit-participant-dialog/page";
+import { ColorfulLoader } from "@/components/ui/loader";
+import { PreviewDialog } from "@/components/ui/preview-dialog";
 
 // Move initialParticipantData outside the component
 const initialParticipantData = {
