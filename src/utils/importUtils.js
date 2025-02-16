@@ -289,56 +289,56 @@ export const extractCommunityMembers = (excelData) => {
 
 // Update the formatEventData function
 const formatEventData = (rawData) => {
-  console.log('Raw event data:', rawData);
-  console.log('Raw numberOfHours:', rawData.numberOfHours);
-  console.log('Type of numberOfHours:', typeof rawData.numberOfHours);
+  console.log("Raw event data:", rawData);
+  console.log("Raw numberOfHours:", rawData.numberOfHours);
+  console.log("Type of numberOfHours:", typeof rawData.numberOfHours);
 
   // Calculate duration from time range
-  let numberOfHours = '';
+  let numberOfHours = "";
   try {
-    console.log('Calculating duration from time range');
-    
+    console.log("Calculating duration from time range");
+
     // Extract time portions from the ISO strings
-    const timeFrom = rawData.eventTimeFrom.split('T')[1].split('.')[0];
-    const timeTo = rawData.eventTimeTo.split('T')[1].split('.')[0];
-    
-    console.log('Time From:', timeFrom);
-    console.log('Time To:', timeTo);
-    
+    const timeFrom = rawData.eventTimeFrom.split("T")[1].split(".")[0];
+    const timeTo = rawData.eventTimeTo.split("T")[1].split(".")[0];
+
+    console.log("Time From:", timeFrom);
+    console.log("Time To:", timeTo);
+
     // Create Date objects for today with the extracted times
     const startTime = new Date(`2000-01-01T${timeFrom}`);
     const endTime = new Date(`2000-01-01T${timeTo}`);
-    
+
     // Handle case where end time is on next day (e.g., event ends after midnight)
     if (endTime < startTime) {
       endTime.setDate(endTime.getDate() + 1);
     }
-    
-    console.log('Start Time:', startTime);
-    console.log('End Time:', endTime);
-    
+
+    console.log("Start Time:", startTime);
+    console.log("End Time:", endTime);
+
     const diffHours = (endTime - startTime) / (1000 * 60 * 60);
     const hours = Math.floor(diffHours);
     const minutes = Math.round((diffHours - hours) * 60);
-    
-    console.log('Calculated diff hours:', diffHours);
-    console.log('Final hours:', hours);
-    console.log('Final minutes:', minutes);
-    
+
+    console.log("Calculated diff hours:", diffHours);
+    console.log("Final hours:", hours);
+    console.log("Final minutes:", minutes);
+
     numberOfHours = `${hours} hours ${minutes} minutes`;
   } catch (error) {
-    console.error('Error calculating duration:', error);
-    numberOfHours = '0 hours 0 minutes';
+    console.error("Error calculating duration:", error);
+    numberOfHours = "0 hours 0 minutes";
   }
 
-  console.log('Final formatted numberOfHours:', numberOfHours);
+  console.log("Final formatted numberOfHours:", numberOfHours);
 
   const formattedData = {
     ...rawData,
-    numberOfHours
+    numberOfHours,
   };
 
-  console.log('Final formatted event data:', formattedData);
+  console.log("Final formatted event data:", formattedData);
   return formattedData;
 };
 
@@ -448,9 +448,9 @@ export const importEventAndParticipants = async (file, academicPeriodId) => {
       showOnHomepage: false,
       isArchived: false,
       academicPeriodId: academicPeriodId,
-      archivedAt: '',
+      archivedAt: "",
       createdAt: new Date().toISOString(),
-      source: 'imported'
+      source: "imported",
     };
 
     const createdEvent = await databases.createDocument(
@@ -733,8 +733,8 @@ const validateParticipants = (participants) => {
   });
 };
 
-// Update the checkForDuplicateEvent function
-const checkForDuplicateEvent = async (eventMetadata) => {
+// Export the checkForDuplicateEvent function
+export const checkForDuplicateEvent = async (eventMetadata) => {
   try {
     // Check for exact match of name, date, and venue combination
     const response = await databases.listDocuments(
@@ -747,8 +747,10 @@ const checkForDuplicateEvent = async (eventMetadata) => {
       ]
     );
 
-    // Return true if an exact match is found
-    return response.documents.length > 0;
+    return {
+      isDuplicate: response.documents.length > 0,
+      existingEvent: response.documents[0] || null,
+    };
   } catch (error) {
     console.error("Error checking for duplicate event:", error);
     throw new Error("Failed to check for duplicate event: " + error.message);

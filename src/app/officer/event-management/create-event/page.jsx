@@ -126,61 +126,7 @@ export default function CreateEvent({
   setActiveTab,
   setCurrentEventId,
 }) {
-  // Update the validation to properly check the period
-  if (!currentAcademicPeriod || !currentAcademicPeriod.$id) {
-    console.log("No valid academic period provided to CreateEvent component");
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Create Event</CardTitle>
-          <CardDescription>Create and manage your events</CardDescription>
-          {currentAcademicPeriod && (
-            <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-semibold text-primary">
-                    Current Academic Period
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    {currentAcademicPeriod.schoolYear} -{" "}
-                    {currentAcademicPeriod.periodType}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">
-                    {format(
-                      new Date(currentAcademicPeriod.startDate),
-                      "MMM d, yyyy"
-                    )}{" "}
-                    -{" "}
-                    {format(
-                      new Date(currentAcademicPeriod.endDate),
-                      "MMM d, yyyy"
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <div className="mb-4">
-              <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">
-              No Active Academic Period
-            </h3>
-            <p className="text-muted-foreground">
-              Events cannot be created until an administrator sets up the
-              current academic period.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  // Move all useState declarations to the top
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState(null);
   const [eventTimeFrom, setEventTimeFrom] = useState("");
@@ -212,16 +158,13 @@ export default function CreateEvent({
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [pendingDate, setPendingDate] = useState(null);
   const [pendingRange, setPendingRange] = useState(null);
-  const [warningType, setWarningType] = useState(""); // 'weekend' or 'holiday'
+  const [warningType, setWarningType] = useState("");
   const [pendingHolidayName, setPendingHolidayName] = useState("");
   const [isRangePopoverOpen, setIsRangePopoverOpen] = useState(false);
   const [selectAllNonAcademic, setSelectAllNonAcademic] = useState(false);
   const [selectAllAcademic, setSelectAllAcademic] = useState(false);
 
-  const academicCategories = schoolOptions.map((school) => school.name);
-  const nonAcademicCategories = getNonAcademicCategories();
-
-  // Load saved form data on component mount
+  // Move all useEffect declarations here
   useEffect(() => {
     const savedData = loadFormData(STORAGE_KEYS.CREATE_EVENT);
     if (savedData) {
@@ -245,7 +188,6 @@ export default function CreateEvent({
     }
   }, []);
 
-  // Save form data on any change
   useEffect(() => {
     const formData = {
       eventName,
@@ -534,8 +476,10 @@ export default function CreateEvent({
 
   const handleSelectAll = () => {
     const allCategories = [
-      ...(eventType.includes("Academic") ? academicCategories : []),
-      ...(eventType.includes("Non-Academic") ? nonAcademicCategories : []),
+      ...(eventType.includes("Academic")
+        ? schoolOptions.map((school) => school.name)
+        : []),
+      ...(eventType.includes("Non-Academic") ? getNonAcademicCategories() : []),
     ];
     if (tempSelectedCategories.length === allCategories.length) {
       setTempSelectedCategories([]);
@@ -552,13 +496,18 @@ export default function CreateEvent({
     if (checked) {
       setTempSelectedCategories((prev) => {
         const nonAcademicSelected = prev.filter(
-          (cat) => !academicCategories.includes(cat)
+          (cat) => !schoolOptions.map((school) => school.name).includes(cat)
         );
-        return [...nonAcademicSelected, ...academicCategories];
+        return [
+          ...nonAcademicSelected,
+          ...schoolOptions.map((school) => school.name),
+        ];
       });
     } else {
       setTempSelectedCategories((prev) =>
-        prev.filter((cat) => !academicCategories.includes(cat))
+        prev.filter(
+          (cat) => !schoolOptions.map((school) => school.name).includes(cat)
+        )
       );
     }
     setSelectAllAcademic(checked);
@@ -568,13 +517,15 @@ export default function CreateEvent({
     if (checked) {
       setTempSelectedCategories((prev) => {
         const academicSelected = prev.filter((cat) =>
-          academicCategories.includes(cat)
+          schoolOptions.map((school) => school.name).includes(cat)
         );
-        return [...academicSelected, ...nonAcademicCategories];
+        return [...academicSelected, ...getNonAcademicCategories()];
       });
     } else {
       setTempSelectedCategories((prev) =>
-        prev.filter((cat) => academicCategories.includes(cat))
+        prev.filter((cat) =>
+          schoolOptions.map((school) => school.name).includes(cat)
+        )
       );
     }
     setSelectAllNonAcademic(checked);
@@ -617,6 +568,60 @@ export default function CreateEvent({
     }
     setActiveTab("participants"); // Switch to participant management tab
   };
+
+  // Early return for invalid academic period
+  if (!currentAcademicPeriod || !currentAcademicPeriod.$id) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Event</CardTitle>
+          <CardDescription>Create and manage your events</CardDescription>
+          {currentAcademicPeriod && (
+            <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-primary">
+                    Current Academic Period
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    {currentAcademicPeriod.schoolYear} -{" "}
+                    {currentAcademicPeriod.periodType}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">
+                    {format(
+                      new Date(currentAcademicPeriod.startDate),
+                      "MMM d, yyyy"
+                    )}{" "}
+                    -{" "}
+                    {format(
+                      new Date(currentAcademicPeriod.endDate),
+                      "MMM d, yyyy"
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <div className="mb-4">
+              <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">
+              No Active Academic Period
+            </h3>
+            <p className="text-muted-foreground">
+              Events cannot be created until an administrator sets up the
+              current academic period.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -1230,10 +1235,10 @@ export default function CreateEvent({
                               tempSelectedCategories.length ===
                               [
                                 ...(eventType.includes("Academic")
-                                  ? academicCategories
+                                  ? schoolOptions.map((school) => school.name)
                                   : []),
                                 ...(eventType.includes("Non-Academic")
-                                  ? nonAcademicCategories
+                                  ? getNonAcademicCategories()
                                   : []),
                               ].length
                             }
@@ -1264,26 +1269,26 @@ export default function CreateEvent({
                               Select All Academic
                             </label>
                           </div>
-                          {academicCategories.map((category) => (
+                          {schoolOptions.map((school) => (
                             <div
-                              key={category}
+                              key={school.name}
                               className="flex items-center space-x-2 p-2 hover:bg-accent rounded cursor-pointer"
-                              onClick={() => handleCategoryClick(category)}
+                              onClick={() => handleCategoryClick(school.name)}
                             >
                               <Checkbox
                                 checked={tempSelectedCategories.includes(
-                                  category
+                                  school.name
                                 )}
                                 onCheckedChange={(checked) => {
                                   setTempSelectedCategories((prev) =>
                                     checked
-                                      ? [...prev, category]
-                                      : prev.filter((c) => c !== category)
+                                      ? [...prev, school.name]
+                                      : prev.filter((c) => c !== school.name)
                                   );
                                 }}
                               />
                               <label className="text-sm cursor-pointer select-none">
-                                {category}
+                                {school.name}
                               </label>
                             </div>
                           ))}
@@ -1309,7 +1314,7 @@ export default function CreateEvent({
                               Select All Non-Academic
                             </label>
                           </div>
-                          {nonAcademicCategories.map((category) => (
+                          {getNonAcademicCategories().map((category) => (
                             <div
                               key={category}
                               className="flex items-center space-x-2 p-2 hover:bg-accent rounded cursor-pointer"
