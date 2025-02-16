@@ -14,7 +14,6 @@ import {
   fetchOfficerEvents,
   getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
-import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
 import { useTabContext, TabProvider } from "@/context/TabContext";
 import { checkNetworkStatus } from "@/utils/networkUtils";
 import { Button } from "@/components/ui/button";
@@ -25,15 +24,18 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Upload, Loader2 } from "lucide-react";
 import { importEventAndParticipants } from "@/utils/importUtils";
+import { ColorfulSpinner } from "@/components/ui/loader";
+import { NetworkStatus } from "@/components/ui/network-status";
 
 export default function EventsManagement() {
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMessage, setLoadingMessage] = useState("Initializing...");
+  const [error, setError] = useState(null);
   const [currentEventId, setCurrentEventId] = useState(null);
+  const [currentEvent, setCurrentEvent] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [networkStatus, setNetworkStatus] = useState({
     isOnline: true,
@@ -91,12 +93,9 @@ export default function EventsManagement() {
   useEffect(() => {
     const fetchAcademicPeriod = async () => {
       try {
-        console.log("Fetching academic period...");
         const period = await getCurrentAcademicPeriod();
-        console.log("Fetched academic period:", period);
         setCurrentAcademicPeriod(period);
       } catch (error) {
-        console.error("Error fetching academic period:", error);
         toast.error("Failed to fetch academic period");
       }
     };
@@ -114,7 +113,7 @@ export default function EventsManagement() {
       try {
         // Only show loading if we already have events
         if (events.length > 0) {
-          setLoadingMessage("Fetching events...");
+          setLoading(true);
         }
 
         // Check cache first
@@ -161,17 +160,17 @@ export default function EventsManagement() {
   useEffect(() => {
     const initializeUser = async () => {
       try {
-        setLoadingMessage("Checking network status...");
+        setLoading(true);
+        setError(null);
+
         const status = await checkNetworkStatus();
         setNetworkStatus(status);
 
         if (!status.isOnline) {
-          toast.error(status.message);
-          setLoading(false);
+          setError(status.message);
           return;
         }
 
-        setLoadingMessage("Authenticating user...");
         const currentUser = await getCurrentUser();
 
         if (currentUser && currentUser.$id) {
@@ -179,12 +178,12 @@ export default function EventsManagement() {
           userIdRef.current = currentUser.$id;
           await fetchEvents(currentUser.$id);
         } else {
-          console.error("No user found or invalid user data");
+          setError("No user found or invalid user data");
           router.push("/signin");
         }
       } catch (error) {
         console.error("Error initializing user:", error);
-        toast.error(
+        setError(
           networkStatus.isOnline
             ? "Failed to initialize user. Please try again."
             : networkStatus.message
@@ -219,38 +218,26 @@ export default function EventsManagement() {
 
   const handleEventCreated = async (newEvent, isImported = false) => {
     try {
-      // Fetch events to update the list
-      await fetchEvents(userIdRef.current);
+      // Update events list
+      setEvents((prevEvents) => [...prevEvents, newEvent]);
 
-      // Set the current event ID to the newly created event
+      // Set the current event
+      setCurrentEvent(newEvent);
       setCurrentEventId(newEvent.$id);
 
-      // If this is the first event (events array was empty before)
-      if (events.length === 0) {
-        // Update events array with the new event
-        setEvents([newEvent]);
-
-        // For imported events, go to log tab
-        // For created events, go to participant management tab
-        setActiveTab(isImported ? "log" : "participants");
-
-        // Show appropriate welcome message
-        toast.success(
-          isImported
-            ? "Event imported successfully! You can now view the events."
-            : "Event created successfully! You can now add participants to your event.",
-          {
-            autoClose: 5000,
-          }
-        );
-      } else {
-        // If not the first event, go to participant management for created events
-        // or log tab for imported events
-        setActiveTab(isImported ? "log" : "participants");
+      // Navigate to participant management if not imported
+      if (!isImported) {
+        setActiveTab("participants");
       }
+
+      console.log("Event created and selected:", {
+        newEvent,
+        currentEventId: newEvent.$id,
+        isImported,
+      });
     } catch (error) {
-      console.error("Error handling event creation:", error);
-      toast.error("An error occurred while updating the event list");
+      console.error("Error in handleEventCreated:", error);
+      toast.error("Error setting up new event");
     }
   };
 
@@ -282,146 +269,180 @@ export default function EventsManagement() {
   const handleImportEvent = async (file) => {
     try {
       setLoading(true);
-      const result = await importEventAndParticipants(file);
+
+      if (!currentAcademicPeriod || !currentAcademicPeriod.$id) {
+        toast.error(
+          "No active academic period found. Please set up an academic period first."
+        );
+        return;
+      }
+
+      const result = await importEventAndParticipants(
+        file,
+        currentAcademicPeriod.$id
+      );
 
       if (result.success) {
         toast.success(result.message);
-        // Pass true as second argument to indicate this is an imported event
         await handleEventCreated(result.event, true);
       } else {
         toast.error(result.message || "Failed to import event");
       }
     } catch (error) {
-      console.error("Error importing event:", error);
-      toast.error("Failed to import event. Please try again.");
+      toast.error(error.message || "Failed to import event. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const renderEmptyState = (activeTab) => (
-    <Card className="w-full">
-      <CardHeader className="text-center">
-        <CardTitle>{getEmptyStateMessage(activeTab).title}</CardTitle>
-        <CardDescription>
-          {getEmptyStateMessage(activeTab).description}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center gap-4">
-        <Button onClick={() => setActiveTab("createEvent")}>
-          <Plus className="mr-2 h-4 w-4" /> Create Your First Event
-        </Button>
-        <div className="flex items-center gap-2">
-          <div className="bg-border h-px w-12"></div>
-          <span className="text-sm text-muted-foreground">or</span>
-          <div className="bg-border h-px w-12"></div>
-        </div>
-        <div className="relative">
-          <input
-            type="file"
-            id="importFile"
-            className="hidden"
-            accept=".xlsx,.xls,.csv"
-            onChange={(e) => {
-              if (e.target.files?.[0]) {
-                handleImportEvent(e.target.files[0]);
-              }
-            }}
-          />
-          <Button
-            variant="default"
-            className="bg-blue-600 hover:bg-blue-700"
-            onClick={() => document.getElementById("importFile").click()}
-          >
-            <Upload className="mr-2 h-4 w-4" /> Import Your First Event
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (newTab === "log") {
+      setCurrentEventId(null);
+      setCurrentEvent(null);
+    }
+  };
 
-  if (loading) {
+  if (!networkStatus.isOnline) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <GADConnectSimpleLoader />
-        <p className="mt-4 text-gray-600">{loadingMessage}</p>
-        {networkStatus.isLow && (
-          <p className="mt-2 text-yellow-600">{networkStatus.message}</p>
-        )}
-      </div>
+      <NetworkStatus 
+        title="No Internet Connection"
+        message="Please check your internet connection and try again."
+        onRetry={() => window.location.reload()}
+        isOffline={true}
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <NetworkStatus 
+        title="Connection Error"
+        message={error}
+        onRetry={() => fetchEvents(userIdRef.current)}
+        isOffline={false}
+      />
     );
   }
 
   return (
-    <TabProvider value={{ activeTab, setActiveTab }}>
-      <ToastContainer />
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="createEvent">Create Event</TabsTrigger>
-          <TabsTrigger value="participants">Participant Management</TabsTrigger>
-          <TabsTrigger value="log">Events</TabsTrigger>
-        </TabsList>
+    <>
+      {/* Loading state */}
+      {loading && (
+        <div className="flex h-screen items-center justify-center">
+          <ColorfulSpinner />
+        </div>
+      )}
 
-        {events.length === 0 && activeTab !== "createEvent" ? (
-          <div className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Welcome to Event Management</CardTitle>
-                <CardDescription>
-                  Get started by creating your first event or importing an
-                  existing one.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-4">
-                <Button onClick={() => setActiveTab("createEvent")}>
-                  <Plus className="mr-2 h-4 w-4" /> Create Your First Event
-                </Button>
+      {/* No user state */}
+      {!loading && !error && !user && (
+        <div className="flex h-screen flex-col items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      )}
 
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          <>
-            <TabsContent value="overview">
-              <EventOverview
-                events={events}
-                currentEventId={currentEventId}
-                setCurrentEventId={setCurrentEventId}
-                user={user}
-                networkStatus={networkStatus}
-                currentAcademicPeriod={currentAcademicPeriod}
-              />
-            </TabsContent>
-            <TabsContent value="createEvent">
-              <CreateEvent
-                onEventCreated={handleEventCreated}
-                user={user}
-                networkStatus={networkStatus}
-                currentAcademicPeriod={currentAcademicPeriod}
-              />
-            </TabsContent>
-            <TabsContent value="participants">
-              <ParticipantManagement
-                events={events}
-                currentEventId={currentEventId}
-                setCurrentEventId={setCurrentEventId}
-                user={user}
-                setActiveTab={setActiveTab}
-                networkStatus={networkStatus}
-              />
-            </TabsContent>
-            <TabsContent value="log">
-              <EventParticipantLog
-                events={events}
-                currentEventId={currentEventId}
-                user={user}
-                networkStatus={networkStatus}
-              />
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
-    </TabProvider>
+      {/* Main content */}
+      {!loading && !error && user && (
+        <TabProvider value={{ activeTab, setActiveTab }}>
+          <ToastContainer />
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="createEvent">Create Event</TabsTrigger>
+              <TabsTrigger value="participants">
+                Participant Management
+              </TabsTrigger>
+              <TabsTrigger value="log">Event Participant Log</TabsTrigger>
+            </TabsList>
+
+            {/* Show welcome card if no events exist and not on createEvent tab */}
+            {events.length === 0 && activeTab !== "createEvent" ? (
+              <div className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Welcome to Event Management</CardTitle>
+                    <CardDescription>
+                      Get started by creating your first event or importing an existing one.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col items-center gap-4">
+                    <Button onClick={() => setActiveTab("createEvent")}>
+                      <Plus className="mr-2 h-4 w-4" /> Create Your First Event
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <div className="bg-border h-px w-12"></div>
+                      <span className="text-sm text-muted-foreground">or</span>
+                      <div className="bg-border h-px w-12"></div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        id="welcomeImportFile"
+                        className="hidden"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            handleImportEvent(e.target.files[0]);
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="default"
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => document.getElementById("welcomeImportFile").click()}
+                      >
+                        <Upload className="mr-2 h-4 w-4" /> Import Your First Event
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <>
+                <TabsContent value="overview">
+                  <EventOverview
+                    events={events}
+                    currentEventId={currentEventId}
+                    setCurrentEventId={setCurrentEventId}
+                    user={user}
+                    networkStatus={networkStatus}
+                    currentAcademicPeriod={currentAcademicPeriod}
+                  />
+                </TabsContent>
+                <TabsContent value="createEvent">
+                  <CreateEvent
+                    user={user}
+                    currentAcademicPeriod={currentAcademicPeriod}
+                    onEventCreated={handleEventCreated}
+                    setActiveTab={setActiveTab}
+                  />
+                </TabsContent>
+                <TabsContent value="participants">
+                  <ParticipantManagement
+                    events={events}
+                    currentEventId={currentEventId}
+                    setCurrentEventId={setCurrentEventId}
+                    currentEvent={currentEvent}
+                    setCurrentEvent={setCurrentEvent}
+                    user={user}
+                    setActiveTab={setActiveTab}
+                    networkStatus={networkStatus}
+                    currentAcademicPeriod={currentAcademicPeriod}
+                  />
+                </TabsContent>
+                <TabsContent value="log">
+                  <EventParticipantLog
+                    events={events}
+                    currentEventId={currentEventId}
+                    user={user}
+                    networkStatus={networkStatus}
+                  />
+                </TabsContent>
+              </>
+            )}
+          </Tabs>
+        </TabProvider>
+      )}
+    </>
   );
 }

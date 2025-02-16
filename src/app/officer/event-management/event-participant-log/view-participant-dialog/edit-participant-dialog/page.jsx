@@ -52,17 +52,41 @@ export default function EditParticipantDialog({
     }
 
     try {
-      // Filter out system fields
-      const { $id, $databaseId, $collectionId, ...validData } =
-        editedParticipant;
+      // Clean the participant data by removing Appwrite system fields
+      const cleanParticipant = { ...editedParticipant };
+      // Remove all Appwrite system fields
+      delete cleanParticipant.$id;
+      delete cleanParticipant.$createdAt;
+      delete cleanParticipant.$updatedAt;
+      delete cleanParticipant.$permissions;
+      delete cleanParticipant.$collectionId;
+      delete cleanParticipant.$databaseId;
+      delete cleanParticipant.$read;
+      delete cleanParticipant.$write;
+      
+      // Keep only the fields we want to update
+      const updateData = {
+        name: cleanParticipant.name,
+        sex: cleanParticipant.sex,
+        age: cleanParticipant.age,
+        school: cleanParticipant.school,
+        year: cleanParticipant.year,
+        section: cleanParticipant.section,
+        ethnicGroup: cleanParticipant.ethnicGroup,
+        otherEthnicGroup: cleanParticipant.otherEthnicGroup,
+        eventId: cleanParticipant.eventId,
+        createdBy: cleanParticipant.createdBy,
+        academicPeriodId: cleanParticipant.academicPeriodId,
+        isArchived: cleanParticipant.isArchived || false
+      };
 
       // Update the participant in the database
-      await updateParticipant($id, validData); // Ensure $id is passed as the document ID
+      await updateParticipant(editedParticipant.$id, updateData);
       onUpdateParticipant(editedParticipant); // Update local state
       toast.success("Participant updated successfully");
       setIsDialogOpen(false); // Close the dialog
     } catch (error) {
-      console.error("Error updating participant:", error.message);
+      console.error("Update error:", error);
       toast.error("Failed to update participant. Please try again.");
     }
   };

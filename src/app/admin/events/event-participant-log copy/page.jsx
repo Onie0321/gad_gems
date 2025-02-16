@@ -32,18 +32,35 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  participantCollectionId,
+  studentsCollectionId,
   userCollectionId,
-  client,
   getCurrentAcademicPeriod,
+  staffFacultyCollectionId,
+  communityCollectionId,
+  academicPeriodCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
+import { Eye, Edit, ArrowUpDown } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ID } from "appwrite";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
-import AddParticipant from "./add-participant-dialog/page";
-import EditEvent from "./edit-event-dialog/page";
-import ViewParticipants from "./view-participant-dialog/page";
-import ExportEventsButton from "./export-event/page";
-import GenerateReportButton from "./import-event/page";
+import EditEvent from "@/app/officer/event-management/event-participant-log/edit-event-dialog/page";
+import ViewParticipants from "@/app/officer/event-management/event-participant-log/view-participant-dialog/page";
+import ExportEventsButton from "@/app/officer/event-management/event-participant-log/export-event/page";
+import GenerateReportButton from "@/app/officer/event-management/event-participant-log/import-event/page";
 
 export default function EventParticipantLog() {
   const [events, setEvents] = useState([]);
@@ -51,86 +68,96 @@ export default function EventParticipantLog() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sortCriteria, setSortCriteria] = useState("eventDate");
+  const [sortCriteria, setSortCriteria] = useState("createdAtDesc");
   const [statusFilter, setStatusFilter] = useState("All");
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showEventDetails, setShowEventDetails] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     fetchData();
-
-    // Subscribe to event changes
-    const eventUnsubscribe = client.subscribe(
-      `databases.${databaseId}.collections.${eventCollectionId}.documents`,
-      (response) => {
-        console.log("Event update received:", response);
-        fetchData(); // Refresh all data when any event changes
-      }
-    );
-
-    // Subscribe to participant changes
-    const participantUnsubscribe = client.subscribe(
-      `databases.${databaseId}.collections.${participantCollectionId}.documents`,
-      (response) => {
-        console.log("Participant update received:", response);
-        fetchData(); // Refresh all data when any participant changes
-      }
-    );
-
-    // Cleanup subscriptions
-    return () => {
-      eventUnsubscribe();
-      participantUnsubscribe();
-    };
   }, []);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const currentPeriod = await getCurrentAcademicPeriod();
 
-      if (!currentPeriod) {
-        throw new Error("No active academic period found");
-      }
-
-      // Fetch events first
+      // Fetch all events without academic period filter for admin
       const response = await databases.listDocuments(
         databaseId,
         eventCollectionId,
-        [
-          Query.equal("isArchived", false),
-          Query.equal("academicPeriodId", currentPeriod.$id),
-          Query.orderDesc("createdAt"),
-        ]
+        [Query.equal("isArchived", false), Query.orderDesc("createdAt")]
       );
 
-      // Get all event IDs from the current period
-      const eventIds = response.documents.map((event) => event.$id);
+      // Get all unique academic period IDs from events
+      const academicPeriodIds = [
+        ...new Set(response.documents.map((event) => event.academicPeriodId)),
+      ];
 
-      // Fetch all participants for these events in one query
-      const allParticipantsResponse = await databases.listDocuments(
-        databaseId,
-        participantCollectionId,
-        [
-          Query.equal("isArchived", false),
-          Query.equal("eventId", eventIds),
-        ]
-      );
+      // Fetch all participants across all periods
+      const [studentsResponse, staffResponse, communityResponse] =
+        await Promise.all([
+          databases.listDocuments(databaseId, studentsCollectionId, [
+            Query.equal("isArchived", false),
+            Query.equal("academicPeriodId", academicPeriodIds),
+          ]),
+          databases.listDocuments(databaseId, staffFacultyCollectionId, [
+            Query.equal("isArchived", false),
+            Query.equal("academicPeriodId", academicPeriodIds),
+          ]),
+          databases.listDocuments(databaseId, communityCollectionId, [
+            Query.equal("isArchived", false),
+            Query.equal("academicPeriodId", academicPeriodIds),
+          ]),
+        ]);
 
-      // Get creator information and combine with event data
+      // Map participants with their specific fields
+      const allParticipants = [
+        ...studentsResponse.documents.map((p) => ({
+          ...p,
+          participantType: "Student",
+          identifier: p.studentId || null,
+        })),
+        ...staffResponse.documents.map((p) => ({
+          ...p,
+          participantType: "Staff/Faculty",
+          identifier: p.staffFacultyId || null,
+        })),
+        ...communityResponse.documents.map((p) => ({
+          ...p,
+          participantType: "Community Member",
+          identifier: null,
+        })),
+      ];
+
+      // Process events with participants
       const eventsWithParticipants = await Promise.all(
         response.documents.map(async (event) => {
           try {
-            // Filter participants for this specific event
-            const eventParticipants = allParticipantsResponse.documents.filter(
+            const eventParticipants = allParticipants.filter(
               (p) => p.eventId === event.$id
             );
 
-            // Calculate participant counts
+            // Calculate participant counts with proper type checking
             const participantCounts = {
               total: eventParticipants.length,
-              male: eventParticipants.filter((p) => p.sex === "Male").length,
-              female: eventParticipants.filter((p) => p.sex === "Female").length,
+              male: eventParticipants.filter(
+                (p) => p.sex?.toLowerCase() === "male"
+              ).length,
+              female: eventParticipants.filter(
+                (p) => p.sex?.toLowerCase() === "female"
+              ).length,
+              students: eventParticipants.filter(
+                (p) => p.participantType === "Student"
+              ).length,
+              staffFaculty: eventParticipants.filter(
+                (p) => p.participantType === "Staff/Faculty"
+              ).length,
+              community: eventParticipants.filter(
+                (p) => p.participantType === "Community Member"
+              ).length,
             };
 
             // Fetch creator information
@@ -140,11 +167,32 @@ export default function EventParticipantLog() {
               event.createdBy
             );
 
+            // Get academic period info if available
+            let academicPeriodInfo = null;
+            if (event.academicPeriodId) {
+              try {
+                academicPeriodInfo = await databases.getDocument(
+                  databaseId,
+                  academicPeriodCollectionId,
+                  event.academicPeriodId
+                );
+              } catch (error) {
+                console.error("Error fetching academic period:", error);
+              }
+            }
+
             return {
               ...event,
               participants: eventParticipants,
-              participantCounts: participantCounts,
+              participantCounts,
               creatorName: creatorResponse.name || "Unknown",
+              academicPeriod: academicPeriodInfo
+                ? {
+                    schoolYear: academicPeriodInfo.schoolYear,
+                    periodType: academicPeriodInfo.periodType,
+                    isActive: academicPeriodInfo.isActive,
+                  }
+                : null,
             };
           } catch (error) {
             console.error(
@@ -154,8 +202,16 @@ export default function EventParticipantLog() {
             return {
               ...event,
               participants: [],
-              participantCounts: { total: 0, male: 0, female: 0 },
+              participantCounts: {
+                total: 0,
+                male: 0,
+                female: 0,
+                students: 0,
+                staffFaculty: 0,
+                community: 0,
+              },
               creatorName: "Unknown",
+              academicPeriod: null,
             };
           }
         })
@@ -183,18 +239,32 @@ export default function EventParticipantLog() {
 
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     switch (sortCriteria) {
-      case "all":
-        return 0; // No sorting, maintain original order
-      case "eventDate":
-        return new Date(b.eventDate) - new Date(a.eventDate);
       case "eventName":
         return a.eventName.localeCompare(b.eventName);
-      case "participantCount":
-        return b.totalParticipants - a.totalParticipants;
+      case "eventNameDesc":
+        return b.eventName.localeCompare(a.eventName);
+      case "eventDate":
+        return new Date(a.eventDate) - new Date(b.eventDate);
+      case "eventDateDesc":
+        return new Date(b.eventDate) - new Date(a.eventDate);
+      case "eventVenue":
+        return a.eventVenue.localeCompare(b.eventVenue);
+      case "eventVenueDesc":
+        return b.eventVenue.localeCompare(a.eventVenue);
+      case "createdAt":
+        return new Date(a.$createdAt) - new Date(b.$createdAt);
+      case "createdAtDesc":
       default:
-        return 0;
+        return new Date(b.$createdAt) - new Date(a.$createdAt);
     }
   });
+
+  const paginatedEvents = sortedEvents.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  const totalPages = Math.ceil(sortedEvents.length / rowsPerPage);
 
   const handleUpdateEvent = async (updatedEvent) => {
     try {
@@ -213,9 +283,57 @@ export default function EventParticipantLog() {
     }
   };
 
-  if (loading) {
-    return <LoadingAnimation />;
-  }
+  const handleAddParticipant = async (newParticipant) => {
+    try {
+      // Create the new participant document
+      const response = await databases.createDocument(
+        databaseId,
+        studentsCollectionId,
+        ID.unique(),
+        {
+          ...newParticipant,
+          eventId: selectedEvent.$id,
+          isArchived: false,
+        }
+      );
+
+      // Update the local state
+      setParticipants((prevParticipants) => [...prevParticipants, response]);
+
+      // Update the event's participant counts
+      const updatedEvent = {
+        ...selectedEvent,
+        participantCounts: {
+          ...selectedEvent.participantCounts,
+          total: selectedEvent.participantCounts.total + 1,
+          [newParticipant.sex.toLowerCase()]:
+            selectedEvent.participantCounts[newParticipant.sex.toLowerCase()] +
+            1,
+        },
+      };
+
+      setSelectedEvent(updatedEvent);
+
+      // Update the events list with new participant count
+      setEvents(
+        events.map((event) =>
+          event.$id === selectedEvent.$id ? updatedEvent : event
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Participant added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding participant:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add participant",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (error) {
     return (
@@ -233,7 +351,7 @@ export default function EventParticipantLog() {
         <CardDescription>
           View and manage all events and their participants
         </CardDescription>
-        <div className="mt-4 grid grid-cols-3 gap-4">
+        <div className="mt-4 grid grid-cols-2 gap-4">
           <div className="bg-primary text-primary-foreground p-4 rounded-lg">
             <h3 className="text-lg font-semibold">Total Events</h3>
             <p className="text-3xl font-bold">{events.length}</p>
@@ -241,14 +359,40 @@ export default function EventParticipantLog() {
           <div className="bg-green-600 text-primary-foreground p-4 rounded-lg">
             <h3 className="text-lg font-semibold">Total Participants</h3>
             <p className="text-3xl font-bold">
-              {events.reduce((sum, event) => sum + (event.participantCounts?.total || 0), 0)}
+              {events.reduce(
+                (sum, event) => sum + event.participantCounts.total,
+                0
+              )}
             </p>
-          </div>
-          <div className="bg-blue-600 text-primary-foreground p-4 rounded-lg">
-            <h3 className="text-lg font-semibold">Active Events</h3>
-            <p className="text-3xl font-bold">
-              {events.filter((e) => new Date(e.eventDate) >= new Date()).length}
-            </p>
+            <div className="text-xs mt-2">
+              <div className="flex justify-between">
+                <span>Students:</span>
+                <span>
+                  {events.reduce(
+                    (sum, event) => sum + event.participantCounts.students,
+                    0
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Staff/Faculty:</span>
+                <span>
+                  {events.reduce(
+                    (sum, event) => sum + event.participantCounts.staffFaculty,
+                    0
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Community:</span>
+                <span>
+                  {events.reduce(
+                    (sum, event) => sum + event.participantCounts.community,
+                    0
+                  )}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -262,17 +406,20 @@ export default function EventParticipantLog() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-64"
             />
-            <Select onValueChange={setSortCriteria} defaultValue={sortCriteria}>
+            <Select
+              onValueChange={setSortCriteria}
+              defaultValue="createdAtDesc"
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="createdAtDesc">Newest First</SelectItem>
+                <SelectItem value="createdAt">Oldest First</SelectItem>
                 <SelectItem value="eventDate">Event Date</SelectItem>
-                <SelectItem value="eventName">Event Name</SelectItem>
-                <SelectItem value="participantCount">
-                  Participant Count
-                </SelectItem>
+                <SelectItem value="eventDateDesc">Event Date (Desc)</SelectItem>
+                <SelectItem value="eventName">Event Name (A-Z)</SelectItem>
+                <SelectItem value="eventNameDesc">Event Name (Z-A)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -284,22 +431,96 @@ export default function EventParticipantLog() {
 
         {/* Events Table */}
         <div className="rounded-md border">
+          <div className="flex items-center justify-end p-4 space-x-2">
+            <span className="text-sm text-gray-600">Rows per page:</span>
+            <Select
+              value={rowsPerPage.toString()}
+              onValueChange={(value) => {
+                setRowsPerPage(Number(value));
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[70px]">
+                <SelectValue placeholder={rowsPerPage} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="15">15</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Event Name</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Venue</TableHead>
-                <TableHead className="text-center">
-                  Participants (M/F)
+                <TableHead
+                  className="bg-gray-100 text-black hover:bg-gray-200 transition-colors cursor-pointer"
+                  onClick={() =>
+                    setSortCriteria(
+                      sortCriteria === "eventName"
+                        ? "eventNameDesc"
+                        : "eventName"
+                    )
+                  }
+                >
+                  Event Name
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
                 </TableHead>
-                <TableHead>Created By</TableHead> {/* New column */}
-                <TableHead className="text-center">Actions</TableHead>
+                <TableHead
+                  className="bg-gray-100 text-black hover:bg-gray-200 transition-colors cursor-pointer"
+                  onClick={() =>
+                    setSortCriteria(
+                      sortCriteria === "eventDate"
+                        ? "eventDateDesc"
+                        : "eventDate"
+                    )
+                  }
+                >
+                  Date
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                </TableHead>
+                <TableHead
+                  className="bg-gray-100 text-black hover:bg-gray-200 transition-colors cursor-pointer"
+                  onClick={() =>
+                    setSortCriteria(
+                      sortCriteria === "eventVenue"
+                        ? "eventVenueDesc"
+                        : "eventVenue"
+                    )
+                  }
+                >
+                  Venue
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                </TableHead>
+                <TableHead className="bg-gray-100 text-black text-center">
+                  Participants
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                </TableHead>
+
+                <TableHead className="bg-gray-100 text-black">
+                  Created By
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                </TableHead>
+                <TableHead
+                  className="bg-gray-100 text-black hover:bg-gray-200 transition-colors cursor-pointer"
+                  onClick={() =>
+                    setSortCriteria(
+                      sortCriteria === "createdAt"
+                        ? "createdAtDesc"
+                        : "createdAt"
+                    )
+                  }
+                >
+                  Created At
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                </TableHead>
+                <TableHead className="bg-gray-100 text-black text-center">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedEvents.map((event) => (
+              {paginatedEvents.map((event) => (
                 <TableRow key={event.$id}>
                   <TableCell className="font-medium">
                     {event.eventName}
@@ -307,25 +528,18 @@ export default function EventParticipantLog() {
                   <TableCell>
                     {format(new Date(event.eventDate), "MMM dd, yyyy")}
                   </TableCell>
-                  <TableCell>
-                    {format(new Date(event.eventTimeFrom), "hh:mm a")} -
-                    {format(new Date(event.eventTimeTo), "hh:mm a")}
-                  </TableCell>
                   <TableCell>{event.eventVenue}</TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center">
                       <div>Total: {event.participantCounts.total}</div>
-                      <div className="text-sm text-muted-foreground">
-                        <span className="text-blue-600">
-                          {event.participantCounts.male}
-                        </span>
-                        /
-                        <span className="text-pink-600">
-                          {event.participantCounts.female}
-                        </span>
+                      <div className="text-xs text-muted-foreground space-x-2">
+                        <span>S: {event.participantCounts.students} |</span>
+                        <span>F: {event.participantCounts.staffFaculty} |</span>
+                        <span>C: {event.participantCounts.community}</span>
                       </div>
                     </div>
                   </TableCell>
+
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-600">
@@ -333,9 +547,11 @@ export default function EventParticipantLog() {
                       </span>
                     </div>
                   </TableCell>
-
+                  <TableCell>
+                    {format(new Date(event.$createdAt), "MMM dd, yyyy h:mm a")}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
+                    <div className="flex justify-end space-x-4">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -343,20 +559,24 @@ export default function EventParticipantLog() {
                           setSelectedEvent(event);
                           setShowParticipants(true);
                         }}
+                        className="flex flex-col items-center gap-1 h-auto py-2"
                       >
-                        View
+                        <Eye className="h-4 w-4" />
+                        <span className="text-xs">View</span>
                       </Button>
                       <EditEvent
                         event={event}
                         onUpdateEvent={handleUpdateEvent}
-                      />
-                      <ViewParticipants
-                        event={event}
-                        participants={event.participants}
-                        show={
-                          showParticipants && selectedEvent?.$id === event.$id
+                        trigger={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="flex flex-col items-center gap-1 h-auto py-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span className="text-xs">Edit</span>
+                          </Button>
                         }
-                        onClose={() => setShowParticipants(false)}
                       />
                     </div>
                   </TableCell>
@@ -364,23 +584,127 @@ export default function EventParticipantLog() {
               ))}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between px-4 py-4 border-t">
+            <div className="text-sm text-gray-600">
+              Showing {(currentPage - 1) * rowsPerPage + 1} to{" "}
+              {Math.min(currentPage * rowsPerPage, sortedEvents.length)} of{" "}
+              {sortedEvents.length} entries
+            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                {[...Array(totalPages)].map((_, i) => (
+                  <PaginationItem key={i + 1}>
+                    <PaginationLink
+                      onClick={() => setCurrentPage(i + 1)}
+                      isActive={currentPage === i + 1}
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         </div>
       </CardContent>
-      {/* Add this before the closing Card tag */}
-      {selectedEvent && (
-        <ViewParticipants
-          isOpen={showParticipants}
-          onClose={() => {
-            setShowParticipants(false);
-            setSelectedEvent(null);
-          }}
-          participants={selectedEvent.participants || []}
-          selectedEvent={selectedEvent}
-          onAddParticipant={async () => {
-            await fetchData(); // Refresh data after adding/updating participant
-          }}
-        />
-      )}
+      {/* Add these dialogs at the bottom of your return statement */}
+      <EventDetailsDialog
+        event={selectedEvent}
+        isOpen={showEventDetails}
+        onClose={() => {
+          setShowEventDetails(false);
+          setSelectedEvent(null);
+        }}
+      />
+      <ViewParticipants
+        isOpen={showParticipants}
+        onClose={() => setShowParticipants(false)}
+        participants={participants}
+        selectedEvent={selectedEvent}
+        onAddParticipant={handleAddParticipant}
+      />
     </Card>
   );
 }
+
+const EventDetailsDialog = ({ event, isOpen, onClose }) => {
+  if (!event) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Event Details</DialogTitle>
+        </DialogHeader>
+
+        {/* Event Details Section */}
+        <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Event Name
+            </label>
+            <p className="mt-1">{event?.eventName}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Event Date
+            </label>
+            <p className="mt-1">
+              {format(new Date(event?.eventDate), "MMMM dd, yyyy")}
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Event Time
+            </label>
+            <p className="mt-1">{event?.eventTime}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">Venue</label>
+            <p className="mt-1">{event?.eventVenue}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Event Type
+            </label>
+            <p className="mt-1">{event?.eventType}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">
+              Created By
+            </label>
+            <p className="mt-1">{event?.creatorName}</p>
+          </div>
+          <div className="col-span-2">
+            <label className="text-sm font-medium text-gray-500">
+              Description
+            </label>
+            <p className="mt-1">{event?.eventDescription}</p>
+          </div>
+        </div>
+
+        {/* Existing Participants Section */}
+        <DialogTitle className="text-lg font-semibold mb-4">
+          Participants
+        </DialogTitle>
+        {/* ... rest of your existing participants table ... */}
+      </DialogContent>
+    </Dialog>
+  );
+};

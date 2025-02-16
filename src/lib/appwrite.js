@@ -5,7 +5,6 @@ import {
   Databases,
   ID,
   Query,
-  Realtime,
   Storage,
   Permission,
   Role,
@@ -13,17 +12,21 @@ import {
   RealtimeResponseEvent,
 } from "appwrite";
 
-export const client = new Client()
-  .setEndpoint("https://cloud.appwrite.io/v1")
-  .setProject("670e7a740019d9d38739");
+const client = new Client()
+  .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
+  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+
+export const account = new Account(client);
+export const databases = new Databases(client);
+
+// Export the client for realtime subscriptions
+export { client };
 
 export const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID;
 export const userCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID;
 export const eventCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID;
-export const participantCollectionId =
-  process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID;
 export const studentsCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID;
 export const questionsCollectionId =
@@ -50,35 +53,9 @@ export const communityCollectionId =
 export const academicPeriodCollectionId =
   process.env.NEXT_PUBLIC_APPWRITE_ACADEMIC_PERIOD_COLLECTION_ID;
 
-export const account = new Account(client);
 //const avatars = new Avatars(client);
-export const databases = new Databases(client);
 export const storage = new Storage(client);
 export const teams = new Teams(client);
-
-export async function createGoogleUser(userId, email, name) {
-  try {
-    // Create the user document in the database
-    const newUser = await databases.createDocument(
-      databaseId,
-      userCollectionId,
-      userId,
-      {
-        email: email,
-        name: name,
-        role: "user", // Default role for Google sign-ins
-      }
-    );
-
-    return newUser;
-  } catch (error) {
-    console.error("Error creating Google user:", error.message);
-    throw new Error("Error creating Google user");
-  }
-}
-// src/lib/appwrite.js
-
-// ... other imports and configurations ...
 
 export const updateUserFirstLogin = async (userId) => {
   try {
@@ -151,12 +128,15 @@ export async function createUser(email, password, name, role = "user") {
 
 export async function getAllUsers(email) {
   try {
+    console.log("Checking for existing user with email:", email);
     const response = await databases.listDocuments(
       databaseId,
       userCollectionId,
       [Query.equal("email", email)]
     );
-    return response.documents.length > 0;
+
+    console.log("Database response:", response);
+    return response.total > 0;
   } catch (error) {
     console.error("Error checking existing users:", error);
     throw error;
@@ -449,7 +429,7 @@ export const getParticipants = async (eventId = null, userId = null) => {
 
     const response = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       query
     );
 
@@ -597,23 +577,38 @@ export const checkTimeConflict = async (
   }
 };
 
-export const createParticipant = async (participantData, createdById) => {
+export const createParticipant = async (participantData) => {
   try {
+    console.log("Creating participant with data:", participantData);
+
+    // Ensure all required fields are present
+    const requiredFields = {
+      eventId: participantData.eventId,
+      name: participantData.name,
+      createdBy: participantData.createdBy,
+    };
+
+    // Check if any required field is missing
+    const missingFields = Object.entries(requiredFields)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingFields.length > 0) {
+      throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+    }
+
     const response = await databases.createDocument(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       ID.unique(),
-      {
-        ...participantData,
-        createdBy: createdById,
-      }
+      participantData
     );
+
     console.log("Participant created successfully:", response);
     return response;
   } catch (error) {
     console.error("Error creating participant:", error);
-    // Instead of throwing an error, we'll return null
-    return null;
+    throw error;
   }
 };
 
@@ -631,7 +626,7 @@ export async function getAllEventsAndParticipants() {
     // Then fetch all participants
     const participantsResponse = await databases.listDocuments(
       databaseId,
-      participantCollectionId
+      studentsCollectionId
     );
 
     return {
@@ -648,7 +643,7 @@ export const updateParticipant = async (participantId, updatedData) => {
   try {
     const response = await databases.updateDocument(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       participantId,
       updatedData
     );
@@ -707,7 +702,7 @@ export const deleteParticipant = async (participantId, userId) => {
     // Fetch the participant to check ownership
     const participant = await databases.getDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
-      process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID,
       participantId
     );
 
@@ -722,7 +717,7 @@ export const deleteParticipant = async (participantId, userId) => {
     // Proceed with deletion
     await databases.deleteDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
-      process.env.NEXT_PUBLIC_APPWRITE_PARTICIPANT_COLLECTION_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID,
       participantId
     );
 
@@ -737,7 +732,7 @@ export async function getParticipantByStudentId(studentId) {
   try {
     const response = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [Query.equal("studentId", studentId)]
     );
 
@@ -773,7 +768,7 @@ export async function fetchParticipantData(
   }
 
   try {
-    // For students, we only need to check the participantCollectionId
+    // For students, we only need to check the studentsCollectionId
     const query = [
       Query.equal(
         participantType === "student"
@@ -788,13 +783,13 @@ export async function fetchParticipantData(
 
     console.log("Querying with:", {
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       query,
     });
 
     const response = await databases.listDocuments(
       databaseId,
-      participantCollectionId, // Always use participantCollectionId for all types
+      studentsCollectionId, // Always use studentsCollectionId for all types
       query
     );
 
@@ -850,40 +845,20 @@ export async function fetchParticipantData(
 }
 
 // Add this helper function to check for duplicate participants
-export async function checkDuplicateParticipant(
-  eventId,
-  studentId = "",
-  name = ""
-) {
-  console.log("Checking for duplicate participant:", {
-    eventId,
-    studentId,
-    name,
-  });
-
+export const checkDuplicateParticipant = async (eventId, identifier) => {
   try {
-    const queries = [Query.equal("eventId", eventId)];
-
-    if (studentId) {
-      queries.push(Query.equal("studentId", studentId));
-    }
-    if (name) {
-      queries.push(Query.equal("name", name));
-    }
-
     const response = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
-      queries
+      studentsCollectionId,
+      [Query.equal("eventId", eventId), Query.equal("$id", identifier)]
     );
 
-    console.log("Duplicate check response:", response);
-    return response.total > 0;
+    return response.documents.length > 0;
   } catch (error) {
     console.error("Error checking for duplicate participant:", error);
     throw error;
   }
-}
+};
 
 export function subscribeToRealTimeUpdates(collectionId, callback) {
   if (!databaseId || !collectionId) {
@@ -960,7 +935,7 @@ export async function fetchTrendData(startDate, endDate) {
 
     const participants = await Promise.all(
       events.documents.map((event) =>
-        databases.listDocuments(databaseId, participantCollectionId, [
+        databases.listDocuments(databaseId, studentsCollectionId, [
           Query.equal("eventId", event.$id),
         ])
       )
@@ -1000,30 +975,38 @@ export function processTrendData(data) {
 
 function processAgeData(participants) {
   const ageGroups = {
-    "Below 18": { male: 0, female: 0 },
-    "18-24": { male: 0, female: 0 },
-    "25-34": { male: 0, female: 0 },
-    "35-44": { male: 0, female: 0 },
-    "45-54": { male: 0, female: 0 },
-    "Above 55": { male: 0, female: 0 },
+    "Below 18": { male: 0, female: 0, total: 0 },
+    "18-24": { male: 0, female: 0, total: 0 },
+    "25-34": { male: 0, female: 0, total: 0 },
+    "35-44": { male: 0, female: 0, total: 0 },
+    "45-54": { male: 0, female: 0, total: 0 },
+    "Above 55": { male: 0, female: 0, total: 0 },
   };
 
-  participants.forEach((p) => {
-    const age = parseInt(p.age);
-    const sex = p.sex.toLowerCase();
-    if (age < 18) ageGroups["Below 18"][sex]++;
-    else if (age >= 18 && age <= 24) ageGroups["18-24"][sex]++;
-    else if (age >= 25 && age <= 34) ageGroups["25-34"][sex]++;
-    else if (age >= 35 && age <= 44) ageGroups["35-44"][sex]++;
-    else if (age >= 45 && age <= 54) ageGroups["45-54"][sex]++;
-    else if (age >= 55) ageGroups["Above 55"][sex]++;
+  participants.forEach((participant) => {
+    const age = parseInt(participant.age);
+    const sex = participant.sex?.toLowerCase() || "unknown";
+    if (isNaN(age)) return; // Skip if age is not a valid number
+
+    let ageGroup;
+    if (age < 18) ageGroup = "Below 18";
+    else if (age <= 24) ageGroup = "18-24";
+    else if (age <= 34) ageGroup = "25-34";
+    else if (age <= 44) ageGroup = "35-44";
+    else if (age <= 54) ageGroup = "45-54";
+    else ageGroup = "Above 55";
+
+    if (sex === "male") ageGroups[ageGroup].male++;
+    else if (sex === "female") ageGroups[ageGroup].female++;
+    ageGroups[ageGroup].total++;
   });
 
-  return Object.entries(ageGroups).map(([name, value]) => ({
+  // Convert to array format for the chart
+  return Object.entries(ageGroups).map(([name, counts]) => ({
     name,
-    male: value.male,
-    female: value.female,
-    total: value.male + value.female,
+    value: counts.total,
+    male: counts.male,
+    female: counts.female,
   }));
 }
 
@@ -1052,7 +1035,7 @@ export async function fetchReportData() {
     const events = await databases.listDocuments(databaseId, eventCollectionId);
     const participants = await databases.listDocuments(
       databaseId,
-      participantCollectionId
+      studentsCollectionId
     );
 
     return {
@@ -1503,31 +1486,49 @@ export const createNotification = async ({
   title,
   message,
   actionType = null,
-  approvalStatus = "pending",
   status = "pending",
+  approvalStatus = "pending",
   read = false,
 }) => {
   try {
+    // Validate required fields
+    if (!userId || !type || !title || !message) {
+      throw new Error("Missing required notification fields");
+    }
+
+    // Validate collection ID
+    if (!notificationsCollectionId) {
+      throw new Error("Notifications collection ID is not configured");
+    }
+
+    const notificationData = {
+      userId,
+      type,
+      title,
+      message,
+      actionType,
+      status,
+      approvalStatus,
+      read,
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log("Creating notification with data:", notificationData);
+
     const response = await databases.createDocument(
       databaseId,
       notificationsCollectionId,
       ID.unique(),
-      {
-        userId,
-        type,
-        title,
-        message,
-        actionType,
-        approvalStatus,
-        status,
-        read,
-        timestamp: new Date().toISOString(),
-      }
+      notificationData
     );
+
+    console.log("Notification created successfully:", response);
     return response;
   } catch (error) {
     console.error("Error creating notification:", error);
-    throw error;
+    // Don't throw the error, just log it and return null
+    // This prevents the password reset flow from breaking if notification fails
+    return null;
   }
 };
 
@@ -1629,42 +1630,132 @@ export async function fetchNotifications(filters = []) {
 
 // Add these helper functions for dashboard calculations
 const calculateSexDistribution = (participants) => {
-  const maleCount = participants.filter((p) => p.sex === "Male").length;
-  const femaleCount = participants.filter((p) => p.sex === "Female").length;
+  console.log("Starting sex distribution calculation with participants:", {
+    totalParticipants: participants.length,
+    participantTypes: participants.map(p => p.participantType),
+    sexValues: participants.map(p => p.sex)
+  });
 
-  return [
-    { name: "Male", value: maleCount },
-    { name: "Female", value: femaleCount },
+  // Count all participants by sex, including all participant types
+  const maleCount = participants.filter(
+    (p) => p.sex?.toLowerCase() === "male"
+  ).length;
+
+  const femaleCount = participants.filter(
+    (p) => p.sex?.toLowerCase() === "female"
+  ).length;
+
+  const total = maleCount + femaleCount;
+
+  console.log("Initial sex counts:", {
+    maleCount,
+    femaleCount,
+    total,
+    unaccountedFor: participants.length - total
+  });
+
+  // Calculate detailed breakdowns
+  const maleDetails = {
+    students: participants.filter(
+      (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Student"
+    ).length,
+    staffFaculty: participants.filter(
+      (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Staff/Faculty"
+    ).length,
+    community: participants.filter(
+      (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Community Member"
+    ).length,
+  };
+
+  const femaleDetails = {
+    students: participants.filter(
+      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Student"
+    ).length,
+    staffFaculty: participants.filter(
+      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Staff/Faculty"
+    ).length,
+    community: participants.filter(
+      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Community Member"
+    ).length,
+  };
+
+  console.log("Detailed breakdown:", {
+    male: maleDetails,
+    female: femaleDetails,
+    totals: {
+      students: maleDetails.students + femaleDetails.students,
+      staffFaculty: maleDetails.staffFaculty + femaleDetails.staffFaculty,
+      community: maleDetails.community + femaleDetails.community
+    }
+  });
+
+  // Return the distribution with detailed counts and total
+  const distribution = [
+    {
+      name: "Male",
+      value: maleCount,
+      total: total,
+      details: maleDetails,
+    },
+    {
+      name: "Female",
+      value: femaleCount,
+      total: total,
+      details: femaleDetails,
+    },
   ];
+
+  console.log("Final distribution data:", distribution);
+
+  return distribution;
 };
 
 const calculateAgeDistribution = (participants) => {
+  // Initialize age groups with counts
   const ageGroups = {
-    "Under 18": 0,
-    "18-24": 0,
-    "25-34": 0,
-    "35-44": 0,
-    "45+": 0,
+    "Below 18": { male: 0, female: 0, total: 0 },
+    "18-24": { male: 0, female: 0, total: 0 },
+    "25-34": { male: 0, female: 0, total: 0 },
+    "35-44": { male: 0, female: 0, total: 0 },
+    "45-54": { male: 0, female: 0, total: 0 },
+    "Above 55": { male: 0, female: 0, total: 0 },
   };
 
+  // Count participants in each age group
   participants.forEach((participant) => {
-    const age = participant.age;
-    if (age < 18) ageGroups["Under 18"]++;
-    else if (age <= 24) ageGroups["18-24"]++;
-    else if (age <= 34) ageGroups["25-34"]++;
-    else if (age <= 44) ageGroups["35-44"]++;
-    else ageGroups["45+"]++;
+    const age = parseInt(participant.age);
+    const sex = participant.sex?.toLowerCase() || "unknown";
+    if (isNaN(age)) return; // Skip if age is not a valid number
+
+    let ageGroup;
+    if (age < 18) ageGroup = "Below 18";
+    else if (age <= 24) ageGroup = "18-24";
+    else if (age <= 34) ageGroup = "25-34";
+    else if (age <= 44) ageGroup = "35-44";
+    else if (age <= 54) ageGroup = "45-54";
+    else ageGroup = "Above 55";
+
+    if (sex === "male") ageGroups[ageGroup].male++;
+    else if (sex === "female") ageGroups[ageGroup].female++;
+    ageGroups[ageGroup].total++;
   });
 
-  return Object.entries(ageGroups).map(([name, value]) => ({ name, value }));
+  // Convert to array format for the chart
+  return Object.entries(ageGroups).map(([name, counts]) => ({
+    name,
+    value: counts.total,
+    male: counts.male,
+    female: counts.female,
+  }));
 };
 
 const calculateLocationDistribution = (participants) => {
-  // Calculate location distribution with proper formatting
   const locations = {};
 
   participants.forEach((participant) => {
-    const location = participant.homeAddress || "Not Specified";
+    const location = participant.address || "Not Specified";
+    const sex = participant.sex?.toLowerCase() || "unknown";
+
     // Clean up the location string and capitalize first letter of each word
     const formattedLocation = location
       .split(",")[0] // Take only the first part before comma if exists
@@ -1674,19 +1765,34 @@ const calculateLocationDistribution = (participants) => {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
 
-    locations[formattedLocation] = (locations[formattedLocation] || 0) + 1;
+    if (!locations[formattedLocation]) {
+      locations[formattedLocation] = {
+        male: 0,
+        female: 0,
+        total: 0,
+      };
+    }
+
+    if (sex === "male") locations[formattedLocation].male++;
+    else if (sex === "female") locations[formattedLocation].female++;
+    locations[formattedLocation].total++;
   });
 
   // Convert to array format and sort by count
   return Object.entries(locations)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value) // Sort by count in descending order
+    .map(([name, counts]) => ({
+      name,
+      value: counts.total,
+      male: counts.male,
+      female: counts.female,
+    }))
+    .sort((a, b) => b.value - a.value) // Sort by total count in descending order
     .slice(0, 10); // Only take top 10 locations
 };
 
 export const fetchTotals = async (academicPeriodId) => {
   try {
-    // Fetch events
+    // Fetch all events
     const eventsResponse = await databases.listDocuments(
       databaseId,
       eventCollectionId,
@@ -1696,22 +1802,17 @@ export const fetchTotals = async (academicPeriodId) => {
         Query.orderDesc("createdAt"),
       ]
     );
-
     const events = eventsResponse.documents;
-    const eventIds = events.map((event) => event.$id);
 
-    // Fetch participants only if there are events
-    let participants = [];
-    if (eventIds.length > 0) {
-      const participantsResponse = await databases.listDocuments(
-        databaseId,
-        participantCollectionId,
-        [Query.equal("eventId", eventIds), Query.equal("isArchived", false)]
-      );
-      participants = participantsResponse.documents;
-    }
+    // Fetch all participants
+    const participantsResponse = await databases.listDocuments(
+      databaseId,
+      studentsCollectionId,
+      [Query.equal("isArchived", false)]
+    );
+    const participants = participantsResponse.documents;
 
-    // Calculate totals
+    // Calculate event totals
     const totalEvents = events.length;
     const academicEvents = events.filter(
       (event) => event.eventType === "Academic"
@@ -1892,7 +1993,7 @@ export const listEvents = async () => {
         try {
           const participants = await databases.listDocuments(
             databaseId,
-            participantCollectionId,
+            studentsCollectionId,
             [
               Query.equal("eventId", event.$id),
               Query.limit(100), // Adjust limit as needed
@@ -2057,34 +2158,50 @@ export const getCurrentAcademicPeriod = async () => {
       isAfterEnd: now > endDate,
     });
 
-    // Check if we're within the period dates
-    if (now < startDate) {
-      console.log("Current date is before the period start date");
-      return currentPeriod; // Still return the period as it's the upcoming active period
+    // Check if period is ending soon (7 days before end date)
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    if (endDate <= sevenDaysFromNow && endDate > now) {
+      // Notify about ending period if not already notified
+      if (!currentPeriod.endingNotified) {
+        await notifyOfficersAboutAcademicPeriod(
+          ACADEMIC_PERIOD_NOTIFICATIONS.PERIOD_ENDING,
+          currentPeriod
+        );
+
+        // Mark as notified
+        await databases.updateDocument(
+          databaseId,
+          academicPeriodCollectionId,
+          currentPeriod.$id,
+          { endingNotified: true }
+        );
+      }
     }
 
+    // Check if period has ended
     if (now > endDate) {
-      console.warn("Current academic period has expired");
-      // Auto-archive expired period
-      try {
+      // Notify about ended period if not already notified
+      if (!currentPeriod.endedNotified) {
+        await notifyOfficersAboutAcademicPeriod(
+          ACADEMIC_PERIOD_NOTIFICATIONS.PERIOD_ENDED,
+          currentPeriod
+        );
+
+        // Mark as notified and archive
         await databases.updateDocument(
           databaseId,
           academicPeriodCollectionId,
           currentPeriod.$id,
           {
+            endedNotified: true,
             isActive: false,
             archivedAt: new Date().toISOString(),
           }
         );
-        console.log("Successfully archived expired period");
-      } catch (archiveError) {
-        console.error("Failed to archive expired period:", archiveError);
       }
       return null;
     }
 
-    // Period is valid and active
-    console.log("Returning valid academic period");
     return currentPeriod;
   } catch (error) {
     console.error("Error getting current academic period:", error);
@@ -2098,7 +2215,9 @@ export const archiveCurrentPeriodData = async (oldPeriodId, newPeriodId) => {
     // Archive events and participants
     const [eventsResponse, participantsResponse] = await Promise.all([
       databases.listDocuments(databaseId, eventCollectionId),
-      databases.listDocuments(databaseId, participantCollectionId),
+      databases.listDocuments(databaseId, studentsCollectionId, [
+        Query.equal("isArchived", false),
+      ]),
     ]);
 
     // Update all events to be archived
@@ -2115,7 +2234,7 @@ export const archiveCurrentPeriodData = async (oldPeriodId, newPeriodId) => {
       (participant) =>
         databases.updateDocument(
           databaseId,
-          participantCollectionId,
+          studentsCollectionId,
           participant.$id,
           {
             isArchived: true,
@@ -2192,6 +2311,12 @@ export const createNewAcademicPeriod = async (
     // Archive current data
     await archiveCurrentPeriodData(currentPeriodId, newPeriod.$id);
 
+    // Notify officers about new period
+    await notifyOfficersAboutAcademicPeriod(
+      ACADEMIC_PERIOD_NOTIFICATIONS.NEW_PERIOD_CREATED,
+      newPeriod
+    );
+
     return newPeriod;
   } catch (error) {
     console.error("Error creating new academic period:", error);
@@ -2243,7 +2368,7 @@ export const fetchEventParticipants = async (eventIds, academicPeriodId) => {
   try {
     const participantsResponse = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [
         Query.equal("isArchived", false),
         Query.equal("academicPeriodId", academicPeriodId),
@@ -2295,13 +2420,14 @@ export const fetchEventOverviewData = async (userId) => {
     // Get event IDs
     const eventIds = eventsResponse.documents.map((event) => event.$id);
 
-    // Fetch participants
+    // Fetch participants with createdBy filter
     const participantsResponse = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [
         Query.equal("academicPeriodId", currentPeriod.$id),
         Query.equal("eventId", eventIds),
+        Query.equal("createdBy", userId),
       ]
     );
 
@@ -2354,7 +2480,7 @@ export const fetchEventLogData = async (userId) => {
 
     const participantsResponse = await databases.listDocuments(
       databaseId,
-      participantCollectionId,
+      studentsCollectionId,
       [
         Query.equal("isArchived", false),
         Query.equal("academicPeriodId", currentPeriod.$id),
@@ -2378,59 +2504,39 @@ export const fetchEventLogData = async (userId) => {
 
 // Add these new functions to handle event participant log operations
 
-export const fetchEventParticipantLogData = async (userId) => {
+export const fetchEventParticipantLogData = async () => {
   try {
-    const currentPeriod = await getCurrentAcademicPeriod();
-    if (!currentPeriod) {
-      throw new Error("No active academic period found");
-    }
+    console.log("Fetching event participant log data...");
 
-    // Fetch events
-    const eventsResponse = await databases.listDocuments(
-      databaseId,
-      eventCollectionId,
-      [
-        Query.equal("createdBy", userId),
-        Query.equal("academicPeriodId", currentPeriod.$id),
-        Query.orderDesc("createdAt"),
-      ]
-    );
+    const [
+      eventsResponse,
+      participantsResponse,
+      staffResponse,
+      communityResponse,
+    ] = await Promise.all([
+      databases.listDocuments(databaseId, eventCollectionId),
+      databases.listDocuments(databaseId, studentsCollectionId, [
+        Query.equal("isArchived", false),
+      ]),
+      databases.listDocuments(databaseId, staffFacultyCollectionId),
+      databases.listDocuments(databaseId, communityCollectionId),
+    ]);
 
-    if (eventsResponse.documents.length === 0) {
-      return {
-        events: [],
-        participants: [],
-        staffFaculty: [],
-        community: [],
-        currentPeriod,
-      };
-    }
-
-    const eventIds = eventsResponse.documents.map((event) => event.$id);
-
-    // Fetch all participant types
-    const [participantsResponse, staffFacultyResponse, communityResponse] =
-      await Promise.all([
-        databases.listDocuments(databaseId, participantCollectionId, [
-          Query.equal("eventId", eventIds),
-        ]),
-        databases.listDocuments(databaseId, staffFacultyCollectionId, [
-          Query.equal("eventId", eventIds),
-        ]),
-        databases.listDocuments(databaseId, communityCollectionId, [
-          Query.equal("eventId", eventIds),
-        ]),
-      ]);
+    console.log("Fetched data:", {
+      events: eventsResponse.documents.length,
+      participants: participantsResponse.documents.length,
+      staffFaculty: staffResponse.documents.length,
+      community: communityResponse.documents.length,
+    });
 
     return {
       events: eventsResponse.documents,
       participants: participantsResponse.documents,
-      staffFaculty: staffFacultyResponse.documents,
+      staffFaculty: staffResponse.documents,
       community: communityResponse.documents,
-      currentPeriod,
     };
   } catch (error) {
-    console.error("Error fetching event participant log data:", error);
+    console.error("Error in fetchEventParticipantLogData:", error);
     throw error;
   }
 };
@@ -2458,7 +2564,7 @@ export const getEventParticipantCounts = (
     male: maleCount,
     female: femaleCount,
     students: studentParticipants.length,
-    staff: staffParticipants.length,
+    staffFaculty: staffParticipants.length,
     community: communityParticipants.length,
   };
 };
@@ -2503,6 +2609,81 @@ export const getCommunityMembers = async (eventId = null) => {
     return response.documents;
   } catch (error) {
     console.error("Error fetching community members:", error);
+    throw error;
+  }
+};
+
+// Add these constants for academic period notification types
+export const ACADEMIC_PERIOD_NOTIFICATIONS = {
+  PERIOD_ENDING: "period_ending",
+  PERIOD_ENDED: "period_ended",
+  NEW_PERIOD_CREATED: "new_period_created",
+};
+
+// Add this function to notify officers about academic period events
+export const notifyOfficersAboutAcademicPeriod = async (type, periodData) => {
+  try {
+    // Get all users with officer role
+    const officers = await databases.listDocuments(
+      databaseId,
+      userCollectionId,
+      [Query.equal("role", "user")]
+    );
+
+    // Create notifications for each officer
+    const notificationPromises = officers.documents.map((officer) => {
+      let title, message;
+
+      switch (type) {
+        case ACADEMIC_PERIOD_NOTIFICATIONS.PERIOD_ENDING:
+          title = "Academic Period Ending Soon";
+          message = `The current ${periodData.periodType} (${
+            periodData.schoolYear
+          }) will end on ${new Date(periodData.endDate).toLocaleDateString()}`;
+          break;
+        case ACADEMIC_PERIOD_NOTIFICATIONS.PERIOD_ENDED:
+          title = "Academic Period Ended";
+          message = `The ${periodData.periodType} (${periodData.schoolYear}) has ended`;
+          break;
+        case ACADEMIC_PERIOD_NOTIFICATIONS.NEW_PERIOD_CREATED:
+          title = "New Academic Period Created";
+          message = `A new ${periodData.periodType} for ${periodData.schoolYear} has been created`;
+          break;
+        default:
+          return null;
+      }
+
+      return createNotification({
+        userId: officer.$id,
+        type: "academic_period",
+        title,
+        message,
+        actionType: type,
+        status: "unread",
+      });
+    });
+
+    await Promise.all(notificationPromises.filter(Boolean));
+  } catch (error) {
+    console.error("Error notifying officers about academic period:", error);
+    throw error;
+  }
+};
+
+export const createOAuthSession = async (provider) => {
+  try {
+    const currentUrl = window.location.origin;
+    return await account.createOAuth2Session(
+      provider,
+      `${currentUrl}/auth-callback`,
+      currentUrl,
+      [
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+      ]
+    );
+  } catch (error) {
+    console.error("OAuth session creation error:", error);
     throw error;
   }
 };

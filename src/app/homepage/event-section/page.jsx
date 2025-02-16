@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CalendarIcon, MapPinIcon, UsersIcon } from "lucide-react";
+import { CalendarIcon, MapPinIcon, UsersIcon, Calendar, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -91,14 +91,9 @@ export default function RecentEvents() {
   }
 
   const NoEventsDisplay = () => (
-    <div className="min-h-[400px] flex flex-col items-center justify-center p-8 bg-gradient-to-br from-violet-50 to-blue-50 rounded-2xl">
+    <div className="min-h-[400px] flex flex-col items-center justify-center p-8 rounded-2xl">
       <div className="relative w-24 h-24 mb-6">
-        <Image
-          src="/logo/gad.png"
-          alt="GAD Logo"
-          fill
-          className="object-contain opacity-50"
-        />
+    
       </div>
       <h3 className="text-2xl font-semibold text-gray-700 mb-2">No Events Currently</h3>
       <p className="text-gray-500 text-center max-w-md">
@@ -110,14 +105,23 @@ export default function RecentEvents() {
   return (
     <section className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30" id="events">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600 mb-4">
-            Recent Events
-          </h2>
+        <motion.div 
+          className="text-center mb-12"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Calendar className="w-8 h-8 text-violet-600" />
+            <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+              Recent Events
+            </h2>
+          </div>
           <p className="text-gray-600 max-w-2xl mx-auto">
             Discover our latest activities and programs promoting gender equality and inclusive development.
           </p>
-        </div>
+        </motion.div>
 
         {events.length === 0 ? (
           <NoEventsDisplay />

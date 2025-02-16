@@ -118,9 +118,15 @@ export default function ExportEventsButton() {
 
   return (
     <div>
-      <Button variant="outline" onClick={handleDialogOpen} disabled={isLoading}>
+      <Button 
+        variant="outline" 
+        onClick={handleDialogOpen} 
+        disabled={isLoading}
+        className="w-full sm:w-auto whitespace-nowrap"
+      >
         <Users className="mr-2 h-4 w-4" />
-        {isLoading ? "Loading..." : "Export Events"}
+        <span className="hidden sm:inline">{isLoading ? "Loading..." : "Export Events"}</span>
+        <span className="sm:hidden">{isLoading ? "Loading..." : "Export"}</span>
       </Button>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

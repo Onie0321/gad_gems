@@ -19,15 +19,15 @@ export const validateEventForm = (event) => {
 };
 
 export const schoolOptions = [
-  { name: "School of Accountancy and Business Management", abbr: "SABM" },
-  { name: "School of Agricultural Science", abbr: "SAS" },
-  { name: "School of Arts and Sciences", abbr: "SASc" },
-  { name: "School of Education", abbr: "SED" },
-  { name: "School of Engineering", abbr: "SOE" },
-  { name: "School of Fisheries and Oceanic Science", abbr: "SFOS" },
-  { name: "School of Forestry and Environmental Sciences", abbr: "SFES" },
-  { name: "School of Industrial Technology", abbr: "SIT" },
-  { name: "School of Information Technology", abbr: "SITech" },
+    { name: "School of Accountancy and Business Management", abbr: "SABM" },
+    { name: "School of Agricultural Science", abbr: "SAS" },
+    { name: "School of Arts and Sciences", abbr: "SASc" },
+    { name: "School of Education", abbr: "SED" },
+    { name: "School of Engineering", abbr: "SOE" },
+    { name: "School of Fisheries and Oceanic Science", abbr: "SFOS" },
+    { name: "School of Forestry and Environmental Sciences", abbr: "SFES" },
+    { name: "School of Industrial Technology", abbr: "SIT" },
+    { name: "School of Information Technology", abbr: "SITech" },
 ];
 
 // src/utils/participantUtils.js

@@ -33,10 +33,11 @@ import {
   databases,
   userCollectionId,
   eventCollectionId,
-  participantCollectionId,
+  studentsCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
   getCurrentAcademicPeriod,
+  signOut,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -53,6 +54,8 @@ import HomepageSettings from "./homepage-settings/page";
 import { useToast } from "@/hooks/use-toast";
 import AcademicPeriodManagement from "./academic-period/page";
 import Archives from "./archives/page";
+import TimeoutWarningModal from "@/components/modals/TimeoutWarningModal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
@@ -72,6 +75,11 @@ export default function AdminDashboard() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+
+  const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+  const WARNING_DURATION = 60; // 60 seconds
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -106,33 +114,75 @@ export default function AdminDashboard() {
     checkUserRole();
   }, []);
 
-  const handleActivity = React.useCallback(() => {
-    setLastActivity(Date.now());
-    if (isLocked) {
-      return;
-    }
-  }, [isLocked]);
+  useEffect(() => {
+    let inactivityTimer;
+    let warningTimer;
 
-  React.useEffect(() => {
-    const events = ["mousedown", "keydown", "touchstart", "scroll"];
-    events.forEach((event) => document.addEventListener(event, handleActivity));
+    const resetTimers = () => {
+      setLastActivity(Date.now());
+      setShowTimeoutWarning(false);
+      clearTimeout(inactivityTimer);
+      clearTimeout(warningTimer);
 
-    return () => {
-      events.forEach((event) =>
-        document.removeEventListener(event, handleActivity)
-      );
+      // Set new timers
+      inactivityTimer = setTimeout(() => {
+        setShowTimeoutWarning(true);
+        warningTimer = setTimeout(
+          handleSessionTimeout,
+          WARNING_DURATION * 1000
+        );
+      }, INACTIVITY_TIMEOUT - WARNING_DURATION * 1000);
     };
-  }, [handleActivity]);
 
-  React.useEffect(() => {
-    const checkInactivity = setInterval(() => {
-      if (Date.now() - lastActivity > inactivityTimeout && !isLocked) {
-        setIsLocked(true);
+    // Monitor user activity
+    const handleActivity = () => {
+      if (!isSessionExpired && !showTimeoutWarning) {
+        resetTimers();
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(checkInactivity);
-  }, [lastActivity, inactivityTimeout, isLocked]);
+    // Add event listeners for user activity
+    const events = [
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "mousemove",
+      "scroll",
+      "click",
+    ];
+
+    events.forEach((event) => {
+      document.addEventListener(event, handleActivity);
+    });
+
+    // Initial timer setup
+    resetTimers();
+
+    // Cleanup
+    return () => {
+      events.forEach((event) => {
+        document.removeEventListener(event, handleActivity);
+      });
+      clearTimeout(inactivityTimer);
+      clearTimeout(warningTimer);
+    };
+  }, [isSessionExpired, showTimeoutWarning]);
+
+  const handleSessionTimeout = async () => {
+    setIsSessionExpired(true);
+    setShowTimeoutWarning(false);
+    try {
+      await signOut();
+      router.push("/sign-in");
+    } catch (error) {
+      console.error("Error during session timeout:", error);
+    }
+  };
+
+  const handleExtendSession = () => {
+    setShowTimeoutWarning(false);
+    setLastActivity(Date.now());
+  };
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -161,7 +211,7 @@ export default function AdminDashboard() {
               Query.limit(100),
             ]),
             // Fetch students
-            databases.listDocuments(databaseId, participantCollectionId, [
+            databases.listDocuments(databaseId, studentsCollectionId, [
               Query.limit(100),
             ]),
             // Fetch staff/faculty
@@ -244,7 +294,7 @@ export default function AdminDashboard() {
         return <DemographicAnalysis />;
       case "homepage":
         return <HomepageSettings />;
-      case "academic-period":
+      case "academic Period":
         return <AcademicPeriodManagement />;
       case "archives":
         return <Archives />;
@@ -255,8 +305,51 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+        {/* Sidebar Skeleton */}
+        <aside className="hidden w-64 overflow-y-auto bg-white dark:bg-gray-800 md:block">
+          <div className="flex h-full flex-col">
+            <div className="p-5">
+              <Skeleton className="h-8 w-32 mx-auto" />
+            </div>
+            <div className="space-y-4 p-5">
+              {[...Array(7)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content Skeleton */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Top Bar Skeleton */}
+          <header className="flex h-16 items-center justify-between border-b bg-white px-6 dark:border-gray-700 dark:bg-gray-800">
+            <Skeleton className="h-8 w-48" />
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
+            </div>
+          </header>
+
+          {/* Main Content Skeleton */}
+          <main className="flex-1 overflow-y-auto p-6">
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+
+            {/* Charts/Tables Skeleton */}
+            <div className="grid gap-4 md:grid-cols-2 mb-6">
+              <Skeleton className="h-[300px] w-full" />
+              <Skeleton className="h-[300px] w-full" />
+            </div>
+
+            {/* Table Skeleton */}
+            <Skeleton className="h-[400px] w-full" />
+          </main>
+        </div>
       </div>
     );
   }
@@ -272,8 +365,45 @@ export default function AdminDashboard() {
 
   if (!currentUser) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+        {/* Sidebar Skeleton */}
+        <aside className="hidden w-64 overflow-y-auto bg-white dark:bg-gray-800 md:block">
+          <div className="flex h-full flex-col">
+            <div className="p-5">
+              <Skeleton className="h-8 w-32 mx-auto" />
+            </div>
+            <div className="space-y-4 p-5">
+              {[...Array(7)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content Skeleton */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Top Bar Skeleton */}
+          <header className="flex h-16 items-center justify-between border-b bg-white px-6 dark:border-gray-700 dark:bg-gray-800">
+            <Skeleton className="h-8 w-48" />
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
+            </div>
+          </header>
+
+          {/* Main Content Skeleton */}
+          <main className="flex-1 overflow-y-auto p-6">
+            {/* User Profile Skeleton */}
+            <div className="mb-6">
+              <Skeleton className="h-20 w-full max-w-sm rounded-lg" />
+            </div>
+
+            {/* Loading Message */}
+            <div className="flex items-center justify-center">
+              <Skeleton className="h-6 w-48" />
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -285,6 +415,13 @@ export default function AdminDashboard() {
         onUnlock={handleUnlock}
         inactivityTimeout={inactivityTimeout}
         setInactivityTimeout={setInactivityTimeout}
+      />
+      <TimeoutWarningModal
+        isOpen={showTimeoutWarning}
+        onExtendSession={handleExtendSession}
+        onClose={handleSessionTimeout}
+        onTimeout={handleSessionTimeout}
+        warningDuration={WARNING_DURATION}
       />
       {/* Sidebar */}
       <aside className="hidden w-64 overflow-y-auto bg-white dark:bg-gray-800 md:block">
@@ -337,10 +474,10 @@ export default function AdminDashboard() {
             </Button>
             <Button
               variant={
-                activeSection === "academic-period" ? "default" : "ghost"
+                activeSection === "academic Period" ? "default" : "ghost"
               }
               className="w-full justify-start"
-              onClick={() => setActiveSection("academic-period")}
+              onClick={() => setActiveSection("academic Period")}
             >
               <Clock className="mr-2 h-4 w-4" />
               Academic Period
@@ -356,6 +493,7 @@ export default function AdminDashboard() {
           </nav>
         </div>
       </aside>
+
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Bar */}

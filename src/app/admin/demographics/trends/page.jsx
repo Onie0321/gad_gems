@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EventParticipationTrends } from "./event-participation/page"
 import { DemographicTrends } from "./demographic-trends/page"
 import { ActionableInsights } from "./actionable-insights/page"
-import { databases, databaseId, participantCollectionId, eventCollectionId } from '@/lib/appwrite'
+import { databases, databaseId, studentsCollectionId, eventCollectionId } from '@/lib/appwrite'
 import { Query } from 'appwrite'
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading"
@@ -24,7 +24,7 @@ export const Trends = () => {
       // Fetch participants within date range
       const participantsResponse = await databases.listDocuments(
         databaseId,
-        participantCollectionId,
+        studentsCollectionId,
         [
           Query.greaterThanEqual('$createdAt', dateRange.from.toISOString()),
           Query.lessThanEqual('$createdAt', dateRange.to.toISOString()),
@@ -71,7 +71,7 @@ export const Trends = () => {
     const ageGroups = participants.reduce((acc, participant) => {
       const age = parseInt(participant.age);
       let group = '';
-      if (age < 18) group = 'Under 18';
+      if (age < 18) group = '18 and below';
       else if (age <= 24) group = '18-24';
       else if (age <= 34) group = '25-34';
       else if (age <= 44) group = '35-44';

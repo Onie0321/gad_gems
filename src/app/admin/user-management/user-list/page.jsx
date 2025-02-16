@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Search, Eye, Pencil } from "lucide-react";
+import { Loader2, Search, Eye, Pencil, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -45,6 +45,8 @@ import {
 import { Query, ID } from "appwrite";
 import { Label } from "@/components/ui/label";
 import { SelectStatus } from "@/components/ui/selectStatus";
+import { Badge } from "@/components/ui/badge";
+import UserProfileDialog from "../user-profile-dialog/page";
 
 export default function UserList() {
   const [users, setUsers] = useState([]);
@@ -63,6 +65,10 @@ export default function UserList() {
     role: "",
   });
   const [searchColumn, setSearchColumn] = useState("all");
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState("asc");
 
   useEffect(() => {
     loadUsers();
@@ -170,6 +176,15 @@ export default function UserList() {
     }
   };
 
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
   const filteredUsers = users.filter((user) => {
     const name = user.name?.toLowerCase() || "";
     const email = user.email?.toLowerCase() || "";
@@ -210,6 +225,55 @@ export default function UserList() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    if (!sortColumn) return 0;
+
+    let aValue, bValue;
+
+    switch (sortColumn) {
+      case "name":
+        aValue = a.name?.toLowerCase() || "";
+        bValue = b.name?.toLowerCase() || "";
+        break;
+      case "email":
+        aValue = a.email?.toLowerCase() || "";
+        bValue = b.email?.toLowerCase() || "";
+        break;
+      case "role":
+        aValue = a.role?.toLowerCase() || "";
+        bValue = b.role?.toLowerCase() || "";
+        break;
+      case "status":
+        aValue = a.approvalStatus?.toLowerCase() || "";
+        bValue = b.approvalStatus?.toLowerCase() || "";
+        break;
+      case "verification":
+        aValue = a.emailVerification ? 1 : 0;
+        bValue = b.emailVerification ? 1 : 0;
+        break;
+      case "joined":
+        aValue = new Date(a.$createdAt).getTime();
+        bValue = new Date(b.$createdAt).getTime();
+        break;
+      default:
+        return 0;
+    }
+
+    const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    return sortDirection === "asc" ? comparison : -comparison;
+  });
+
+  const paginatedUsers = sortedUsers.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
       case "approved":
@@ -238,28 +302,7 @@ export default function UserList() {
     <Card className="p-6">
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <div className="flex gap-2">
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-yellow-100"></div>
-              <span className="text-sm">
-                Pending:{" "}
-                {
-                  users.filter((user) => user.approvalStatus === "pending")
-                    .length
-                }
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-green-100"></div>
-              <span className="text-sm">
-                Approved:{" "}
-                {
-                  users.filter((user) => user.approvalStatus === "approved")
-                    .length
-                }
-              </span>
-            </div>
-          </div>
+          <div className="flex gap-2"></div>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1 max-w-sm">
@@ -274,20 +317,6 @@ export default function UserList() {
               className="pl-10"
             />
           </div>
-
-          <Select value={searchColumn} onValueChange={setSearchColumn}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Search in column" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Columns</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="email">Email</SelectItem>
-              <SelectItem value="role">Role</SelectItem>
-              <SelectItem value="status">Status</SelectItem>
-              <SelectItem value="joined">Join Date</SelectItem>
-            </SelectContent>
-          </Select>
 
           <Select value={filterRole} onValueChange={setFilterRole}>
             <SelectTrigger className="w-[180px]">
@@ -310,24 +339,96 @@ export default function UserList() {
               <SelectItem value="approved">Approved</SelectItem>
             </SelectContent>
           </Select>
+
+          <div className="flex items-center justify-end mb-4">
+            <div className="flex items-center space-x-2">
+              <Select
+                value={String(rowsPerPage)}
+                onValueChange={(value) => {
+                  setRowsPerPage(Number(value));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[80px]">
+                  <SelectValue placeholder="5" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="15">15</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-gray-500">Rows per page</span>
+
+            </div>
+          </div>
         </div>
 
         <Table>
           <TableCaption>
-            {filteredUsers.length === 0
-              ? "No matching users found"
-              : `Showing ${filteredUsers.length} ${
-                  filteredUsers.length === 1 ? "user" : "users"
-                }`}
+            Showing {(currentPage - 1) * rowsPerPage + 1} to{" "}
+            {Math.min(currentPage * rowsPerPage, filteredUsers.length)} of{" "}
+            {filteredUsers.length} users
           </TableCaption>
           <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+            <TableRow className="bg-gray-100">
+              <TableHead className="text-black font-bold">
+                <div
+                  className="flex items-center cursor-pointer"
+                  onClick={() => handleSort("name")}
+                >
+                  Name
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </div>
+              </TableHead>
+              <TableHead className="text-black font-bold">
+                <div
+                  className="flex items-center cursor-pointer"
+                  onClick={() => handleSort("email")}
+                >
+                  Email
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </div>
+              </TableHead>
+              <TableHead className="text-black font-bold">
+                <div
+                  className="flex items-center cursor-pointer"
+                  onClick={() => handleSort("role")}
+                >
+                  Role
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </div>
+              </TableHead>
+              <TableHead className="text-black font-bold">
+                <div
+                  className="flex items-center cursor-pointer"
+                  onClick={() => handleSort("status")}
+                >
+                  Status
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </div>
+              </TableHead>
+              <TableHead className="text-black font-bold">
+                <div
+                  className="flex items-center cursor-pointer"
+                  onClick={() => handleSort("verification")}
+                >
+                  Verification
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </div>
+              </TableHead>
+              <TableHead className="text-black font-bold">
+                <div
+                  className="flex items-center cursor-pointer"
+                  onClick={() => handleSort("joined")}
+                >
+                  Joined
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </div>
+              </TableHead>
+              <TableHead className="text-right text-black font-bold">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -340,14 +441,14 @@ export default function UserList() {
                   </div>
                 </TableCell>
               </TableRow>
-            ) : filteredUsers.length === 0 ? (
+            ) : paginatedUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8">
                   No matching users found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredUsers.map((user) => (
+              paginatedUsers.map((user) => (
                 <TableRow key={user.$id}>
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
@@ -362,7 +463,22 @@ export default function UserList() {
                     />
                   </TableCell>
                   <TableCell>
-                    {format(new Date(user.$createdAt), "MMM d, yyyy")}
+                    <Badge
+                      variant="outline"
+                      className={`${
+                        user.emailVerification
+                          ? "bg-green-100 text-green-800 hover:bg-green-200"
+                          : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                      }`}
+                    >
+                      {user.emailVerification ? "Verified" : "Unverified"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {format(
+                      new Date(user.$createdAt),
+                      "MMMM d, yyyy 'at' h:mm aaa"
+                    )}
                   </TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button
@@ -383,41 +499,11 @@ export default function UserList() {
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TableCell>
-                  <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>User Details</DialogTitle>
-                      </DialogHeader>
-                      {selectedUser && (
-                        <div className="space-y-4">
-                          <div>
-                            <label className="font-bold">Name:</label>
-                            <p>{selectedUser.name}</p>
-                          </div>
-                          <div>
-                            <label className="font-bold">Email:</label>
-                            <p>{selectedUser.email}</p>
-                          </div>
-                          <div>
-                            <label className="font-bold">Role:</label>
-                            <p className="capitalize">{selectedUser.role}</p>
-                          </div>
-                          <div>
-                            <label className="font-bold">Status:</label>
-                            <p className="capitalize">
-                              {selectedUser.approvalStatus}
-                            </p>
-                          </div>
-                          <div>
-                            <label className="font-bold">Joined:</label>
-                            <p>
-                              {format(new Date(selectedUser.$createdAt), "PPP")}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </DialogContent>
-                  </Dialog>
+                  <UserProfileDialog
+                    isOpen={isViewOpen}
+                    onClose={() => setIsViewOpen(false)}
+                    user={selectedUser}
+                  />
 
                   <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                     <DialogContent>
@@ -473,6 +559,71 @@ export default function UserList() {
             )}
           </TableBody>
         </Table>
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-500">
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === 1}
+            >
+              First
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(
+                (pageNum) =>
+                  pageNum === 1 ||
+                  pageNum === totalPages ||
+                  Math.abs(pageNum - currentPage) <= 1
+              )
+              .map((pageNum, index, array) => {
+                if (index > 0 && array[index - 1] !== pageNum - 1) {
+                  return (
+                    <span key={`ellipsis-${pageNum}`} className="px-2">
+                      ...
+                    </span>
+                  );
+                }
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(pageNum)}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(totalPages)}
+              disabled={currentPage === totalPages}
+            >
+              Last
+            </Button>
+          </div>
+        </div>
       </div>
     </Card>
   );

@@ -43,7 +43,7 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirected, setIsRedirected] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const { loading } = useAuth();
+  const auth = useAuth();
 
   useEffect(() => {
     setIsMounted(true);
@@ -189,7 +189,7 @@ export default function SignInPage() {
     }
   };
 
-  if (loading) {
+  if (auth.loading) {
     return null; // Let the layout handle loading state
   }
 

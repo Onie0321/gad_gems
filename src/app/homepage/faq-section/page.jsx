@@ -7,6 +7,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { HelpCircle } from "lucide-react";
+import { motion } from "framer-motion";
+
 export default function FAQSection() {
   const faqs = [
     {
@@ -34,14 +37,23 @@ export default function FAQSection() {
   return (
     <section id="faq" className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600 mb-4">
-            Frequently Asked Questions
-          </h2>
+        <motion.div 
+          className="text-center mb-12"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <HelpCircle className="w-8 h-8 text-violet-600" />
+            <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+              Frequently Asked Questions
+            </h2>
+          </div>
           <p className="text-gray-600 max-w-2xl mx-auto">
             Find answers to common questions about our services and programs
           </p>
-        </div>
+        </motion.div>
         <Accordion
           type="single"
           collapsible

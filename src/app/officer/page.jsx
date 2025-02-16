@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, PieChart, Settings, Menu, X } from "lucide-react";
+import { Calendar, PieChart, Settings, Menu, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import EventsPage from "./event-management/page";
@@ -122,7 +122,11 @@ export default function OfficerDashboard() {
   };
 
   if (loading) {
-    return <GADConnectSimpleLoader />;
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#4DB6AC]" />
+      </div>
+    );
   }
 
   if (error) {

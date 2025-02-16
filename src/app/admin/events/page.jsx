@@ -7,14 +7,22 @@ import { SearchFilter } from "./search/page";
 import { useState, useEffect } from "react";
 import { getCurrentAcademicPeriod, databases } from "@/lib/appwrite";
 import { Query } from "appwrite";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EventManagementSystem() {
   const [currentPeriod, setCurrentPeriod] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadCurrentPeriod = async () => {
-      const period = await getCurrentAcademicPeriod();
-      setCurrentPeriod(period);
+      try {
+        const period = await getCurrentAcademicPeriod();
+        setCurrentPeriod(period);
+      } catch (error) {
+        console.error("Error loading current period:", error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadCurrentPeriod();
   }, []);
@@ -32,6 +40,23 @@ export default function EventManagementSystem() {
     );
     // Rest of your code...
   };
+
+  if (loading) {
+    return (
+      <div className="w-full space-y-4">
+        <Skeleton className="h-10 w-[200px]" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-[90%]" />
+          <Skeleton className="h-4 w-[80%]" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Tabs defaultValue="log" className="w-full mt-4">

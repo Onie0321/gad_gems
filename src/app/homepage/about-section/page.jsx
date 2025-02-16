@@ -14,39 +14,38 @@ export default function AboutSection() {
         <h2 className="text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
           About Us
         </h2>
+        <p className="text-lg text-center text-gray-600 leading-relaxed mb-12">
+          The Gender and Development (GAD) Office is dedicated to promoting
+          gender equality and inclusive development in our community.
+        </p>
         <div className="flex flex-col md:flex-row gap-12 items-center justify-center">
-          <div className="md:w-1/2 flex justify-center">
-            <div className="relative">
+          <div className="md:w-1/2 flex justify-center p-4">
+            <div className="relative w-full max-w-lg">
               <div className="absolute -inset-4 bg-gradient-to-r from-violet-200 to-blue-200 rounded-2xl blur-xl opacity-30"></div>
               <Image
                 src="/logo/gadabout.png"
                 alt="About GAD Office"
-                width={500}
-                height={300}
-                className="relative w-full h-auto object-cover rounded-2xl shadow-xl"
+                width={550}
+                height={350}
+                priority
+                className="relative w-full h-auto object-cover rounded-2xl shadow-xl transform hover:scale-105 transition-transform duration-300"
               />
             </div>
           </div>
-          <div className="md:w-1/2 space-y-6">
-            <p className="text-lg text-gray-600 leading-relaxed">
-              The Gender and Development (GAD) Office is dedicated to promoting
-              gender equality and inclusive development in our community.
-            </p>
+          <div className="md:w-1/2 space-y-6 p-4">
             <div className="space-y-4">
-              <h3 className="text-2xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+              <h3 className="text-2xl text-center font-semibold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
                 Our Vision
               </h3>
               <p className="text-gray-600">
-                {" "}
                 "ASCOT 2030: ASCOT as a globally recognized comprehensive
                 inclusive higher education institution anchoring on the local
                 culture of Aurora in particular and the Philippines in general."
               </p>
-              <h3 className="text-2xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+              <h3 className="text-2xl text-center font-semibold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
                 Our Mission
               </h3>
               <p className="text-gray-600">
-                {" "}
                 "ASCOT shall capacitate human resources of Aurora and beyond to
                 be globally empowered and future-proofed; generate, disseminate,
                 and apply knowledge and technologies for sustainable
