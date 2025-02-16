@@ -1,3 +1,4 @@
+"use client";
 import React, { useEffect, useState } from "react";
 import {
   Card,
@@ -12,7 +13,6 @@ import {
   studentsCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
-
 } from "@/lib/appwrite";
 
 export function DemographicsOverview({ selectedPeriod }) {
@@ -57,49 +57,57 @@ export function DemographicsOverview({ selectedPeriod }) {
     const total = allParticipants.length;
 
     // Gender Distribution
-    const genderCounts = allParticipants.reduce((acc, participant) => {
-      const gender = participant.sex?.toLowerCase() || "not specified";
-      acc[gender] = (acc[gender] || 0) + 1;
-      return acc;
-    }, { male: 0, female: 0, notSpecified: 0 });
+    const genderCounts = allParticipants.reduce(
+      (acc, participant) => {
+        const gender = participant.sex?.toLowerCase() || "not specified";
+        acc[gender] = (acc[gender] || 0) + 1;
+        return acc;
+      },
+      { male: 0, female: 0, notSpecified: 0 }
+    );
 
     // Average Age
     const validAges = allParticipants
-      .map(p => parseInt(p.age))
-      .filter(age => !isNaN(age));
-    const avgAge = validAges.length > 0
-      ? Math.round(validAges.reduce((a, b) => a + b) / validAges.length)
-      : 0;
+      .map((p) => parseInt(p.age))
+      .filter((age) => !isNaN(age));
+    const avgAge =
+      validAges.length > 0
+        ? Math.round(validAges.reduce((a, b) => a + b) / validAges.length)
+        : 0;
 
     // Top Ethnicity
     const ethnicityCount = {};
-    allParticipants.forEach(p => {
+    allParticipants.forEach((p) => {
       if (p.ethnicGroup) {
-        ethnicityCount[p.ethnicGroup] = (ethnicityCount[p.ethnicGroup] || 0) + 1;
+        ethnicityCount[p.ethnicGroup] =
+          (ethnicityCount[p.ethnicGroup] || 0) + 1;
       }
     });
-    const topEthnicity = Object.entries(ethnicityCount)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || "Not Available";
+    const topEthnicity =
+      Object.entries(ethnicityCount).sort(([, a], [, b]) => b - a)[0]?.[0] ||
+      "Not Available";
 
     // Top Education Level
     const educationCount = {};
-    allParticipants.forEach(p => {
+    allParticipants.forEach((p) => {
       if (p.school) {
         educationCount[p.school] = (educationCount[p.school] || 0) + 1;
       }
     });
-    const topEducation = Object.entries(educationCount)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || "Not Available";
+    const topEducation =
+      Object.entries(educationCount).sort(([, a], [, b]) => b - a)[0]?.[0] ||
+      "Not Available";
 
     // Top Year Level
     const yearCount = {};
-    allParticipants.forEach(p => {
+    allParticipants.forEach((p) => {
       if (p.year) {
         yearCount[p.year] = (yearCount[p.year] || 0) + 1;
       }
     });
-    const topYear = Object.entries(yearCount)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || "Not Available";
+    const topYear =
+      Object.entries(yearCount).sort(([, a], [, b]) => b - a)[0]?.[0] ||
+      "Not Available";
 
     setKeyMetrics({
       totalParticipants: total,
@@ -163,7 +171,9 @@ export function DemographicsOverview({ selectedPeriod }) {
           <CardDescription>Most common education level</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-xl font-semibold">{keyMetrics.topEducationLevel}</p>
+          <p className="text-xl font-semibold">
+            {keyMetrics.topEducationLevel}
+          </p>
         </CardContent>
       </Card>
 
@@ -178,4 +188,4 @@ export function DemographicsOverview({ selectedPeriod }) {
       </Card>
     </div>
   );
-} 
+}
