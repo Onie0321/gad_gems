@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "./user-menu/UserMenu";
 import NotificationButton from "./Notifications";
+import { Suspense } from "react";
 
 import EventsSection from "./Events";
 import DemographicAnalysis from "./Demographics";
@@ -58,7 +59,8 @@ import TimeoutWarningModal from "@/components/modals/TimeoutWarningModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardOverview from "./Dashboard";
 
-export default function AdminDashboard() {
+// Create a wrapper component for the parts using useSearchParams
+function AdminDashboardContent() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
   const [isLocked, setIsLocked] = React.useState(false);
   const [inactivityTimeout, setInactivityTimeout] = React.useState(
@@ -513,5 +515,18 @@ export default function AdminDashboard() {
         </main>
       </div>
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    }>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }

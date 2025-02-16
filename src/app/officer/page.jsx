@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Calendar, PieChart, Settings, Menu, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 
 // Note: Update chart colors in respective components to use a mix of Blue (#2D89EF), Teal (#4DB6AC), Coral (#FF6F61), and Violet for visual clarity.
 
-export default function OfficerDashboard() {
+// Create a wrapper component for the parts using useSearchParams
+function OfficerDashboardContent() {
   const [activeTab, setActiveTab] = useState("event-management");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
@@ -249,5 +250,20 @@ export default function OfficerDashboard() {
         />
       )}
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function OfficerDashboard() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-full flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[#4DB6AC]" />
+        </div>
+      }
+    >
+      <OfficerDashboardContent />
+    </Suspense>
   );
 }
