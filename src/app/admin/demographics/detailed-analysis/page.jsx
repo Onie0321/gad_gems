@@ -252,7 +252,7 @@ export function DetailedAnalysis({
     };
 
     fetchData();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, setHasParticipants, setLoading]);
 
   if (localLoading) {
     return (
