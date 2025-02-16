@@ -2,13 +2,13 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import EventAnalysis from "./Event-Analysis";
-import { SearchFilter } from "./Search";
+import EventAnalysis from "./events/Event-Analysis";
+import { SearchFilter } from "./events/Search";
 import { useState, useEffect } from "react";
 import { getCurrentAcademicPeriod, databases } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { Skeleton } from "@/components/ui/skeleton";
-import EventParticipantLog from "./EventParticipantLog";
+import EventParticipantLog from "./events/EventParticipantLog";
 
 export default function EventManagementSystem() {
   const [currentPeriod, setCurrentPeriod] = useState(null);

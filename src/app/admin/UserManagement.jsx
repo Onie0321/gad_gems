@@ -4,8 +4,8 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import ActivityLogs from "./ActivityLogs";
-import UserList from "./UserList";
+import ActivityLogs from "./user-management/ActivityLogs";
+import UserList from "./user-management/UserList";
 
 export default function UserManagement() {
   const [activeTab, setActiveTab] = useState("users");

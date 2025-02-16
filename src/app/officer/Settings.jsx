@@ -1,16 +1,22 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function SettingsSection() {
   return (
@@ -25,7 +31,9 @@ export default function SettingsSection() {
         <Card>
           <CardHeader>
             <CardTitle>General Settings</CardTitle>
-            <CardDescription>Manage your account and system preferences</CardDescription>
+            <CardDescription>
+              Manage your account and system preferences
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form>
@@ -36,7 +44,11 @@ export default function SettingsSection() {
                 </div>
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" placeholder="john@example.com" type="email" />
+                  <Input
+                    id="email"
+                    placeholder="john@example.com"
+                    type="email"
+                  />
                 </div>
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="language">Language</Label>
@@ -65,7 +77,9 @@ export default function SettingsSection() {
         <Card>
           <CardHeader>
             <CardTitle>Appearance Settings</CardTitle>
-            <CardDescription>Customize the look and feel of your dashboard</CardDescription>
+            <CardDescription>
+              Customize the look and feel of your dashboard
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form>
@@ -110,14 +124,18 @@ export default function SettingsSection() {
         <Card>
           <CardHeader>
             <CardTitle>Notification Settings</CardTitle>
-            <CardDescription>Manage your notification preferences</CardDescription>
+            <CardDescription>
+              Manage your notification preferences
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form>
               <div className="grid w-full items-center gap-4">
                 <div className="flex items-center space-x-2">
                   <Switch id="email-notifications" />
-                  <Label htmlFor="email-notifications">Email notifications</Label>
+                  <Label htmlFor="email-notifications">
+                    Email notifications
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Switch id="push-notifications" />
@@ -141,7 +159,9 @@ export default function SettingsSection() {
         <Card>
           <CardHeader>
             <CardTitle>Security Settings</CardTitle>
-            <CardDescription>Manage your account security and privacy</CardDescription>
+            <CardDescription>
+              Manage your account security and privacy
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form>
@@ -160,7 +180,9 @@ export default function SettingsSection() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <Switch id="two-factor" />
-                  <Label htmlFor="two-factor">Enable Two-Factor Authentication</Label>
+                  <Label htmlFor="two-factor">
+                    Enable Two-Factor Authentication
+                  </Label>
                 </div>
                 <Button type="submit">Update Security Settings</Button>
               </div>
@@ -169,5 +191,5 @@ export default function SettingsSection() {
         </Card>
       </TabsContent>
     </Tabs>
-  )
+  );
 }
