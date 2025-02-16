@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,14 +68,38 @@ export default function EditParticipantDialog({
   const checkUnsavedChanges = (newData) => {
     // Only compare fields that are editable for each participant type
     const compareFields = {
-      student: ['name', 'sex', 'age', 'address', 'school', 'year', 'section', 'ethnicGroup', 'otherEthnicGroup'],
-      staff: ['name', 'sex', 'age', 'address', 'ethnicGroup', 'otherEthnicGroup'],
-      community: ['name', 'sex', 'age', 'address', 'ethnicGroup', 'otherEthnicGroup']
+      student: [
+        "name",
+        "sex",
+        "age",
+        "address",
+        "school",
+        "year",
+        "section",
+        "ethnicGroup",
+        "otherEthnicGroup",
+      ],
+      staff: [
+        "name",
+        "sex",
+        "age",
+        "address",
+        "ethnicGroup",
+        "otherEthnicGroup",
+      ],
+      community: [
+        "name",
+        "sex",
+        "age",
+        "address",
+        "ethnicGroup",
+        "otherEthnicGroup",
+      ],
     };
 
     const fieldsToCompare = compareFields[participantType];
-    const hasChanges = fieldsToCompare.some(field => 
-      participant[field] !== newData[field]
+    const hasChanges = fieldsToCompare.some(
+      (field) => participant[field] !== newData[field]
     );
     setHasUnsavedChanges(hasChanges);
   };
@@ -593,12 +618,16 @@ export default function EditParticipantDialog({
 
       {/* Show unsaved changes dialog only when there are actual changes */}
       {showUnsavedDialog && hasUnsavedChanges && (
-        <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialog
+          open={showUnsavedDialog}
+          onOpenChange={setShowUnsavedDialog}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
               <AlertDialogDescription>
-                You have unsaved changes. Do you want to save them before closing?
+                You have unsaved changes. Do you want to save them before
+                closing?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
