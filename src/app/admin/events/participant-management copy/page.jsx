@@ -67,8 +67,8 @@ import {
 import { createParticipant } from "@/lib/appwrite";
 import EditParticipantDialog from "./edit-participant-dialog/page";
 import DeleteParticipantDialog from "./delete-participant-dialog/page";
-import ViewParticipants from "../event-participant-log copy/view-participant-dialog/page";
 import { debounce } from "lodash";
+import ViewParticipants from "@/app/officer/event-management/event-participant-log/view-participant-dialog/page";
 
 export default function ParticipantManagement({
   events,
