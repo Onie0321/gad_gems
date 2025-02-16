@@ -8,7 +8,12 @@ import EventsPage from "./EventManagement";
 import DemographicAnalysis from "./DemographicAnalysis";
 import { Notifications } from "./Notifications";
 import UserMenu from "./UserMenu";
-import { getCurrentUser } from "@/lib/appwrite";
+import {
+  getCurrentUser,
+  databases,
+  databaseId,
+  userCollectionId,
+} from "@/lib/appwrite";
 import { useRouter, useSearchParams } from "next/navigation";
 import WelcomeModal from "@/components/modals/welcome";
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
@@ -119,6 +124,21 @@ export default function OfficerDashboard() {
       );
     }
     return null;
+  };
+
+  const updateUserFirstLogin = async (userId) => {
+    try {
+      await databases.updateDocument(databaseId, userCollectionId, userId, {
+        isFirstLogin: false,
+      });
+    } catch (error) {
+      console.error("Error updating first login status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update login status",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
