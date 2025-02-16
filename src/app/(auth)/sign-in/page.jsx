@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import {
 } from "@/lib/appwrite";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
 
 const MotionDiv = dynamic(
   () => import("framer-motion").then((mod) => mod.motion.div),
@@ -45,6 +46,45 @@ export default function SignInPage() {
   const [isMounted, setIsMounted] = useState(false);
   const auth = useAuth();
 
+  const handleUserStatus = useCallback(
+    (user) => {
+      switch (user.approvalStatus) {
+        case "pending":
+          toast({
+            title: "Account Pending",
+            description:
+              "Your account is pending approval. Please wait for admin confirmation.",
+            variant: "warning",
+          });
+          break;
+        case "approved":
+          toast({
+            title: "Welcome Back!",
+            description: `You've successfully signed in, ${user.name}.`,
+            variant: "success",
+          });
+          router.push(user.role === "admin" ? "/admin" : "/officer");
+          break;
+        case "declined":
+          toast({
+            title: "Account Declined",
+            description:
+              "Your account has been declined. Please contact the administrator.",
+            variant: "destructive",
+          });
+          break;
+        default:
+          toast({
+            title: "Unknown Status",
+            description:
+              "There was an issue with your account status. Please contact support.",
+            variant: "destructive",
+          });
+      }
+    },
+    [toast, router]
+  );
+
   useEffect(() => {
     setIsMounted(true);
     const checkSession = async () => {
@@ -59,43 +99,7 @@ export default function SignInPage() {
       }
     };
     checkSession();
-  }, [isRedirected]);
-
-  const handleUserStatus = (user) => {
-    switch (user.approvalStatus) {
-      case "pending":
-        toast({
-          title: "Account Pending",
-          description:
-            "Your account is pending approval. Please wait for admin confirmation.",
-          variant: "warning",
-        });
-        break;
-      case "approved":
-        toast({
-          title: "Welcome Back!",
-          description: `You've successfully signed in, ${user.name}.`,
-          variant: "success",
-        });
-        router.push(user.role === "admin" ? "/admin" : "/officer");
-        break;
-      case "declined":
-        toast({
-          title: "Account Declined",
-          description:
-            "Your account has been declined. Please contact the administrator.",
-          variant: "destructive",
-        });
-        break;
-      default:
-        toast({
-          title: "Unknown Status",
-          description:
-            "There was an issue with your account status. Please contact support.",
-          variant: "destructive",
-        });
-    }
-  };
+  }, [isRedirected, handleUserStatus]);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -217,15 +221,19 @@ export default function SignInPage() {
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center p-8">
             <div className="flex items-center justify-center space-x-4">
-              <img
+              <Image
                 src="/logo/gad.png"
                 alt="GAD Nexus Logo"
-                className="w-32 h-32"
+                width={128}
+                height={128}
+                priority
               />
-              <img
+              <Image
                 src="/logo/ascot.png"
                 alt="ASCOT Logo"
-                className="w-32 h-32"
+                width={128}
+                height={128}
+                priority
               />
             </div>
           </CardContent>
@@ -333,7 +341,7 @@ export default function SignInPage() {
               </Button>
             </div>
             <p className="mt-4 text-center text-sm text-gray-600">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link
                 href="/signup"
                 className="font-medium text-[#FF6F61] hover:text-[#E5635B]"

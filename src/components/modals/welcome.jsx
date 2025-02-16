@@ -20,9 +20,9 @@ const WelcomeModal = ({
         <DialogHeader>
           <DialogTitle>Welcome to GADConnect!</DialogTitle>
           <DialogDescription>
-            Hello {userName}, we're excited to have you on board. GADConnect is
+            Hello {userName}, we&apos;re excited to have you on board. GADConnect is
             your all-in-one platform for event management and demographic
-            analysis. Here's what you can do:
+            analysis. Here&apos;s what you can do:
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
