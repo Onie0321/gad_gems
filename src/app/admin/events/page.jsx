@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import EventParticipantLog from "./event-participant-log copy/page";
+import EventParticipantLog from "./event-participant-log-admin/page";
 import EventAnalysis from "./event-analysis/page";
 import { SearchFilter } from "./search/page";
 import { useState, useEffect } from "react";
