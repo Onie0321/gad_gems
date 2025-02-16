@@ -22,12 +22,12 @@ import {
   getCurrentUser,
   getCurrentAcademicPeriod,
 } from "@/lib/appwrite";
-import GenderBreakdown from "./gender-breakdown/page";
-import AgeDistribution from "./age-distribution/page";
-import EducationLevel from "./educational-level/page";
-import EthnicGroupAnalysis from "./ethnic-group-analysis/page";
-import SchoolDistribution from "./school-distribution/page";
-import SectionDistribution from "./section-distribution/page";
+import GenderBreakdown from "./GenderBreakdown";
+import AgeDistribution from "./AgeDistribution";
+import EducationLevel from "./EducationalLevel";
+import EthnicGroupAnalysis from "./EthnicGroupAnalysis";
+import SchoolDistribution from "./SchoolDistribution";
+import SectionDistribution from "./SectionDistribution";
 import { ColorfulSpinner } from "@/components/ui/loader";
 import { Label } from "@/components/ui/label";
 import {
@@ -191,27 +191,21 @@ export default function DemographicAnalysis() {
 
         // Fetch all required data in parallel
         const [eventsResponse, academicPeriodsResponse] = await Promise.all([
-          databases.listDocuments(
-            databaseId,
-            eventCollectionId,
-            [
-              Query.equal("createdBy", user.$id),
-              Query.equal("academicPeriodId", academicPeriod.$id),
-              Query.equal("isArchived", false),
-              Query.orderDesc("$createdAt"),
-            ]
-          ),
-          databases.listDocuments(
-            databaseId,
-            academicPeriodCollectionId,
-            [Query.orderDesc("startDate")]
-          )
+          databases.listDocuments(databaseId, eventCollectionId, [
+            Query.equal("createdBy", user.$id),
+            Query.equal("academicPeriodId", academicPeriod.$id),
+            Query.equal("isArchived", false),
+            Query.orderDesc("$createdAt"),
+          ]),
+          databases.listDocuments(databaseId, academicPeriodCollectionId, [
+            Query.orderDesc("startDate"),
+          ]),
         ]);
 
         setEvents(eventsResponse.documents);
-        setFilterOptions(prev => ({
+        setFilterOptions((prev) => ({
           ...prev,
-          academicPeriod: academicPeriodsResponse.documents
+          academicPeriod: academicPeriodsResponse.documents,
         }));
 
         setSelectedEvents(["all"]);
@@ -584,7 +578,7 @@ export default function DemographicAnalysis() {
 
   const applyFilters = () => {
     setFilters(tempFilters);
-    const filteredData = participants.filter(participant => {
+    const filteredData = participants.filter((participant) => {
       // ... existing filtering logic ...
     });
     setFilteredParticipants(filteredData);
@@ -610,7 +604,7 @@ export default function DemographicAnalysis() {
         setPendingEventSelection([]);
       } else {
         // If "all" is not selected, select all events
-        const allIds = ["all", ...events.map(event => event.$id)];
+        const allIds = ["all", ...events.map((event) => event.$id)];
         setPendingEventSelection(allIds);
       }
       return;
@@ -620,7 +614,7 @@ export default function DemographicAnalysis() {
     setPendingEventSelection((prev) => {
       // Remove "all" when deselecting any individual event
       if (prev.includes("all")) {
-        prev = prev.filter(id => id !== "all");
+        prev = prev.filter((id) => id !== "all");
       }
 
       const newSelection = prev.includes(eventId)
@@ -710,10 +704,7 @@ export default function DemographicAnalysis() {
                 onOpenChange={setShowEventSelector}
               >
                 <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
+                  <Button variant="outline" className="flex items-center gap-2">
                     Select Events <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
@@ -732,17 +723,27 @@ export default function DemographicAnalysis() {
                       <Checkbox
                         id="all-events"
                         checked={pendingEventSelection.includes("all")}
-                        onCheckedChange={() => handleEventSelectionChange("all")}
+                        onCheckedChange={() =>
+                          handleEventSelectionChange("all")
+                        }
                       />
                       <label htmlFor="all-events">All Events</label>
                     </div>
                     <div className="space-y-2">
                       {events.map((event) => (
-                        <div key={event.$id} className="flex items-center space-x-2">
+                        <div
+                          key={event.$id}
+                          className="flex items-center space-x-2"
+                        >
                           <Checkbox
                             id={event.$id}
-                            checked={pendingEventSelection.includes(event.$id) || pendingEventSelection.includes("all")}
-                            onCheckedChange={() => handleEventSelectionChange(event.$id)}
+                            checked={
+                              pendingEventSelection.includes(event.$id) ||
+                              pendingEventSelection.includes("all")
+                            }
+                            onCheckedChange={() =>
+                              handleEventSelectionChange(event.$id)
+                            }
                           />
                           <label htmlFor={event.$id}>{event.eventName}</label>
                         </div>
@@ -766,8 +767,10 @@ export default function DemographicAnalysis() {
                           pendingEventSelection.includes("all")
                             ? ["All Events"]
                             : events
-                                .filter(event => pendingEventSelection.includes(event.$id))
-                                .map(event => event.eventName)
+                                .filter((event) =>
+                                  pendingEventSelection.includes(event.$id)
+                                )
+                                .map((event) => event.eventName)
                         );
                         setShowEventSelector(false);
                       }}
@@ -780,10 +783,7 @@ export default function DemographicAnalysis() {
 
               <Dialog open={showFilters} onOpenChange={setShowFilters}>
                 <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
+                  <Button variant="outline" className="flex items-center gap-2">
                     <Filter className="h-4 w-4" />
                     Filters
                   </Button>
@@ -843,9 +843,7 @@ export default function DemographicAnalysis() {
                                 className="flex items-center space-x-2"
                               >
                                 <Checkbox
-                                  checked={tempFilters.ageGroups.includes(
-                                    age
-                                  )}
+                                  checked={tempFilters.ageGroups.includes(age)}
                                   onCheckedChange={(checked) => {
                                     setTempFilters((prev) => ({
                                       ...prev,
@@ -928,9 +926,7 @@ export default function DemographicAnalysis() {
                                 className="flex items-center space-x-2 py-1"
                               >
                                 <Checkbox
-                                  checked={tempFilters.schools.includes(
-                                    school
-                                  )}
+                                  checked={tempFilters.schools.includes(school)}
                                   onCheckedChange={(checked) => {
                                     setTempFilters((prev) => ({
                                       ...prev,
@@ -1005,9 +1001,7 @@ export default function DemographicAnalysis() {
                                 className="flex items-center space-x-2"
                               >
                                 <Checkbox
-                                  checked={tempFilters.gender.includes(
-                                    gender
-                                  )}
+                                  checked={tempFilters.gender.includes(gender)}
                                   onCheckedChange={(checked) => {
                                     setTempFilters((prev) => ({
                                       ...prev,

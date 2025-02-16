@@ -4,8 +4,8 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToastContainer, toast } from "react-toastify";
-import EventOverview from "./event-overview/page";
-import CreateEvent from "./create-event/page";
+import EventOverview from "./EventOverview";
+import CreateEvent from "./CreateEvent";
 import ParticipantManagement from "./participant-management/page";
 import EventParticipantLog from "./event-participant-log/page";
 import {

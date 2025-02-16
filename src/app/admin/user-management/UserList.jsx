@@ -46,7 +46,7 @@ import { Query, ID } from "appwrite";
 import { Label } from "@/components/ui/label";
 import { SelectStatus } from "@/components/ui/selectStatus";
 import { Badge } from "@/components/ui/badge";
-import UserProfileDialog from "../user-profile-dialog/page";
+import UserProfileDialog from "./UserProfileDialog";
 
 export default function UserList() {
   const [users, setUsers] = useState([]);
@@ -359,7 +359,6 @@ export default function UserList() {
                 </SelectContent>
               </Select>
               <span className="text-sm text-gray-500">Rows per page</span>
-
             </div>
           </div>
         </div>

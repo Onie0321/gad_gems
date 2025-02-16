@@ -40,11 +40,11 @@ import { cn } from "@/lib/utils";
 import {
   validateEventForm,
   getNonAcademicCategories,
-} from "../../../../../utils/eventUtils";
+} from "../../../../utils/eventUtils";
 import {
   schoolOptions,
   capitalizeWords,
-} from "../../../../../utils/participantUtils";
+} from "../../../../utils/participantUtils";
 import { editEvent, updateEvent } from "@/lib/appwrite";
 
 const EditEvent = ({ event, onUpdateEvent }) => {
