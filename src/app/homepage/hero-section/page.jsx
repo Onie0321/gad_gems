@@ -20,7 +20,7 @@ export default function HeroSection({ onExploreClick }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       id="home"
-      className="relative min-h-screen bg-gradient-to-br from-violet-50 via-white to-blue-50 flex items-center"
+      className="relative min-h-screen bg-gradient-to-br from-[#E3FDFD] via-[#CBF1F5] to-[#E3FDFD] flex items-center"
     >
       <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
       <div className="container mx-auto px-4 py-16 relative z-10">
@@ -31,10 +31,10 @@ export default function HeroSection({ onExploreClick }) {
             transition={{ delay: 0.2 }}
             className="text-left space-y-8"
           >
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-[#71C9CE]">
               Welcome To Our Platform
             </h1>
-            <p className="text-xl text-gray-600 leading-relaxed">
+            <p className="text-xl text-[#71C9CE]/90 leading-relaxed">
               Empowering change through gender equality and inclusive
               development
             </p>
@@ -42,7 +42,7 @@ export default function HeroSection({ onExploreClick }) {
               <Link href="/sign-in">
                 <Button 
                   onClick={onExploreClick}
-                  className="px-8 py-6 text-lg font-semibold rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                  className="px-8 py-6 text-lg font-semibold rounded-xl bg-[#71C9CE] hover:bg-[#A6E3E9] text-white shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   Explore Events
                 </Button>

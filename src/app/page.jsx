@@ -19,7 +19,7 @@ import { useAuth } from "@/context/AuthContext";
 const SectionSeparator = () => (
   <div className="w-full overflow-hidden">
     <div className="w-full max-w-7xl mx-auto px-4">
-      <div className="h-px bg-gradient-to-r from-transparent via-violet-200 to-transparent" />
+      <div className="h-px bg-gradient-to-r from-transparent via-[#71C9CE] to-transparent" />
     </div>
   </div>
 );
@@ -58,9 +58,8 @@ export default function LandingPage() {
     });
   };
 
-
   return (
-    <div className="bg-background min-h-screen relative">
+    <div className="bg-[#E3FDFD] min-h-screen relative">
       <main className="flex-grow">
         <Header />
         <HeroSection onExploreClick={handleExploreClick} />
@@ -83,7 +82,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.5 }}
             onClick={scrollToTop}
-            className="fixed bottom-8 right-8 z-50 p-2 rounded-full bg-violet-600 text-white shadow-lg hover:bg-violet-700 transition-colors duration-200"
+            className="fixed bottom-8 right-8 z-50 p-2 rounded-full bg-[#71C9CE] text-white shadow-lg hover:bg-[#A6E3E9] transition-colors duration-200"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >

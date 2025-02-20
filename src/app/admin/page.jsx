@@ -14,7 +14,6 @@ import {
   Loader2,
   ImageIcon,
   Clock,
-  Archive,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -54,7 +53,6 @@ import {
 import HomepageSettings from "./HomepageSetting";
 import { useToast } from "@/hooks/use-toast";
 import AcademicPeriodManagement from "./Academic-Period";
-import Archives from "./Archives";
 import TimeoutWarningModal from "@/components/modals/TimeoutWarningModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardOverview from "./Dashboard";
@@ -299,8 +297,7 @@ function AdminDashboardContent() {
         return <HomepageSettings />;
       case "academic Period":
         return <AcademicPeriodManagement />;
-      case "archives":
-        return <Archives />;
+     
       default:
         return <DashboardOverview {...props} />;
     }
@@ -485,14 +482,7 @@ function AdminDashboardContent() {
               <Clock className="mr-2 h-4 w-4" />
               Academic Period
             </Button>
-            <Button
-              variant={activeSection === "archives" ? "default" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => setActiveSection("archives")}
-            >
-              <Archive className="mr-2 h-4 w-4" />
-              Archives
-            </Button>
+           
           </nav>
         </div>
       </aside>

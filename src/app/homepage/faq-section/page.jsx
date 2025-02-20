@@ -7,37 +7,40 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { HelpCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { HelpCircle } from "lucide-react";
 
 export default function FAQSection() {
   const faqs = [
     {
-      question: "What is the GAD Office?",
+      question: "What is GAD?",
       answer:
-        "The Gender and Development (GAD) Office is a department dedicated to promoting gender equality and inclusive development in our community through various programs, policies, and initiatives.",
+        "GAD (Gender and Development) is a development approach that focuses on gender equality and women's empowerment as fundamental human rights and essential for achieving sustainable development.",
     },
     {
       question: "How can I participate in GAD events?",
       answer:
-        "You can participate in GAD events by registering through our website or contacting our office directly. We regularly post upcoming events in the Events section of our website.",
+        "You can participate in GAD events by registering through our platform when events are announced. Keep an eye on our Events section for upcoming activities.",
     },
     {
-      question: "What resources does the GAD Office provide?",
+      question: "What services does the GAD office provide?",
       answer:
-        "The GAD Office provides a wide range of resources including educational materials, training programs, counseling services, and support for gender-related issues. You can find more information in our Resources section.",
+        "The GAD office provides various services including event organization, gender sensitivity training, policy advocacy, and support for gender-related concerns within the institution.",
     },
     {
-      question: "How can I support the GAD Office's initiatives?",
+      question: "How can I contact the GAD office?",
       answer:
-        "You can support our initiatives by volunteering, attending our events, spreading awareness about our programs, or making donations to support our work. Contact us for more information on how you can get involved.",
+        "You can reach us through our office contact details provided in the Contact section, or visit us directly at our office location during business hours.",
     },
   ];
 
   return (
-    <section id="faq" className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30">
+    <section
+      id="faq"
+      className="py-16 bg-gradient-to-br from-[#E3FDFD] via-[#CBF1F5] to-[#E3FDFD]"
+    >
       <div className="container mx-auto px-4">
-        <motion.div 
+        <motion.div
           className="text-center mb-12"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -45,35 +48,40 @@ export default function FAQSection() {
           transition={{ duration: 0.5 }}
         >
           <div className="flex items-center justify-center gap-2 mb-4">
-            <HelpCircle className="w-8 h-8 text-violet-600" />
-            <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+            <HelpCircle className="w-8 h-8 text-[#71C9CE]" />
+            <h2 className="text-4xl font-bold text-[#71C9CE]">
               Frequently Asked Questions
             </h2>
           </div>
-          <p className="text-gray-600 max-w-2xl mx-auto">
+          <p className="text-[#71C9CE]/90 max-w-2xl mx-auto">
             Find answers to common questions about our services and programs
           </p>
         </motion.div>
-        <Accordion
-          type="single"
-          collapsible
-          className="w-full max-w-3xl mx-auto bg-white/80 backdrop-blur-sm shadow-sm ring-1 ring-gray-200/50 rounded-2xl p-6"
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="max-w-3xl mx-auto"
         >
-          {faqs.map((faq, index) => (
-            <AccordionItem 
-              key={index} 
-              value={`item-${index}`}
-              className="border-b border-violet-100 last:border-0"
-            >
-              <AccordionTrigger className="text-lg font-semibold hover:text-violet-600 hover:no-underline">
-                {faq.question}
-              </AccordionTrigger>
-              <AccordionContent className="text-gray-600">
-                {faq.answer}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+          <Accordion type="single" collapsible className="space-y-4">
+            {faqs.map((faq, index) => (
+              <AccordionItem
+                key={index}
+                value={`item-${index}`}
+                className="bg-white/80 backdrop-blur-sm rounded-lg px-6 border border-[#CBF1F5] data-[state=open]:bg-[#CBF1F5]/20"
+              >
+                <AccordionTrigger className="text-[#71C9CE] hover:text-[#71C9CE]/90 text-left">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-[#71C9CE]/90">
+                  {faq.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </motion.div>
       </div>
     </section>
   );
