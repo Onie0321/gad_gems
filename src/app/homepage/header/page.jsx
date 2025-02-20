@@ -31,7 +31,7 @@ export default function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-violet-100 shadow-sm">
+    <header className="sticky top-0 z-50 bg-[#E3FDFD]/80 backdrop-blur-sm border-b border-[#CBF1F5] shadow-sm">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2">
           <Image
@@ -39,10 +39,10 @@ export default function Header() {
             alt="GAD Logo"
             width={48}
             height={48}
-            className="rounded-full border-2 border-violet-300"
+            className="rounded-full border-2 border-[#71C9CE]"
             priority
           />
-          <span className="font-bold text-xl bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+          <span className="font-bold text-xl text-[#71C9CE]">
             GAD Office
           </span>
         </Link>
@@ -54,7 +54,7 @@ export default function Header() {
                 <button
                   key={item.name}
                   onClick={() => scrollToSection(item.name)}
-                  className="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-violet-600 hover:bg-violet-50 transition-colors duration-200 flex items-center gap-2"
+                  className="px-3 py-2 rounded-md text-sm font-medium text-[#71C9CE] hover:text-white hover:bg-[#A6E3E9] transition-colors duration-200 flex items-center gap-2"
                 >
                   {item.icon}
                   <span className="hidden sm:inline">{item.name}</span>

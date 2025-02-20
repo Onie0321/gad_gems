@@ -8,7 +8,7 @@ export default function FeedbackSection() {
   return (
     <section
       id="our-office"
-      className="py-24 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30"
+      className="py-24 bg-gradient-to-br from-[#E3FDFD] via-[#CBF1F5] to-[#E3FDFD]"
     >
       <div className="container mx-auto px-6">
         <motion.div
@@ -19,12 +19,12 @@ export default function FeedbackSection() {
           transition={{ duration: 0.5 }}
         >
           <div className="flex items-center justify-center gap-2 mb-4">
-            <MapPin className="w-8 h-8 text-violet-600" />
-            <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-blue-600">
+            <MapPin className="w-8 h-8 text-[#71C9CE]" />
+            <h2 className="text-4xl font-bold text-[#71C9CE]">
               Our Office
             </h2>
           </div>
-          <p className="text-gray-600 max-w-2xl mx-auto">
+          <p className="text-[#71C9CE]/90 max-w-2xl mx-auto">
             Visit us at our main campus or reach out through our various
             communication channels.
           </p>
@@ -33,12 +33,12 @@ export default function FeedbackSection() {
         <div className="grid md:grid-cols-2 gap-8 items-start">
           {/* Contact Information */}
           <div className="order-2 md:order-1 h-[432px]">
-            <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 ring-1 ring-gray-200/50 transform hover:-translate-y-1 h-full flex items-center justify-center">
-              <div className="space-y-12 text-gray-600 w-full max-w-md">
+            <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 ring-1 ring-[#CBF1F5] transform hover:-translate-y-1 h-full flex items-center justify-center">
+              <div className="space-y-12 text-[#71C9CE]/90 w-full max-w-md">
                 <div className="flex items-center space-x-6 group">
-                  <div className="bg-violet-100 p-4 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+                  <div className="bg-[#CBF1F5] p-4 rounded-xl group-hover:bg-[#A6E3E9] transition-colors duration-300">
                     <svg
-                      className="w-8 h-8 text-violet-600"
+                      className="w-8 h-8 text-[#71C9CE]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -58,7 +58,7 @@ export default function FeedbackSection() {
                     </svg>
                   </div>
                   <div className="text-center flex-1">
-                    <h3 className="font-semibold text-gray-800 mb-2 text-lg">
+                    <h3 className="font-semibold text-[#71C9CE] mb-2 text-lg">
                       Address
                     </h3>
                     <p className="text-base">Brgy. Zabali, Baler, Aurora</p>
@@ -67,9 +67,9 @@ export default function FeedbackSection() {
                 </div>
 
                 <div className="flex items-center space-x-6 group">
-                  <div className="bg-violet-100 p-4 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+                  <div className="bg-[#CBF1F5] p-4 rounded-xl group-hover:bg-[#A6E3E9] transition-colors duration-300">
                     <svg
-                      className="w-8 h-8 text-violet-600"
+                      className="w-8 h-8 text-[#71C9CE]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -83,7 +83,7 @@ export default function FeedbackSection() {
                     </svg>
                   </div>
                   <div className="text-center flex-1">
-                    <h3 className="font-semibold text-gray-800 mb-2 text-lg">
+                    <h3 className="font-semibold text-[#71C9CE] mb-2 text-lg">
                       Phone
                     </h3>
                     <p className="text-base">+63 9123456789</p>
@@ -91,9 +91,9 @@ export default function FeedbackSection() {
                 </div>
 
                 <div className="flex items-center space-x-6 group">
-                  <div className="bg-violet-100 p-4 rounded-xl group-hover:bg-violet-200 transition-colors duration-300">
+                  <div className="bg-[#CBF1F5] p-4 rounded-xl group-hover:bg-[#A6E3E9] transition-colors duration-300">
                     <svg
-                      className="w-8 h-8 text-violet-600"
+                      className="w-8 h-8 text-[#71C9CE]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -107,12 +107,12 @@ export default function FeedbackSection() {
                     </svg>
                   </div>
                   <div className="text-center flex-1">
-                    <h3 className="font-semibold text-gray-800 mb-2 text-lg">
+                    <h3 className="font-semibold text-[#71C9CE] mb-2 text-lg">
                       Email
                     </h3>
                     <a
                       href="mailto:gad@ascot.edu.ph"
-                      className="text-violet-600 hover:text-violet-700 transition-colors duration-300 text-base"
+                      className="text-[#71C9CE] hover:text-[#A6E3E9] transition-colors duration-300 text-base"
                     >
                       gad@ascot.edu.ph
                     </a>
@@ -124,7 +124,7 @@ export default function FeedbackSection() {
 
           {/* Map */}
           <div className="order-1 md:order-2">
-            <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ring-1 ring-gray-200/50 overflow-hidden transform hover:-translate-y-1">
+            <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ring-1 ring-[#CBF1F5] overflow-hidden transform hover:-translate-y-1">
               <div className="rounded-xl overflow-hidden">
                 <iframe
                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3917.218497498902!2d121.5740752!3d15.7440445!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3390a6dde33069ab%3A0x6352ac3889b63f4!2sAurora%20State%20College%20of%20Technology%20(ASCOT)%20Main%20Campus%20Administration%20Building!5e0!3m2!1sen!2sph!4v1691580195739"

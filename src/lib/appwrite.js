@@ -2687,3 +2687,17 @@ export const createOAuthSession = async (provider) => {
     throw error;
   }
 };
+
+export async function getAllAcademicPeriods() {
+  try {
+    const response = await databases.listDocuments(
+      databaseId,
+      academicPeriodCollectionId,
+      [Query.orderDesc('createdAt')] // Sort by creation date, newest first
+    );
+    return response.documents;
+  } catch (error) {
+    console.error('Error fetching academic periods:', error);
+    throw error;
+  }
+}
