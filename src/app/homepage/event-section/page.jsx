@@ -10,7 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CalendarIcon, MapPinIcon, UsersIcon, Calendar, Sparkles } from "lucide-react";
+import {
+  CalendarIcon,
+  MapPinIcon,
+  UsersIcon,
+  Calendar,
+  Sparkles,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +45,15 @@ import {
 import { databases, databaseId, eventCollectionId } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { motion } from "framer-motion";
+
+const formatEventDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+  });
+};
 
 export default function RecentEvents() {
   const [mounted, setMounted] = useState(false);
@@ -92,17 +107,23 @@ export default function RecentEvents() {
 
   const NoEventsDisplay = () => (
     <div className="min-h-[400px] flex flex-col items-center justify-center p-8 rounded-2xl bg-[#CBF1F5]/30">
-      <h3 className="text-2xl font-semibold text-[#71C9CE] mb-2">No Events Currently</h3>
+      <h3 className="text-2xl font-semibold text-[#71C9CE] mb-2">
+        No Events Currently
+      </h3>
       <p className="text-[#71C9CE]/90 text-center max-w-md">
-        Stay tuned! New events will be posted here soon. Check back later for upcoming activities and programs.
+        Stay tuned! New events will be posted here soon. Check back later for
+        upcoming activities and programs.
       </p>
     </div>
   );
 
   return (
-    <section className="py-16 bg-gradient-to-br from-[#E3FDFD] via-[#CBF1F5] to-[#E3FDFD]" id="events">
+    <section
+      className="py-16 bg-gradient-to-br from-[#E3FDFD] via-[#CBF1F5] to-[#E3FDFD]"
+      id="events"
+    >
       <div className="container mx-auto px-4">
-        <motion.div 
+        <motion.div
           className="text-center mb-12"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -111,12 +132,11 @@ export default function RecentEvents() {
         >
           <div className="flex items-center justify-center gap-2 mb-4">
             <Calendar className="w-8 h-8 text-[#71C9CE]" />
-            <h2 className="text-4xl font-bold text-[#71C9CE]">
-              Recent Events
-            </h2>
+            <h2 className="text-4xl font-bold text-[#71C9CE]">Recent Events</h2>
           </div>
           <p className="text-[#71C9CE]/90 max-w-2xl mx-auto">
-            Discover our latest activities and programs promoting gender equality and inclusive development.
+            Discover our latest activities and programs promoting gender
+            equality and inclusive development.
           </p>
         </motion.div>
 
@@ -149,11 +169,15 @@ export default function RecentEvents() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <p className="text-[#71C9CE]/90 line-clamp-3">{event.description}</p>
+                      <p className="text-[#71C9CE]/90 line-clamp-3">
+                        {event.description}
+                      </p>
                       <div className="space-y-2">
                         <div className="flex items-center text-[#71C9CE]">
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          <span className="text-sm">{event.date}</span>
+                          <span className="text-sm">
+                            {formatEventDate(event.date)}
+                          </span>
                         </div>
                         <div className="flex items-center text-[#71C9CE]">
                           <MapPinIcon className="mr-2 h-4 w-4" />
@@ -161,15 +185,17 @@ export default function RecentEvents() {
                         </div>
                         <div className="flex items-center text-[#71C9CE]">
                           <UsersIcon className="mr-2 h-4 w-4" />
-                          <span className="text-sm">{event.attendees} attendees</span>
+                          <span className="text-sm">
+                            {event.attendees} attendees
+                          </span>
                         </div>
                       </div>
                     </CardContent>
                     <CardFooter>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             className="w-full bg-[#71C9CE] hover:bg-[#A6E3E9] text-white border border-[#CBF1F5]"
                           >
                             View Details
@@ -199,7 +225,9 @@ export default function RecentEvents() {
                                     <TableCell className="font-medium">
                                       {event.name}
                                     </TableCell>
-                                    <TableCell>{event.date}</TableCell>
+                                    <TableCell>
+                                      {formatEventDate(event.date)}
+                                    </TableCell>
                                     <TableCell>{event.location}</TableCell>
                                     <TableCell>{event.attendees}</TableCell>
                                   </TableRow>

@@ -16,6 +16,15 @@ import { Query } from "appwrite";
 import { motion } from "framer-motion";
 import { Newspaper } from "lucide-react";
 
+const formatNewsDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+  });
+};
+
 export default function NewsSection() {
   const [mounted, setMounted] = useState(false);
   const [news, setNews] = useState([]);
@@ -75,7 +84,7 @@ export default function NewsSection() {
                 {item.date && (
                   <div className="flex items-center text-sm text-[#71C9CE]">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    <span>{item.date}</span>
+                    <span>{formatNewsDate(item.date)}</span>
                   </div>
                 )}
               </CardHeader>
@@ -99,7 +108,7 @@ export default function NewsSection() {
       className="py-16 bg-gradient-to-br from-[#E3FDFD] via-[#CBF1F5] to-[#E3FDFD]"
     >
       <div className="container mx-auto px-4">
-        <motion.div 
+        <motion.div
           className="text-center mb-12"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -108,9 +117,7 @@ export default function NewsSection() {
         >
           <div className="flex items-center justify-center gap-2 mb-4">
             <Newspaper className="w-8 h-8 text-[#71C9CE]" />
-            <h2 className="text-4xl font-bold text-[#71C9CE]">
-              Latest News
-            </h2>
+            <h2 className="text-4xl font-bold text-[#71C9CE]">Latest News</h2>
           </div>
           <p className="text-[#71C9CE]/90 max-w-2xl mx-auto">
             Stay updated with our latest announcements and developments
