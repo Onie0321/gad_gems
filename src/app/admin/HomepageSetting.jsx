@@ -53,6 +53,16 @@ const formatDate = (dateString) => {
   });
 };
 
+// Add this schema after the newsFormSchema
+const eventFormSchema = z.object({
+  eventName: z.string().min(1, "Event name is required"),
+  eventDescription: z.string().min(1, "Description is required"),
+  eventDate: z.string().min(1, "Date is required"),
+  eventVenue: z.string().min(1, "Venue is required"),
+  eventImageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  showOnHomepage: z.boolean().default(false),
+});
+
 function ContentManagementClient() {
   const [events, setEvents] = useState([]);
   const [newsItems, setNewsItems] = useState([]);
@@ -64,6 +74,7 @@ function ContentManagementClient() {
   const [currentEventsPage, setCurrentEventsPage] = useState(1);
   const [currentNewsPage, setCurrentNewsPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
+  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(newsFormSchema),
@@ -72,6 +83,18 @@ function ContentManagementClient() {
       description: "",
       imageUrl: "",
       date: new Date().toISOString().split("T")[0],
+      showOnHomepage: false,
+    },
+  });
+
+  const eventForm = useForm({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: {
+      eventName: "",
+      eventDescription: "",
+      eventVenue: "",
+      eventDate: new Date().toISOString().split("T")[0],
+      eventImageUrl: "",
       showOnHomepage: false,
     },
   });
@@ -221,6 +244,42 @@ function ContentManagementClient() {
     }
   };
 
+  const onSubmitEvent = async (data) => {
+    try {
+      const eventData = {
+        ...data,
+        showOnHomepage: true,
+      };
+
+      if (!eventData.eventImageUrl) {
+        delete eventData.eventImageUrl;
+      }
+
+      await databases.createDocument(
+        databaseId,
+        eventCollectionId,
+        ID.unique(),
+        eventData
+      );
+
+      toast({
+        title: "Success",
+        description: "Event created successfully",
+      });
+
+      await fetchEvents();
+      setIsEventDialogOpen(false);
+      eventForm.reset();
+    } catch (error) {
+      console.error("Error creating event:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create event",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     const initializeData = async () => {
       try {
@@ -334,27 +393,33 @@ function ContentManagementClient() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Events Section */}
         <div className="space-y-4">
-          <h3 className="text-xl font-semibold">Events </h3>
+          <h3 className="text-xl font-semibold">Events</h3>
           <h6 className="text-sm font-semibold">Select Events to Show on Homepage</h6>
-          
+
           {events.length > 0 ? (
             <>
               <div className="grid gap-4">
                 {/* Select All Events Checkbox */}
-                <div
-                  className="flex items-center space-x-4 p-4 border rounded cursor-pointer hover:bg-gray-50"
-                  onClick={handleSelectAllEvents}
-                >
-                  <Checkbox
-                    checked={paginateItems(events, currentEventsPage).every(event => 
-                      selectedEvents.includes(event.$id))}
-                    onCheckedChange={handleSelectAllEvents}
-                  />
-                  <div className="flex-1">
-                    <h4 className="font-semibold">
-                      {paginateItems(events, currentEventsPage).every(event => 
-                        selectedEvents.includes(event.$id)) ? 'Deselect All Events' : 'Select All Events'}
-                    </h4>
+                <div className="bg-white shadow-sm rounded-lg p-4 border">
+                  <div
+                    className="flex items-center space-x-4 cursor-pointer hover:bg-gray-50"
+                    onClick={handleSelectAllEvents}
+                  >
+                    <Checkbox
+                      checked={paginateItems(events, currentEventsPage).every(
+                        (event) => selectedEvents.includes(event.$id)
+                      )}
+                      onCheckedChange={handleSelectAllEvents}
+                    />
+                    <div className="flex-1">
+                      <h4 className="font-semibold">
+                        {paginateItems(events, currentEventsPage).every((event) =>
+                          selectedEvents.includes(event.$id)
+                        )
+                          ? "Deselect All Events"
+                          : "Select All Events"}
+                      </h4>
+                    </div>
                   </div>
                 </div>
 
@@ -362,33 +427,51 @@ function ContentManagementClient() {
                 {paginateItems(events, currentEventsPage).map((event) => (
                   <div
                     key={event.$id}
-                    className="flex items-center space-x-4 p-4 border rounded cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleEventSelection(event.$id)}
+                    className="bg-white shadow-sm rounded-lg overflow-hidden"
                   >
-                    <Checkbox
-                      checked={selectedEvents.includes(event.$id)}
-                      onCheckedChange={() => handleEventSelection(event.$id)}
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-semibold">{event.eventName}</h4>
-                      <p className="text-sm text-gray-600">
-                        Date: {formatDate(event.eventDate)}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Venue: {event.eventVenue}
-                      </p>
+                    {event.eventImageUrl && (
+                      <img
+                        src={event.eventImageUrl}
+                        alt={event.eventName}
+                        className="w-full h-48 object-cover"
+                      />
+                    )}
+                    <div
+                      className="flex items-center space-x-4 p-4 cursor-pointer hover:bg-gray-50"
+                      onClick={() => handleEventSelection(event.$id)}
+                    >
+                      <Checkbox
+                        checked={selectedEvents.includes(event.$id)}
+                        onCheckedChange={() => handleEventSelection(event.$id)}
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-semibold">{event.eventName}</h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {event.eventDescription}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {formatDate(event.eventDate)}
+                          </span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {event.eventVenue}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-              
+
               {/* Events Pagination */}
               {totalEventsPages > 1 && (
                 <div className="flex justify-center gap-2 mt-4">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentEventsPage(prev => Math.max(1, prev - 1))}
+                    onClick={() =>
+                      setCurrentEventsPage((prev) => Math.max(1, prev - 1))
+                    }
                     disabled={currentEventsPage === 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -399,20 +482,110 @@ function ContentManagementClient() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentEventsPage(prev => Math.min(totalEventsPages, prev + 1))}
+                    onClick={() =>
+                      setCurrentEventsPage((prev) =>
+                        Math.min(totalEventsPages, prev + 1)
+                      )
+                    }
                     disabled={currentEventsPage === totalEventsPages}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               )}
-              
-              {/* Add Event Button */}
+
+              {/* Add Event Button and Dialog */}
               <div className="flex justify-end mt-4">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Event
-                </Button>
+                <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Event
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Event</DialogTitle>
+                    </DialogHeader>
+                    <Form {...eventForm}>
+                      <form
+                        onSubmit={eventForm.handleSubmit(onSubmitEvent)}
+                        className="space-y-4"
+                      >
+                        <FormField
+                          control={eventForm.control}
+                          name="eventName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Event Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={eventForm.control}
+                          name="eventDescription"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={eventForm.control}
+                          name="eventDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={eventForm.control}
+                          name="eventVenue"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Venue</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={eventForm.control}
+                          name="eventImageUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Image URL (Optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="url"
+                                  placeholder="https://example.com/image.jpg"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button type="submit">Create Event</Button>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
               </div>
             </>
           ) : (
@@ -431,7 +604,9 @@ function ContentManagementClient() {
         {/* News Items Section */}
         <div className="space-y-4">
           <h3 className="text-xl font-semibold">News Items</h3>
-          <h6 className="text-sm font-semibold">Select News Items to Show on Homepage</h6>  
+          <h6 className="text-sm font-semibold">
+            Select News Items to Show on Homepage
+          </h6>
 
           {newsItems.length > 0 ? (
             <>
@@ -442,14 +617,18 @@ function ContentManagementClient() {
                   onClick={handleSelectAllNews}
                 >
                   <Checkbox
-                    checked={paginateItems(newsItems, currentNewsPage).every(news => 
-                      selectedNews.includes(news.$id))}
+                    checked={paginateItems(newsItems, currentNewsPage).every(
+                      (news) => selectedNews.includes(news.$id)
+                    )}
                     onCheckedChange={handleSelectAllNews}
                   />
                   <div className="flex-1">
                     <h4 className="font-semibold">
-                      {paginateItems(newsItems, currentNewsPage).every(news => 
-                        selectedNews.includes(news.$id)) ? 'Deselect All News' : 'Select All News'}
+                      {paginateItems(newsItems, currentNewsPage).every((news) =>
+                        selectedNews.includes(news.$id)
+                      )
+                        ? "Deselect All News"
+                        : "Select All News"}
                     </h4>
                   </div>
                 </div>
@@ -467,7 +646,9 @@ function ContentManagementClient() {
                     />
                     <div className="flex-1">
                       <h4 className="font-semibold">{item.title}</h4>
-                      <p className="text-sm text-gray-600">{item.description}</p>
+                      <p className="text-sm text-gray-600">
+                        {item.description}
+                      </p>
                       <p className="text-sm text-gray-600">
                         Date: {formatDate(item.date)}
                       </p>
@@ -475,14 +656,16 @@ function ContentManagementClient() {
                   </div>
                 ))}
               </div>
-              
+
               {/* News Pagination */}
               {totalNewsPages > 1 && (
                 <div className="flex justify-center gap-2 mt-4">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentNewsPage(prev => Math.max(1, prev - 1))}
+                    onClick={() =>
+                      setCurrentNewsPage((prev) => Math.max(1, prev - 1))
+                    }
                     disabled={currentNewsPage === 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -493,17 +676,24 @@ function ContentManagementClient() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentNewsPage(prev => Math.min(totalNewsPages, prev + 1))}
+                    onClick={() =>
+                      setCurrentNewsPage((prev) =>
+                        Math.min(totalNewsPages, prev + 1)
+                      )
+                    }
                     disabled={currentNewsPage === totalNewsPages}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               )}
-              
+
               {/* Add News Button */}
               <div className="flex justify-end mt-4">
-                <Dialog open={isNewsDialogOpen} onOpenChange={setIsNewsDialogOpen}>
+                <Dialog
+                  open={isNewsDialogOpen}
+                  onOpenChange={setIsNewsDialogOpen}
+                >
                   <DialogTrigger asChild>
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
@@ -586,7 +776,10 @@ function ContentManagementClient() {
             <>
               <p>No news items found.</p>
               <div className="flex justify-end mt-4">
-                <Dialog open={isNewsDialogOpen} onOpenChange={setIsNewsDialogOpen}>
+                <Dialog
+                  open={isNewsDialogOpen}
+                  onOpenChange={setIsNewsDialogOpen}
+                >
                   <DialogTrigger asChild>
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
