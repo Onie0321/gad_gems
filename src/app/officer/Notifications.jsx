@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, X, Check, Trash2 } from "lucide-react";
+import { Bell, X, Check, Trash2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,7 +23,6 @@ import {
   databases,
   databaseId,
   notificationsCollectionId,
-  client,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { toast } from "@/hooks/use-toast";
@@ -36,6 +35,7 @@ export function Notifications() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchNotifications = async () => {
     try {
@@ -67,30 +67,11 @@ export function Notifications() {
     if (user) {
       fetchNotifications();
 
-      // Subscribe to real-time updates
-      const unsubscribe = client.subscribe(
-        `databases.${databaseId}.collections.${notificationsCollectionId}.documents`,
-        (response) => {
-          if (
-            response.events.includes(
-              "databases.*.collections.*.documents.*.create"
-            )
-          ) {
-            // Add new notification to the list
-            setNotifications((prev) => [response.payload, ...prev]);
-            setUnreadCount((prev) => prev + 1);
-            // Show toast for new notification
-            toast({
-              title: response.payload.title,
-              description: response.payload.message,
-              duration: 5000,
-            });
-          }
-        }
-      );
+      // Set up periodic polling instead of realtime
+      const pollInterval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
 
       return () => {
-        unsubscribe();
+        clearInterval(pollInterval);
       };
     }
   }, [user]);
@@ -286,6 +267,12 @@ export function Notifications() {
     return read ? "bg-gray-50/50" : "bg-gray-50";
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchNotifications();
+    setIsRefreshing(false);
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -303,6 +290,20 @@ export function Notifications() {
           <div className="flex justify-between items-center p-2 border-b">
             <h3 className="font-semibold">Notifications</h3>
             <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className={`text-xs ${isRefreshing ? "opacity-50" : ""}`}
+              >
+                <RotateCw
+                  className={`h-4 w-4 mr-1 ${
+                    isRefreshing ? "animate-spin" : ""
+                  }`}
+                />
+                Refresh
+              </Button>
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"

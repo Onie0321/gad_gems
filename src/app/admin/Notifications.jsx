@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Bell, X, Check, Trash2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Bell, X, Check, Trash2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,36 +19,32 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import {
-  databases,
-  databaseId,
-  notificationsCollectionId,
-  client,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
-import { toast } from "@/hooks/use-toast";
+import { fetchNotifications, markNotificationAsRead } from "@/lib/appwrite";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 export default function Notifications() {
   const { user } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const fetchNotifications = async () => {
+  useEffect(() => {
+    fetchUserNotifications();
+  }, [user]);
+
+  const fetchUserNotifications = async () => {
     try {
       if (!user) return;
 
-      const response = await databases.listDocuments(
-        databaseId,
-        notificationsCollectionId,
-        [Query.orderDesc("$createdAt"), Query.limit(100)]
-      );
-
-      setNotifications(response.documents);
-      setUnreadCount(response.documents.filter((n) => !n.read).length);
+      const userNotifications = await fetchNotifications(user.$id);
+      setNotifications(userNotifications);
+      setUnreadCount(userNotifications.filter((n) => !n.isRead).length);
     } catch (error) {
       console.error("Error fetching notifications:", error);
       toast({
@@ -56,46 +52,16 @@ export default function Notifications() {
         description: "Failed to fetch notifications",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (user) {
-      fetchNotifications();
-
-      // Subscribe to real-time updates
-      const unsubscribe = client.subscribe(
-        `databases.${databaseId}.collections.${notificationsCollectionId}.documents`,
-        (response) => {
-          if (
-            response.events.includes(
-              "databases.*.collections.*.documents.*.create"
-            )
-          ) {
-            // Add new notification to the list
-            setNotifications((prev) => [response.payload, ...prev]);
-            setUnreadCount((prev) => prev + 1);
-            // Show toast for new notification
-            toast({
-              title: response.payload.title,
-              description: response.payload.message,
-              duration: 5000,
-            });
-          }
-        }
-      );
-
-      return () => {
-        unsubscribe();
-      };
-    }
-  }, [user]);
 
   const handleNotificationClick = async (notification) => {
     try {
       // Mark as read if unread
-      if (!notification.read) {
-        await markAsRead(notification.$id);
+      if (!notification.isRead) {
+        await handleMarkAsRead(notification.$id);
       }
 
       // Handle navigation based on notification type and action
@@ -130,18 +96,15 @@ export default function Notifications() {
     }
   };
 
-  const markAsRead = async (notificationId) => {
+  const handleMarkAsRead = async (notificationId) => {
     try {
-      await databases.updateDocument(
-        databaseId,
-        notificationsCollectionId,
-        notificationId,
-        { read: true }
-      );
+      await markNotificationAsRead(notificationId);
 
-      setNotifications(
-        notifications.map((n) =>
-          n.$id === notificationId ? { ...n, read: true } : n
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.$id === notificationId
+            ? { ...notification, isRead: true }
+            : notification
         )
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
@@ -159,17 +122,10 @@ export default function Notifications() {
     try {
       await Promise.all(
         notifications
-          .filter((n) => !n.read)
-          .map((n) =>
-            databases.updateDocument(
-              databaseId,
-              notificationsCollectionId,
-              n.$id,
-              { read: true }
-            )
-          )
+          .filter((n) => !n.isRead)
+          .map((n) => markNotificationAsRead(n.$id))
       );
-      setNotifications(notifications.map((n) => ({ ...n, read: true })));
+      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
       toast({
         title: "Success",
@@ -188,16 +144,12 @@ export default function Notifications() {
   const deleteNotification = async (notificationId, e) => {
     e.stopPropagation();
     try {
-      await databases.deleteDocument(
-        databaseId,
-        notificationsCollectionId,
-        notificationId
-      );
+      await markNotificationAsRead(notificationId);
 
       setNotifications(notifications.filter((n) => n.$id !== notificationId));
       setUnreadCount(
         (prev) =>
-          notifications.filter((n) => !n.read && n.$id !== notificationId)
+          notifications.filter((n) => !n.isRead && n.$id !== notificationId)
             .length
       );
 
@@ -219,11 +171,7 @@ export default function Notifications() {
     try {
       await Promise.all(
         notifications.map((notification) =>
-          databases.deleteDocument(
-            databaseId,
-            notificationsCollectionId,
-            notification.$id
-          )
+          markNotificationAsRead(notification.$id)
         )
       );
 
@@ -270,6 +218,21 @@ export default function Notifications() {
       : `bg-${baseColor}-50 border-${baseColor}-200`;
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchUserNotifications();
+    setIsRefreshing(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-pulse">
+        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+      </div>
+    );
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -287,6 +250,20 @@ export default function Notifications() {
           <div className="flex justify-between items-center p-2 border-b">
             <h3 className="font-semibold">Notifications</h3>
             <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className={`text-xs ${isRefreshing ? "opacity-50" : ""}`}
+              >
+                <RotateCw
+                  className={`h-4 w-4 mr-1 ${
+                    isRefreshing ? "animate-spin" : ""
+                  }`}
+                />
+                Refresh
+              </Button>
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"
@@ -315,8 +292,8 @@ export default function Notifications() {
                 key={notification.$id}
                 className={`flex items-start p-3 cursor-pointer hover:bg-gray-100 border-l-4 ${getNotificationColor(
                   notification.type,
-                  notification.read
-                )} ${notification.read ? "opacity-60" : "font-medium"}`}
+                  notification.isRead
+                )} ${notification.isRead ? "opacity-60" : "font-medium"}`}
                 onClick={() => handleNotificationClick(notification)}
               >
                 <span className="mr-2 text-lg">
@@ -335,14 +312,14 @@ export default function Notifications() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!notification.read && (
+                  {!notification.isRead && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="ml-2"
                       onClick={(e) => {
                         e.stopPropagation();
-                        markAsRead(notification.$id);
+                        handleMarkAsRead(notification.$id);
                       }}
                     >
                       <Check className="h-4 w-4" />

@@ -9,7 +9,6 @@ import CreateEvent from "./event-management/CreateEvent";
 import ParticipantManagement from "./event-management/ParticipantManagement";
 import EventParticipantLog from "./event-management/event-participant-log/EventParticipantLog";
 import {
-  subscribeToRealTimeUpdates,
   getCurrentUser,
   fetchOfficerEvents,
   getCurrentAcademicPeriod,
@@ -196,25 +195,6 @@ export default function EventsManagement() {
 
     initializeUser();
   }, [fetchEvents, router]);
-
-  useEffect(() => {
-    let unsubscribe;
-    if (userIdRef.current && networkStatus.isOnline) {
-      unsubscribe = subscribeToRealTimeUpdates(() => {
-        if (userIdRef.current) {
-          fetchEvents(userIdRef.current);
-        } else {
-          console.error("User ID is not available for real-time updates");
-        }
-      });
-    }
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, [fetchEvents, networkStatus.isOnline]);
 
   const handleEventCreated = async (newEvent, isImported = false) => {
     try {

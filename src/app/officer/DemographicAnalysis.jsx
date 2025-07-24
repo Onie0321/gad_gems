@@ -55,13 +55,14 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  studentsCollectionId,
+  studentCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
   academicPeriodCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { Input } from "@/components/ui/input";
+import { processEthnicityData } from "@/utils/participantUtils";
 
 const getEventNames = async (eventIds) => {
   if (eventIds.includes("all")) {
@@ -460,43 +461,24 @@ export default function DemographicAnalysis() {
   const processEthnicData = (participants) => {
     if (!participants || !Array.isArray(participants)) return [];
 
-    // First, collect all unique ethnic groups from participants
-    const uniqueEthnicGroups = new Set(
-      participants
-        .filter((p) => p.ethnicGroup && p.ethnicGroup.trim() !== "")
-        .map((p) => p.ethnicGroup)
-    );
+    // Use the improved ethnicity processing function
+    const processedData = processEthnicityData(participants);
 
-    // Update the filterOptions by adding new ethnic groups while keeping existing ones
+    // Update the filterOptions with valid ethnic groups (excluding "Unspecified")
+    const validEthnicGroups = processedData
+      .filter((item) => item.name !== "Unspecified")
+      .map((item) => item.name);
+
     setFilterOptions((prev) => {
       const existingGroups = new Set(prev.ethnicGroup);
-      const newGroups = Array.from(uniqueEthnicGroups);
-      newGroups.forEach((group) => existingGroups.add(group));
+      validEthnicGroups.forEach((group) => existingGroups.add(group));
       return {
         ...prev,
         ethnicGroup: Array.from(existingGroups).sort(),
       };
     });
 
-    // Process the data for the chart
-    const ethnicCount = {};
-    participants.forEach((p) => {
-      if (p.ethnicGroup && p.sex) {
-        if (!ethnicCount[p.ethnicGroup]) {
-          ethnicCount[p.ethnicGroup] = {
-            name: p.ethnicGroup,
-            male: 0,
-            female: 0,
-          };
-        }
-        const gender = p.sex.toLowerCase();
-        if (gender === "male" || gender === "female") {
-          ethnicCount[p.ethnicGroup][gender]++;
-        }
-      }
-    });
-
-    return Object.values(ethnicCount);
+    return processedData;
   };
 
   const processSchoolData = (participants) => {

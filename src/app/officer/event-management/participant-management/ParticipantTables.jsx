@@ -149,9 +149,9 @@ export default function ParticipantTables({
                     <TableHead>
                       <TooltipProvider>
                         <Tooltip>
-                          <TooltipTrigger>Sex</TooltipTrigger>
+                          <TooltipTrigger>Gender</TooltipTrigger>
                           <TooltipContent>
-                            <p>Biological sex of the participant</p>
+                            <p>Gender of the participant</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -181,7 +181,7 @@ export default function ParticipantTables({
                         <Tooltip>
                           <TooltipTrigger>School</TooltipTrigger>
                           <TooltipContent>
-                            <p>Academic school or department</p>
+                            <p>School of the student</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -191,7 +191,7 @@ export default function ParticipantTables({
                         <Tooltip>
                           <TooltipTrigger>Year</TooltipTrigger>
                           <TooltipContent>
-                            <p>Current year level</p>
+                            <p>Year level of the student</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -201,7 +201,37 @@ export default function ParticipantTables({
                         <Tooltip>
                           <TooltipTrigger>Section</TooltipTrigger>
                           <TooltipContent>
-                            <p>Current class section</p>
+                            <p>Section of the student</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>Sexual Orientation</TooltipTrigger>
+                          <TooltipContent>
+                            <p>Sexual orientation of the participant</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>Religion</TooltipTrigger>
+                          <TooltipContent>
+                            <p>Religion of the participant</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>First Generation</TooltipTrigger>
+                          <TooltipContent>
+                            <p>First generation student status</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -224,12 +254,15 @@ export default function ParticipantTables({
                     <TableRow key={participant.$id}>
                       <TableCell>{participant.studentId}</TableCell>
                       <TableCell>{participant.name}</TableCell>
-                      <TableCell>{participant.sex}</TableCell>
+                      <TableCell>{participant.gender}</TableCell>
                       <TableCell>{participant.age}</TableCell>
                       <TableCell>{participant.address}</TableCell>
                       <TableCell>{participant.school}</TableCell>
                       <TableCell>{participant.year}</TableCell>
                       <TableCell>{participant.section}</TableCell>
+                      <TableCell>{participant.orientation}</TableCell>
+                      <TableCell>{participant.religion}</TableCell>
+                      <TableCell>{participant.firstGen}</TableCell>
                       <TableCell>{participant.ethnicGroup}</TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
@@ -284,9 +317,9 @@ export default function ParticipantTables({
                     <TableHead>
                       <TooltipProvider>
                         <Tooltip>
-                          <TooltipTrigger>Sex</TooltipTrigger>
+                          <TooltipTrigger>Gender</TooltipTrigger>
                           <TooltipContent>
-                            <p>Biological sex of the participant</p>
+                            <p>Gender of the participant</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -314,6 +347,36 @@ export default function ParticipantTables({
                     <TableHead>
                       <TooltipProvider>
                         <Tooltip>
+                          <TooltipTrigger>Sexual Orientation</TooltipTrigger>
+                          <TooltipContent>
+                            <p>Sexual orientation of the participant</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>Religion</TooltipTrigger>
+                          <TooltipContent>
+                            <p>Religion of the participant</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>First Generation</TooltipTrigger>
+                          <TooltipContent>
+                            <p>First generation student status</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
                           <TooltipTrigger>Ethnic Group</TooltipTrigger>
                           <TooltipContent>
                             <p>Participant's ethnic or cultural group</p>
@@ -329,9 +392,12 @@ export default function ParticipantTables({
                     <TableRow key={participant.$id}>
                       <TableCell>{participant.staffFacultyId}</TableCell>
                       <TableCell>{participant.name}</TableCell>
-                      <TableCell>{participant.sex}</TableCell>
+                      <TableCell>{participant.gender}</TableCell>
                       <TableCell>{participant.age}</TableCell>
                       <TableCell>{participant.address}</TableCell>
+                      <TableCell>{participant.orientation}</TableCell>
+                      <TableCell>{participant.religion}</TableCell>
+                      <TableCell>{participant.firstGen}</TableCell>
                       <TableCell>{participant.ethnicGroup}</TableCell>
                       {!isFinalized && (
                         <TableCell>
@@ -378,9 +444,9 @@ export default function ParticipantTables({
                     <TableHead>
                       <TooltipProvider>
                         <Tooltip>
-                          <TooltipTrigger>Sex</TooltipTrigger>
+                          <TooltipTrigger>Gender</TooltipTrigger>
                           <TooltipContent>
-                            <p>Biological sex of the participant</p>
+                            <p>Gender of the participant</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -408,6 +474,36 @@ export default function ParticipantTables({
                     <TableHead>
                       <TooltipProvider>
                         <Tooltip>
+                          <TooltipTrigger>Sexual Orientation</TooltipTrigger>
+                          <TooltipContent>
+                            <p>Sexual orientation of the participant</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>Religion</TooltipTrigger>
+                          <TooltipContent>
+                            <p>Religion of the participant</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>First Generation</TooltipTrigger>
+                          <TooltipContent>
+                            <p>First generation student status</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
+                    <TableHead>
+                      <TooltipProvider>
+                        <Tooltip>
                           <TooltipTrigger>Ethnic Group</TooltipTrigger>
                           <TooltipContent>
                             <p>Participant's ethnic or cultural group</p>
@@ -422,9 +518,12 @@ export default function ParticipantTables({
                   {communityParticipants.map((participant) => (
                     <TableRow key={participant.$id}>
                       <TableCell>{participant.name}</TableCell>
-                      <TableCell>{participant.sex}</TableCell>
+                      <TableCell>{participant.gender}</TableCell>
                       <TableCell>{participant.age}</TableCell>
                       <TableCell>{participant.address}</TableCell>
+                      <TableCell>{participant.orientation}</TableCell>
+                      <TableCell>{participant.religion}</TableCell>
+                      <TableCell>{participant.firstGen}</TableCell>
                       <TableCell>{participant.ethnicGroup}</TableCell>
                       {!isFinalized && (
                         <TableCell>

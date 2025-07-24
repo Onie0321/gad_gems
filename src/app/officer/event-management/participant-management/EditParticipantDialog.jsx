@@ -44,7 +44,7 @@ import {
 import {
   databases,
   databaseId,
-  studentsCollectionId,
+  studentCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
 } from "@/lib/appwrite";
@@ -128,7 +128,7 @@ export default function EditParticipantDialog({
       let collectionId;
       switch (participantType) {
         case "student":
-          collectionId = studentsCollectionId;
+          collectionId = studentCollectionId;
           console.log("Selected student collection:", collectionId);
           break;
         case "staff":

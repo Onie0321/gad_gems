@@ -17,6 +17,8 @@ export default function AuthCallback() {
   const { toast } = useToast();
 
   useEffect(() => {
+    let completed = false; // Track if a success path was taken
+
     const checkUser = async () => {
       try {
         const user = await account.get();
@@ -26,7 +28,6 @@ export default function AuthCallback() {
         const userExists = await checkUserInDatabase(user.$id);
 
         if (!userExists) {
-          // If user doesn't exist, create a new document in the users collection
           await createUserInDatabase(user);
           toast({
             title: "Success",
@@ -39,36 +40,56 @@ export default function AuthCallback() {
           });
         }
 
-        // Redirect based on user role
+        // Redirect based on user role and approval status
         const userDoc = await getUserFromDatabase(user.$id);
+        completed = true; // Mark as completed before navigation
+
         if (userDoc) {
-          switch (userDoc.role) {
-            case "admin":
-              router.push("/admin");
-              break;
-            case "user":
-              router.push("/officer");
-              break;
-            default:
-              toast({
-                title: "Error",
-                description: "Unknown user role",
-                variant: "destructive",
-              });
-              router.push("/sign-in");
-              break;
+          if (userDoc.approvalStatus === "approved") {
+            toast({
+              title: "Success",
+              description: "Signed in successfully!",
+            });
+            switch (userDoc.role) {
+              case "admin":
+                router.push("/admin");
+                break;
+              case "user":
+                router.push("/officer");
+                break;
+              default:
+                toast({
+                  title: "Error",
+                  description: "Unknown user role",
+                  variant: "destructive",
+                });
+                router.push("/sign-in");
+                break;
+            }
+          } else {
+            toast({
+              title: "Account Pending Approval",
+              description:
+                "Your account is pending admin approval. Please wait for confirmation before signing in.",
+              variant: "warning",
+            });
+            // Optionally redirect to sign-in or a pending page
+            router.push("/sign-in");
           }
         } else {
           router.push("/sign-in");
         }
       } catch (error) {
-        console.error("Authentication error:", error);
-        toast({
-          title: "Error",
-          description: "Authentication failed. Please try again.",
-          variant: "destructive",
-        });
-        router.push("/sign-in");
+        if (!completed) {
+          // Only show error if not already successful
+          console.error("Authentication error:", error);
+          toast({
+            title: "Error",
+            description: "Authentication failed. Please try again.",
+            variant: "destructive",
+          });
+          router.push("/sign-in");
+        }
       }
     };
 
@@ -92,6 +113,22 @@ export default function AuthCallback() {
   };
 
   const createUserInDatabase = async (user) => {
+    // Check if the document already exists before creating
+    try {
+      await databases.getDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
+        process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID,
+        user.$id
+      );
+      // If no error, document exists, do nothing
+      return;
+    } catch (error) {
+      if (error.code !== 404) {
+        // If error is not 'not found', rethrow
+        throw error;
+      }
+      // If 404, proceed to create
+    }
     try {
       await databases.createDocument(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
@@ -106,6 +143,8 @@ export default function AuthCallback() {
         }
       );
     } catch (error) {
+      // If error is 409 (already exists), ignore it
+      if (error.code === 409) return;
       console.error("Error creating user in database:", error);
       throw error;
     }

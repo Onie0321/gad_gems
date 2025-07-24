@@ -17,18 +17,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import EditParticipantDialog from "./EditParticipantDialog";
 import AddParticipant from "../AddParticipantDialog";
 import {
   databases,
   databaseId,
-  studentsCollectionId,
+  studentCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { Loader2 } from "lucide-react";
+import { Edit } from "lucide-react";
+import { DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const EmptyState = ({ message }) => (
   <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -66,7 +69,7 @@ const ViewParticipants = ({
         // Remove the participantType filter since it might not be set for created events
         const [studentsResponse, staffResponse, communityResponse] =
           await Promise.all([
-            databases.listDocuments(databaseId, studentsCollectionId, [
+            databases.listDocuments(databaseId, studentCollectionId, [
               Query.equal("eventId", selectedEvent.$id),
               Query.equal("isArchived", false), // Add this if needed
             ]),
@@ -128,81 +131,80 @@ const ViewParticipants = ({
     };
   }, [eventParticipants, staffFacultyParticipants, communityParticipants]);
 
+  const handleEditParticipant = (participant) => {
+    // Implement the logic to edit the participant
+    console.log("Editing participant:", participant);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            Participants for {selectedEvent?.eventName || "Event"}
-          </DialogTitle>
+          <DialogTitle>View Participants</DialogTitle>
           <DialogDescription>
-            View and manage participants for this event
+            View and manage participants for {selectedEvent?.eventName}
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
-          <div className="flex items-center justify-center p-4">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-purple-700">
-                    {summary.total}
-                  </div>
-                  <div className="text-sm text-purple-600">
-                    Total Participants
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {summary.maleCount}
-                  </div>
-                  <div className="text-sm text-blue-600">Male Participants</div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-pink-50 to-pink-100 border-pink-200">
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-pink-700">
-                    {summary.femaleCount}
-                  </div>
-                  <div className="text-sm text-pink-600">
-                    Female Participants
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+        <div className="space-y-6">
+          {/* Event Details Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Event Name</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedEvent?.eventName}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Date</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedEvent?.date
+                      ? new Date(selectedEvent.date).toLocaleDateString()
+                      : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Venue</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedEvent?.venue || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Status</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedEvent?.status || "N/A"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Participant List</h3>
-              <AddParticipant
-                onAddParticipant={onAddParticipant}
-                eventId={selectedEvent?.$id}
-                isEventSelected={!!selectedEvent}
-                currentEvent={selectedEvent}
-              />
-            </div>
+          {/* Participant Tabs */}
+          <Tabs defaultValue="students" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="students">
+                Students ({eventParticipants.length})
+              </TabsTrigger>
+              <TabsTrigger value="staff">
+                Staff/Faculty ({staffFacultyParticipants.length})
+              </TabsTrigger>
+              <TabsTrigger value="community">
+                Community ({communityParticipants.length})
+              </TabsTrigger>
+            </TabsList>
 
-            <Tabs defaultValue="students" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="students">
-                  Students ({eventParticipants.length})
-                </TabsTrigger>
-                <TabsTrigger value="staff">
-                  Staff/Faculty ({staffFacultyParticipants.length})
-                </TabsTrigger>
-                <TabsTrigger value="community">
-                  Community ({communityParticipants.length})
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="students">
-                <div className="max-h-[330px] overflow-y-auto">
-                  {eventParticipants.length > 0 ? (
+            <TabsContent value="students" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Student Participants</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -214,7 +216,10 @@ const ViewParticipants = ({
                           <TableHead>Year</TableHead>
                           <TableHead>Section</TableHead>
                           <TableHead>Ethnic Group</TableHead>
-                          <TableHead>Actions</TableHead>
+                          <TableHead>Sexual Orientation</TableHead>
+                          <TableHead>Religion</TableHead>
+                          <TableHead>First Generation</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -227,26 +232,41 @@ const ViewParticipants = ({
                             <TableCell>{participant.school}</TableCell>
                             <TableCell>{participant.year}</TableCell>
                             <TableCell>{participant.section}</TableCell>
-                            <TableCell>{participant.ethnicGroup}</TableCell>
                             <TableCell>
-                              <EditParticipantDialog
-                                participant={participant}
-                                onUpdateParticipant={onAddParticipant}
-                              />
+                              {participant.ethnicGroup === "Other"
+                                ? participant.otherEthnicGroup
+                                : participant.ethnicGroup}
+                            </TableCell>
+                            <TableCell>{participant.orientation}</TableCell>
+                            <TableCell>{participant.religion}</TableCell>
+                            <TableCell>{participant.firstGen}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  handleEditParticipant(participant)
+                                }
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  ) : (
-                    <EmptyState message="No student participants found" />
-                  )}
-                </div>
-              </TabsContent>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              <TabsContent value="staff">
-                <div className="max-h-[330px] overflow-y-auto">
-                  {staffFacultyParticipants.length > 0 ? (
+            <TabsContent value="staff" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Staff/Faculty Participants</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -254,9 +274,11 @@ const ViewParticipants = ({
                           <TableHead>Name</TableHead>
                           <TableHead>Sex</TableHead>
                           <TableHead>Age</TableHead>
-                          <TableHead>Address</TableHead>
                           <TableHead>Ethnic Group</TableHead>
-                          <TableHead>Actions</TableHead>
+                          <TableHead>Sexual Orientation</TableHead>
+                          <TableHead>Religion</TableHead>
+                          <TableHead>First Generation</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -266,27 +288,41 @@ const ViewParticipants = ({
                             <TableCell>{participant.name}</TableCell>
                             <TableCell>{participant.sex}</TableCell>
                             <TableCell>{participant.age}</TableCell>
-                            <TableCell>{participant.address}</TableCell>
-                            <TableCell>{participant.ethnicGroup}</TableCell>
                             <TableCell>
-                              <EditParticipantDialog
-                                participant={participant}
-                                onUpdateParticipant={onAddParticipant}
-                              />
+                              {participant.ethnicGroup === "Other"
+                                ? participant.otherEthnicGroup
+                                : participant.ethnicGroup}
+                            </TableCell>
+                            <TableCell>{participant.orientation}</TableCell>
+                            <TableCell>{participant.religion}</TableCell>
+                            <TableCell>{participant.firstGen}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  handleEditParticipant(participant)
+                                }
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  ) : (
-                    <EmptyState message="No staff/faculty participants found" />
-                  )}
-                </div>
-              </TabsContent>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              <TabsContent value="community">
-                <div className="max-h-[330px] overflow-y-auto">
-                  {communityParticipants.length > 0 ? (
+            <TabsContent value="community" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Community Participants</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -295,7 +331,10 @@ const ViewParticipants = ({
                           <TableHead>Age</TableHead>
                           <TableHead>Address</TableHead>
                           <TableHead>Ethnic Group</TableHead>
-                          <TableHead>Actions</TableHead>
+                          <TableHead>Sexual Orientation</TableHead>
+                          <TableHead>Religion</TableHead>
+                          <TableHead>First Generation</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -305,25 +344,41 @@ const ViewParticipants = ({
                             <TableCell>{participant.sex}</TableCell>
                             <TableCell>{participant.age}</TableCell>
                             <TableCell>{participant.address}</TableCell>
-                            <TableCell>{participant.ethnicGroup}</TableCell>
                             <TableCell>
-                              <EditParticipantDialog
-                                participant={participant}
-                                onUpdateParticipant={onAddParticipant}
-                              />
+                              {participant.ethnicGroup === "Other"
+                                ? participant.otherEthnicGroup
+                                : participant.ethnicGroup}
+                            </TableCell>
+                            <TableCell>{participant.orientation}</TableCell>
+                            <TableCell>{participant.religion}</TableCell>
+                            <TableCell>{participant.firstGen}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  handleEditParticipant(participant)
+                                }
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  ) : (
-                    <EmptyState message="No community participants found" />
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

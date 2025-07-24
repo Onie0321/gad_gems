@@ -1,0 +1,208 @@
+[
+  {
+    "row": 3395,
+    "data": {
+      "Student Number": "24-01-1492",
+      "Last Name": "HEMOR",
+      "First Name": "PRINCESS JANE",
+      "Middle Name": "PEÑAREDONDO",
+      "Program": "BIT-FT",
+      "Year Level": 1,
+      "Age": 19,
+      "Gender": "FEMALE",
+      "Religion": "Roman Catholic",
+      "Residential Address": "Brgy.Dibacong, Casiguran, Aurora Dibacong, CASIGURAN, Aurora",
+      "Indigenous People": 7,
+      "First Generation Student": "No"
+    }
+  },
+  {
+    "row": 6225,
+    "data": {
+      "Student Number": "23-01-0015",
+      "Last Name": "ROXAS",
+      "First Name": "KHRIZZY MAE",
+      "Middle Name": "NAKPIL",
+      "Program": "BSIT",
+      "Year Level": 2,
+      "Age": 19,
+      "Gender": "FEMALE",
+      "Religion": "Roman Catholic",
+      "Residential Address": "Casiguran, Aurora",
+      "Indigenous People": 6,
+      "First Generation Student": "Yes"
+    }
+  },
+  {
+    "row": 4851,
+    "data": {
+      "Student Number": "21-01-0884",
+      "Last Name": "MUÑOZ",
+      "First Name": "DONNALIZA",
+      "Middle Name": "PETLONGAY",
+      "Program": "BSTM",
+      "Year Level": 4,
+      "Age": 22,
+      "Gender": "FEMALE",
+      "Religion": "Roman Catholic",
+      "Residential Address": "Brgy. Abuleg, Dinalungan, Aurora . ABULEG, DINALUNGAN, Aurora",
+      "Indigenous People": "NA"
+    }
+  },
+  {
+    "row": 4852,
+    "data": {
+      "Student Number": "23-01-1710",
+      "Last Name": "MURILLO",
+      "First Name": "CARLA MAE",
+      "Middle Name": "RITUAL",
+      "Program": "BSIT",
+      "Year Level": 2,
+      "Age": 20,
+      "Gender": "FEMALE",
+      "Religion": "Iglesia Ni Cristo",
+      "Residential Address": "Brgy. Balaring, Gen. Mamerto Natividad, Nueva Ecija APLAYA, DINGALAN, Aurora",
+      "Indigenous People": "Na",
+      "First Generation Student": "Yes"
+    }
+  },
+  {
+    "row": 4853,
+    "data": {
+      "Student Number": "24-01-0582",
+      "Last Name": "MUTALA",
+      "First Name": "JAMILLAH",
+      "Middle Name": "ALONZO",
+      "Program": "BSHM",
+      "Year Level": 1,
+      "Age": 20,
+      "Gender": "FEMALE",
+      "Sexual Orientation": "Straight",
+      "Religion": "Islam",
+      "Residential Address": "Brgy. Dianawan, Maria Aurora, Aurora  DIANAWAN, MARIA AURORA, Aurora",
+      "Indigenous People": "Maranao/ALta",
+      "First Generation Student": "Yes"
+    }
+  },
+  {
+    "row": 4854,
+    "data": {
+      "Student Number": "24-01-1593",
+      "Last Name": "NAAG",
+      "First Name": "JOHN RENZ",
+      "Middle Name": "TIBLE",
+      "Program": "BSEE",
+      "Year Level": 1,
+      "Age": 19,
+      "Gender": "MALE",
+      "Religion": "Iglesia Ni Cristo",
+      "Residential Address": "Calabuanan, Baler, Aurora CALABUANAN, BALER, Aurora",
+      "Indigenous People": "NONE",
+      "First Generation Student": "No"
+    }
+  },
+  {
+    "row": 4855,
+    "data": {
+      "Student Number": "21-01-0847",
+      "Last Name": "NABOR",
+      "First Name": "APRIL",
+      "Middle Name": "DACQUEL",
+      "Program": "BSHM",
+      "Year Level": 4,
+      "Age": 22,
+      "Gender": "FEMALE",
+      "Sexual Orientation": "Straight",
+      "Religion": "Roman Catholic",
+      "Residential Address": "Brgy. Nonong San Luis, Aurora",
+      "Indigenous People": "NONE",
+      "First Generation Student": "No"
+    }
+  },
+  {
+    "row": 4856,
+    "data": {
+      "Student Number": "23-01-1153",
+      "Last Name": "NABOR",
+      "First Name": "HAROLD",
+      "Middle Name": "GULENG",
+      "Program": "BIT-AET",
+      "Year Level": 2,
+      "Age": 20,
+      "Gender": "MALE",
+      "Religion": "Roman Catholic",
+      "Residential Address": "Brgy. Alcala, Maria Aurora, Aurora ALCALA, MARIA AURORA, Aurora",
+      "Indigenous People": "Na"
+    }
+  },
+  {
+    "row": 4857,
+    "data": {
+      "Student Number": "21-01-0846",
+      "Last Name": "NABOR",
+      "First Name": "NICOLE",
+      "Middle Name": "DACQUEL",
+      "Program": "BSHM",
+      "Year Level": 4,
+      "Age": 22,
+      "Gender": "FEMALE",
+      "Sexual Orientation": "Straight",
+      "Religion": "Roman Catholic",
+      "Residential Address": "Brgy. Nonong San Luis, Aurora",
+      "Indigenous People": "NA",
+      "First Generation Student": "Yes"
+    }
+  },
+  {
+    "row": 4858,
+    "data": {
+      "Student Number": "H-17-01-0457",
+      "Last Name": "NABUTEL",
+      "First Name": "NOLI",
+      "Middle Name": "AMORES",
+      "Program": "BSME2018",
+      "Year Level": 4,
+      "Age": 25,
+      "Gender": "MALE",
+      "Sexual Orientation": "Straight",
+      "Religion": "Methodist",
+      "Residential Address": "Brgy. Alcala, Maria Aurora, Aurora",
+      "Indigenous People": "BAGO - Igorot",
+      "First Generation Student": "Yes"
+    }
+  },
+  {
+    "row": 4859,
+    "data": {
+      "Student Number": "21-01-0821",
+      "Last Name": "NACAWILI",
+      "First Name": "KRISTINE JOY",
+      "Middle Name": "CASTILLO",
+      "Program": "BSF",
+      "Year Level": 4,
+      "Age": 22,
+      "Gender": "FEMALE",
+      "Religion": "Roman Catholic",
+      "Residential Address": "Brgy. Dinadiawan, Dipaculao, Aurora",
+      "Indigenous People": "NA",
+      "First Generation Student": "Yes"
+    }
+  },
+  {
+    "row": 4860,
+    "data": {
+      "Student Number": "20-01-0883",
+      "Last Name": "NACINO",
+      "First Name": "AUSTIN JOHN ANGELO",
+      "Middle Name": "DALAYWAN",
+      "Program": "BSIT-DD",
+      "Year Level": 4,
+      "Age": 23,
+      "Gender": "MALE",
+      "Religion": "Roman Catholic",
+      "Residential Address": "Brgy. 02, Maria Aurora, Aurora Barangay Ii (poblacion) Maria Aurora Aurora",
+      "Indigenous People": "No Answer",
+      "First Generation Student": "Yes"
+    }
+  }
+]

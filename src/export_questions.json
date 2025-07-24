@@ -1,0 +1,66 @@
+[
+  {
+    "questionType": "Multiple Choice",
+    "questionText": "What is your sex",
+    "choices": "male, female",
+    "answer": "",
+    "$id": "67531c330002d1a79d22",
+    "$createdAt": "2024-12-06T15:45:56.807+00:00",
+    "$updatedAt": "2024-12-06T15:45:56.807+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67523fc1001a25c548a3"
+  },
+  {
+    "questionType": "Identification",
+    "questionText": "what is my name?",
+    "choices": "",
+    "answer": "",
+    "$id": "675322aa001bd1dae0b7",
+    "$createdAt": "2024-12-06T16:13:35.854+00:00",
+    "$updatedAt": "2024-12-06T16:13:35.854+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67523fc1001a25c548a3"
+  },
+  {
+    "questionType": "Fill in the Blanks",
+    "questionText": "I am ________ right now.",
+    "choices": "",
+    "answer": "",
+    "$id": "67532965003c8b292d30",
+    "$createdAt": "2024-12-06T16:42:15.757+00:00",
+    "$updatedAt": "2024-12-06T16:42:15.757+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67523fc1001a25c548a3"
+  },
+  {
+    "questionType": "Multiple Choice",
+    "questionText": "what is answers?",
+    "choices": "a, b, c, d",
+    "answer": "",
+    "$id": "675330f9001dcce06c4f",
+    "$createdAt": "2024-12-06T17:14:35.580+00:00",
+    "$updatedAt": "2024-12-06T17:14:35.580+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67523fc1001a25c548a3"
+  }
+]

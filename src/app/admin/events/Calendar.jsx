@@ -1,11 +1,11 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Calendar, momentLocalizer } from 'react-big-calendar'
-import moment from 'moment-timezone'
-import "react-big-calendar/lib/css/react-big-calendar.css"
-import { styled } from "@mui/system"
-import { ThemeProvider, createTheme } from '@mui/material/styles'
+import { useState, useEffect } from "react";
+import { Calendar, momentLocalizer } from "react-big-calendar";
+import moment from "moment-timezone";
+import "react-big-calendar/lib/css/react-big-calendar.css";
+import { styled } from "@mui/system";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
 import {
   Dialog,
   DialogTitle,
@@ -17,10 +17,12 @@ import {
   CssBaseline,
   Snackbar,
   Alert,
-} from '@mui/material'
-import { getEvents, editEvent, createEvent, deleteEvent, subscribeToRealTimeUpdates, eventCollectionId } from '@/lib/appwrite'
+  IconButton,
+} from "@mui/material";
+import { getEvents, editEvent, createEvent, deleteEvent } from "@/lib/appwrite";
+import { Refresh } from "@mui/icons-material";
 
-const localizer = momentLocalizer(moment)
+const localizer = momentLocalizer(moment);
 
 // Styled components for calendar
 const StyledCalendarWrapper = styled("div")(({ theme }) => ({
@@ -42,7 +44,7 @@ const StyledCalendarWrapper = styled("div")(({ theme }) => ({
     borderRadius: theme.shape.borderRadius,
     boxShadow: theme.shadows[2],
   },
-}))
+}));
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
   "& .MuiDialogTitle-root": {
@@ -52,148 +54,174 @@ const StyledDialog = styled(Dialog)(({ theme }) => ({
   "& .MuiDialogContent-root": {
     padding: theme.spacing(3),
   },
-}))
+}));
 
 export function EventCalendar() {
-  const [events, setEvents] = useState([])
-  const [selectedEvent, setSelectedEvent] = useState(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState({
     open: false,
     message: "",
-    severity: "info"
-  })
-  const [currentView, setCurrentView] = useState('month')
-  const [currentDate, setCurrentDate] = useState(new Date())
+    severity: "info",
+  });
+  const [currentView, setCurrentView] = useState("month");
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Create theme
   const theme = createTheme({
     palette: {
-      mode: 'light',
+      mode: "light",
       primary: {
-        main: '#90caf9',
+        main: "#90caf9",
       },
       secondary: {
-        main: '#f48fb1',
+        main: "#f48fb1",
       },
     },
-  })
+  });
 
   useEffect(() => {
-    fetchEvents()
-    const unsubscribe = subscribeToRealTimeUpdates(eventCollectionId, fetchEvents)
-    return () => unsubscribe()
-  }, [])
+    fetchEvents();
+  }, []);
 
   const fetchEvents = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const fetchedEvents = await getEvents()
-      const formattedEvents = fetchedEvents.map(event => ({
+      const fetchedEvents = await getEvents();
+      const formattedEvents = fetchedEvents.map((event) => ({
         id: event.$id,
         title: `${event.eventName} - ${event.eventVenue}`,
-        start: new Date(event.eventDate + 'T' + event.eventTimeFrom),
-        end: new Date(event.eventDate + 'T' + event.eventTimeTo),
+        start: new Date(event.eventDate + "T" + event.eventTimeFrom),
+        end: new Date(event.eventDate + "T" + event.eventTimeTo),
         venue: event.eventVenue,
         eventName: event.eventName,
         category: event.eventType,
-        description: event.eventDescription || '',
-      }))
-      setEvents(formattedEvents)
-      showNotification("Events loaded successfully", "success")
+        description: event.eventDescription || "",
+      }));
+      setEvents(formattedEvents);
+      showNotification("Events loaded successfully", "success");
     } catch (error) {
-      console.error('Error fetching events:', error)
-      showNotification("Failed to load events", "error")
+      console.error("Error fetching events:", error);
+      showNotification("Failed to load events", "error");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleEventClick = (event) => {
-    setSelectedEvent(event)
-    setIsDialogOpen(true)
-  }
+    setSelectedEvent(event);
+    setIsDialogOpen(true);
+  };
 
   const handleEventDrop = async (info) => {
     try {
       await editEvent(info.event.id, {
-        eventDate: info.event.start.toISOString().split('T')[0],
-        eventTimeFrom: info.event.start.toTimeString().split(' ')[0],
-        eventTimeTo: info.event.end.toTimeString().split(' ')[0],
-      })
-      showNotification("Event updated successfully", "success")
-      fetchEvents()
+        eventDate: info.event.start.toISOString().split("T")[0],
+        eventTimeFrom: info.event.start.toTimeString().split(" ")[0],
+        eventTimeTo: info.event.end.toTimeString().split(" ")[0],
+      });
+      showNotification("Event updated successfully", "success");
+      fetchEvents();
     } catch (error) {
-      console.error('Error updating event:', error)
-      showNotification("Failed to update event", "error")
-      info.revert()
+      console.error("Error updating event:", error);
+      showNotification("Failed to update event", "error");
+      info.revert();
     }
-  }
+  };
 
   const handleDateSelect = async (selectInfo) => {
-    const title = prompt('Please enter a title for your event')
+    const title = prompt("Please enter a title for your event");
     if (title) {
       try {
         await createEvent({
           eventName: title,
-          eventDate: selectInfo.start.toISOString().split('T')[0],
-          eventTimeFrom: selectInfo.start.toTimeString().split(' ')[0],
-          eventTimeTo: selectInfo.end.toTimeString().split(' ')[0],
-          eventVenue: prompt('Please enter the venue') || 'TBD',
-          eventType: prompt('Please enter the category') || 'default'
-        })
-        showNotification("Event created successfully", "success")
-        fetchEvents()
+          eventDate: selectInfo.start.toISOString().split("T")[0],
+          eventTimeFrom: selectInfo.start.toTimeString().split(" ")[0],
+          eventTimeTo: selectInfo.end.toTimeString().split(" ")[0],
+          eventVenue: prompt("Please enter the venue") || "TBD",
+          eventType: prompt("Please enter the category") || "default",
+        });
+        showNotification("Event created successfully", "success");
+        fetchEvents();
       } catch (error) {
-        console.error('Error creating event:', error)
-        showNotification("Failed to create event", "error")
+        console.error("Error creating event:", error);
+        showNotification("Failed to create event", "error");
       }
     }
-  }
+  };
 
   const handleEventDelete = async () => {
     if (selectedEvent) {
       try {
-        await deleteEvent(selectedEvent.id)
-        setIsDialogOpen(false)
-        showNotification("Event deleted successfully", "success")
-        fetchEvents()
+        await deleteEvent(selectedEvent.id);
+        setIsDialogOpen(false);
+        showNotification("Event deleted successfully", "success");
+        fetchEvents();
       } catch (error) {
-        console.error('Error deleting event:', error)
-        showNotification("Failed to delete event", "error")
+        console.error("Error deleting event:", error);
+        showNotification("Failed to delete event", "error");
       }
     }
-  }
+  };
 
   const showNotification = (message, severity = "info") => {
-    setNotification({ open: true, message, severity })
-  }
+    setNotification({ open: true, message, severity });
+  };
 
   const eventStyleGetter = (event) => ({
     style: {
-      backgroundColor: event.category === 'important' ? '#f44336' : '#2196f3',
-      borderRadius: '4px',
+      backgroundColor: event.category === "important" ? "#f44336" : "#2196f3",
+      borderRadius: "4px",
       opacity: 0.8,
-      color: 'white',
-      border: 'none',
-      display: 'block'
-    }
-  })
+      color: "white",
+      border: "none",
+      display: "block",
+    },
+  });
 
   // Custom event component to display event details
   const EventComponent = ({ event }) => (
-    <div style={{ height: '100%', padding: '2px 4px' }}>
+    <div style={{ height: "100%", padding: "2px 4px" }}>
       <strong>{event.eventName}</strong>
       <br />
       <small>{event.venue}</small>
     </div>
-  )
+  );
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchEvents();
+    setIsRefreshing(false);
+  };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <StyledCalendarWrapper>
+        <div className="flex justify-end mb-4">
+          <IconButton
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            sx={{
+              "&.Mui-disabled": {
+                opacity: 0.5,
+              },
+            }}
+          >
+            <Refresh
+              sx={{
+                animation: isRefreshing ? "spin 1s linear infinite" : "none",
+                "@keyframes spin": {
+                  "0%": { transform: "rotate(0deg)" },
+                  "100%": { transform: "rotate(360deg)" },
+                },
+              }}
+            />
+          </IconButton>
+        </div>
         <Calendar
           localizer={localizer}
           events={events}
@@ -209,17 +237,24 @@ export function EventCalendar() {
           onView={setCurrentView}
           date={currentDate}
           onNavigate={setCurrentDate}
-          views={['month', 'week', 'day', 'agenda']}
+          views={["month", "week", "day", "agenda"]}
           components={{
-            event: EventComponent
+            event: EventComponent,
           }}
           formats={{
             eventTimeRangeFormat: ({ start, end }, culture, localizer) =>
-              `${localizer.format(start, 'h:mm a', culture)} - ${localizer.format(end, 'h:mm a', culture)}`,
+              `${localizer.format(
+                start,
+                "h:mm a",
+                culture
+              )} - ${localizer.format(end, "h:mm a", culture)}`,
           }}
         />
 
-        <StyledDialog open={isDialogOpen} onClose={() => setIsDialogOpen(false)}>
+        <StyledDialog
+          open={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+        >
           <DialogTitle>Event Details</DialogTitle>
           <DialogContent>
             {selectedEvent && (
@@ -231,10 +266,13 @@ export function EventCalendar() {
                   <strong>Venue:</strong> {selectedEvent.venue}
                 </Typography>
                 <Typography variant="body1">
-                  <strong>Date:</strong> {moment(selectedEvent.start).format('LL')}
+                  <strong>Date:</strong>{" "}
+                  {moment(selectedEvent.start).format("LL")}
                 </Typography>
                 <Typography variant="body1">
-                  <strong>Time:</strong> {moment(selectedEvent.start).format('LT')} - {moment(selectedEvent.end).format('LT')}
+                  <strong>Time:</strong>{" "}
+                  {moment(selectedEvent.start).format("LT")} -{" "}
+                  {moment(selectedEvent.end).format("LT")}
                 </Typography>
                 {selectedEvent.description && (
                   <Typography variant="body1">
@@ -248,7 +286,11 @@ export function EventCalendar() {
             )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleEventDelete} color="error" variant="contained">
+            <Button
+              onClick={handleEventDelete}
+              color="error"
+              variant="contained"
+            >
               Delete
             </Button>
             <Button onClick={() => setIsDialogOpen(false)} variant="outlined">
@@ -271,6 +313,5 @@ export function EventCalendar() {
         </Snackbar>
       </StyledCalendarWrapper>
     </ThemeProvider>
-  )
+  );
 }
-

@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -36,19 +36,17 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, HelpCircle, Loader2 } from 'lucide-react';
+import { Plus, HelpCircle, Loader2 } from "lucide-react";
 import {
   capitalizeWords,
   formatStudentId,
   schoolOptions,
-  isStudentIdComplete
+  isStudentIdComplete,
 } from "@/utils/participantUtils";
-import {
-  createParticipant,
-} from "@/lib/appwrite";
+import { createParticipant } from "@/lib/appwrite";
 import { toast } from "react-toastify";
-import { debounce } from 'lodash';
-import { databases, databaseId, studentsCollectionId } from "@/lib/appwrite";
+import { debounce } from "lodash";
+import { databases, databaseId, studentCollectionId } from "@/lib/appwrite";
 import { Query } from "appwrite";
 
 const AddParticipant = ({
@@ -113,14 +111,18 @@ const AddParticipant = ({
 
   const handleInputChange = (field, value) => {
     let processedValue = value;
-    
+
     // Special handling for different fields
     switch (field) {
       case "studentId":
         processedValue = formatStudentId(value);
         if (isStudentIdComplete(processedValue)) {
           debouncedCheckDuplicates(processedValue, eventId, setDuplicateErrors);
-          handleAutofill(processedValue, setAutofillData, setShowAutofillDialog);
+          handleAutofill(
+            processedValue,
+            setAutofillData,
+            setShowAutofillDialog
+          );
         }
         break;
       case "staffFacultyId":
@@ -130,7 +132,7 @@ const AddParticipant = ({
         processedValue = capitalizeWords(value);
         break;
       case "age":
-        processedValue = value.replace(/\D/g, '');
+        processedValue = value.replace(/\D/g, "");
         break;
       case "section":
         processedValue = value.toUpperCase();
@@ -139,14 +141,14 @@ const AddParticipant = ({
         break;
     }
 
-    setParticipantData(prev => ({
+    setParticipantData((prev) => ({
       ...prev,
-      [field]: processedValue
+      [field]: processedValue,
     }));
 
     // Clear errors for the field being changed
     if (errors[field]) {
-      setErrors(prev => {
+      setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[field];
         return newErrors;
@@ -167,7 +169,11 @@ const AddParticipant = ({
     if (!participantData.sex) {
       newErrors.sex = "Sex is required";
     }
-    if (!participantData.age || participantData.age < 1 || participantData.age > 125) {
+    if (
+      !participantData.age ||
+      participantData.age < 1 ||
+      participantData.age > 125
+    ) {
       newErrors.age = "Age must be between 1 and 125";
     }
     if (!participantData.address) {
@@ -176,7 +182,10 @@ const AddParticipant = ({
     if (!participantData.ethnicGroup) {
       newErrors.ethnicGroup = "Ethnic group is required";
     }
-    if (participantData.ethnicGroup === "Other" && !participantData.otherEthnicGroup) {
+    if (
+      participantData.ethnicGroup === "Other" &&
+      !participantData.otherEthnicGroup
+    ) {
       newErrors.otherEthnicGroup = "Please specify the ethnic group";
     }
 
@@ -219,10 +228,33 @@ const AddParticipant = ({
     try {
       // Check for duplicates based on participant type
       let isDuplicate = false;
-      if (participantData.participantType === "student" && participantData.studentId) {
-        isDuplicate = await checkDuplicateParticipant(eventId, participantData.studentId);
-      } else if (participantData.participantType === "staff" && participantData.staffFacultyId) {
-        isDuplicate = await checkDuplicateParticipant(eventId, participantData.staffFacultyId);
+      if (
+        participantData.participantType === "student" &&
+        participantData.studentId
+      ) {
+        isDuplicate = await checkDuplicateParticipant(
+          eventId,
+          participantData.studentId,
+          "student"
+        );
+      } else if (
+        participantData.participantType === "staff" &&
+        participantData.staffFacultyId
+      ) {
+        isDuplicate = await checkDuplicateParticipant(
+          eventId,
+          participantData.staffFacultyId,
+          "staff"
+        );
+      } else if (
+        participantData.participantType === "community" &&
+        participantData.name
+      ) {
+        isDuplicate = await checkDuplicateParticipant(
+          eventId,
+          participantData.name,
+          "community"
+        );
       }
 
       if (isDuplicate) {
@@ -234,13 +266,14 @@ const AddParticipant = ({
       const participantToAdd = {
         ...participantData,
         eventId,
-        ethnicGroup: participantData.ethnicGroup === "Other" 
-          ? participantData.otherEthnicGroup 
-          : participantData.ethnicGroup
+        ethnicGroup:
+          participantData.ethnicGroup === "Other"
+            ? participantData.otherEthnicGroup
+            : participantData.ethnicGroup,
       };
 
       const response = await createParticipant(participantToAdd);
-      
+
       if (response) {
         onAddParticipant(response);
         toast.success("Participant added successfully");
@@ -334,7 +367,9 @@ const AddParticipant = ({
               <Input
                 id="staffFacultyId"
                 value={participantData.staffFacultyId}
-                onChange={(e) => handleInputChange("staffFacultyId", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("staffFacultyId", e.target.value)
+                }
                 className="col-span-3"
                 placeholder="Enter staff/faculty ID"
               />
@@ -348,7 +383,9 @@ const AddParticipant = ({
             <Input
               id="name"
               value={participantData.name}
-              onChange={(e) => handleInputChange("name", capitalizeWords(e.target.value))}
+              onChange={(e) =>
+                handleInputChange("name", capitalizeWords(e.target.value))
+              }
               className="col-span-3"
               placeholder="Enter full name"
             />
@@ -404,9 +441,15 @@ const AddParticipant = ({
                     <SelectValue placeholder="Select school" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="School of Engineering">School of Engineering</SelectItem>
-                    <SelectItem value="School of Architecture">School of Architecture</SelectItem>
-                    <SelectItem value="School of Computing">School of Computing</SelectItem>
+                    <SelectItem value="School of Engineering">
+                      School of Engineering
+                    </SelectItem>
+                    <SelectItem value="School of Architecture">
+                      School of Architecture
+                    </SelectItem>
+                    <SelectItem value="School of Computing">
+                      School of Computing
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -472,7 +515,8 @@ const AddParticipant = ({
                 setParticipantData({
                   ...participantData,
                   ethnicGroup: value,
-                  otherEthnicGroup: value === "Other" ? "" : participantData.otherEthnicGroup,
+                  otherEthnicGroup:
+                    value === "Other" ? "" : participantData.otherEthnicGroup,
                 })
               }
             >
@@ -498,7 +542,9 @@ const AddParticipant = ({
               <Input
                 id="otherEthnicGroup"
                 value={participantData.otherEthnicGroup}
-                onChange={(e) => handleInputChange("otherEthnicGroup", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("otherEthnicGroup", e.target.value)
+                }
                 className="col-span-3"
                 placeholder="Specify ethnic group"
               />
@@ -507,7 +553,10 @@ const AddParticipant = ({
         </div>
 
         <DialogFooter>
-          <Button onClick={handleAddParticipant} disabled={loading || !isEventSelected}>
+          <Button
+            onClick={handleAddParticipant}
+            disabled={loading || !isEventSelected}
+          >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -520,7 +569,10 @@ const AddParticipant = ({
         </DialogFooter>
       </DialogContent>
 
-      <AlertDialog open={showAutofillDialog} onOpenChange={setShowAutofillDialog}>
+      <AlertDialog
+        open={showAutofillDialog}
+        onOpenChange={setShowAutofillDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Autofill Participant Data</AlertDialogTitle>
@@ -544,4 +596,3 @@ const AddParticipant = ({
 };
 
 export default AddParticipant;
-

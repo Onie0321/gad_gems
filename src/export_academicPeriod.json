@@ -1,0 +1,82 @@
+[
+  {
+    "startDate": "2025-01-12T16:00:00.000Z",
+    "endDate": "2025-06-05T16:00:00.000Z",
+    "schoolYear": "2024-2025",
+    "periodType": "Second Semester",
+    "isActive": false,
+    "archivedAt": "2025-01-30T16:06:06.997Z",
+    "createdAt": "2025-01-22T16:52:11.995Z",
+    "createdBy": null,
+    "$id": "6791223c8a4f9e0ba595",
+    "$createdAt": "2025-01-22T16:52:12.572+00:00",
+    "$updatedAt": "2025-01-30T16:06:07.550+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67874371002ba61cd762"
+  },
+  {
+    "startDate": "2025-08-24T16:00:00.000Z",
+    "endDate": "2026-01-15T16:00:00.000Z",
+    "schoolYear": "2025-2026",
+    "periodType": "First Semester",
+    "isActive": false,
+    "archivedAt": "2025-01-30T16:10:07.331Z",
+    "createdAt": "2025-01-30T16:06:07.948Z",
+    "createdBy": null,
+    "$id": "679ba37038667f938ebf",
+    "$createdAt": "2025-01-30T16:06:08.233+00:00",
+    "$updatedAt": "2025-01-30T16:10:07.867+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67874371002ba61cd762"
+  },
+  {
+    "startDate": "2025-01-12T16:00:00.000Z",
+    "endDate": "2025-06-05T16:00:00.000Z",
+    "schoolYear": "2025-2026",
+    "periodType": "Second Semester",
+    "isActive": false,
+    "archivedAt": "2025-01-30T16:20:17.079Z",
+    "createdAt": "2025-01-30T16:10:08.257Z",
+    "createdBy": null,
+    "$id": "679ba46082ccef0b70c3",
+    "$createdAt": "2025-01-30T16:10:08.538+00:00",
+    "$updatedAt": "2025-01-30T16:20:18.183+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67874371002ba61cd762"
+  },
+  {
+    "startDate": "2026-08-16T16:00:00.000Z",
+    "endDate": "2026-12-17T16:00:00.000Z",
+    "schoolYear": "2026-2027",
+    "periodType": "First Semester",
+    "isActive": true,
+    "archivedAt": null,
+    "createdAt": "2025-01-30T16:20:18.588Z",
+    "createdBy": null,
+    "$id": "679ba6c2dff117d41a86",
+    "$createdAt": "2025-01-30T16:20:18.921+00:00",
+    "$updatedAt": "2025-01-30T16:20:18.921+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67874371002ba61cd762"
+  }
+]

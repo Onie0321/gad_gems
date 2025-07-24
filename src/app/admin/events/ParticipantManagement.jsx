@@ -69,6 +69,7 @@ import EditParticipantDialog from "./EditParticipantDialog";
 import DeleteParticipantDialog from "./DeleteParticipantLog";
 import { debounce } from "lodash";
 import ViewParticipants from "@/app/officer/event-management/event-participant-log/view-participant-dialog/page";
+import EthnicitySelect from "@/components/shared/EthnicitySelect";
 
 export default function ParticipantManagement({
   events,
@@ -596,9 +597,9 @@ export default function ParticipantManagement({
             </div>
             <div className="space-y-2">
               <Label htmlFor="ethnicGroup">Ethnic Group</Label>
-              <Select
-                value={participantData.ethnicGroup} // Ensure this value comes from participantData
-                onValueChange={(value) =>
+              <EthnicitySelect
+                value={participantData.ethnicGroup}
+                onChange={(value) =>
                   setParticipantData({
                     ...participantData,
                     ethnicGroup: value,
@@ -606,20 +607,9 @@ export default function ParticipantManagement({
                       value === "Other" ? "" : participantData.otherEthnicGroup,
                   })
                 }
+                className="w-full"
                 disabled={!isEventSelected}
-              >
-                <SelectTrigger id="ethnicGroup">
-                  <SelectValue placeholder="Select ethnic group" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Tagalog">Tagalog</SelectItem>
-                  <SelectItem value="Cebuano">Cebuano</SelectItem>
-                  <SelectItem value="Ilocano">Ilocano</SelectItem>
-                  <SelectItem value="Bicolano">Bicolano</SelectItem>
-                  <SelectItem value="Waray">Waray</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              />
               {errors.ethnicGroup && (
                 <p className="text-sm text-red-500">{errors.ethnicGroup}</p>
               )}

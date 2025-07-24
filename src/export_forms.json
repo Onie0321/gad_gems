@@ -1,0 +1,56 @@
+[
+  {
+    "fileId": "6758dcbc00216dda58be",
+    "fileName": "(GAD)Gender And Development.csv",
+    "totalParticipants": 5,
+    "totalQuestions": 29,
+    "totalAnswers": 145,
+    "importDate": "2024-12-11T00:28:46.035Z",
+    "$id": "6758dcbe00023a15b111",
+    "$createdAt": "2024-12-11T00:28:46.462+00:00",
+    "$updatedAt": "2024-12-11T00:28:46.462+00:00",
+    "$permissions": [
+      "read(\"user:6757f89ea560b9922304\")",
+      "update(\"user:6757f89ea560b9922304\")",
+      "delete(\"user:6757f89ea560b9922304\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "6758d91d002bd1d3ecad"
+  },
+  {
+    "fileId": "6758e17f003a112383a0",
+    "fileName": "GAD-Survey-on-GAD-Statistics-Responses.xlsx",
+    "totalParticipants": 87,
+    "totalQuestions": 105,
+    "totalAnswers": 9135,
+    "importDate": "December 11, 2024",
+    "$id": "6758e18100286cb2005f",
+    "$createdAt": "2024-12-11T00:49:06.033+00:00",
+    "$updatedAt": "2024-12-11T00:49:06.033+00:00",
+    "$permissions": [
+      "read(\"user:6757f89ea560b9922304\")",
+      "update(\"user:6757f89ea560b9922304\")",
+      "delete(\"user:6757f89ea560b9922304\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "6758d91d002bd1d3ecad"
+  },
+  {
+    "fileId": "6758e7e600152cb59d73",
+    "fileName": "GAD-Survey-on-GAD-Statistics-Responses.xlsx",
+    "totalParticipants": 87,
+    "totalQuestions": 105,
+    "totalAnswers": 9135,
+    "importDate": "December 11, 2024",
+    "$id": "6758e7e8000178093331",
+    "$createdAt": "2024-12-11T01:16:24.867+00:00",
+    "$updatedAt": "2024-12-11T01:16:24.867+00:00",
+    "$permissions": [
+      "read(\"user:6757f89ea560b9922304\")",
+      "update(\"user:6757f89ea560b9922304\")",
+      "delete(\"user:6757f89ea560b9922304\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "6758d91d002bd1d3ecad"
+  }
+]

@@ -15,8 +15,14 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  studentsCollectionId,
+  studentCollectionId,
+  staffFacultyCollectionId,
+  communityCollectionId,
   getCurrentAcademicPeriod,
+  getEvents,
+  getParticipants,
+  getStaffFaculty,
+  getCommunityMembers,
 } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import {
@@ -42,6 +48,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import { useToast } from "@/hooks/use-toast";
 
 // Loading Skeleton Component
 const AnalyticsSkeleton = () => (
@@ -99,6 +106,8 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function EventAnalysis() {
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const [filteredParticipants, setFilteredParticipants] = useState([]);
   const [stats, setStats] = useState({
     totalParticipants: 0,
     averageParticipants: 0,
@@ -109,13 +118,14 @@ export default function EventAnalysis() {
     },
     eventTypes: [],
     participantsByEvent: [],
-    participantsByGender: [],
+    participantsByType: [],
     participantsBySchool: [],
+    participantsByOccupation: [],
   });
   const [currentPeriod, setCurrentPeriod] = useState(null);
   const [filters, setFilters] = useState({
     eventType: "all",
-    school: "all",
+    participantType: "all",
     gender: "all",
     timeRange: "year",
   });
@@ -215,15 +225,22 @@ export default function EventAnalysis() {
   const fetchEventStats = async () => {
     try {
       setLoading(true);
+
       // Get current academic period
       const period = await getCurrentAcademicPeriod();
       if (!period) {
-        throw new Error("No active academic period found");
+        toast({
+          title: "No Active Period",
+          description:
+            "No active academic period found. Please set up an academic period first.",
+          variant: "destructive",
+        });
+        return;
       }
       setCurrentPeriod(period);
 
-      // First fetch all events
-      const eventsResponse = await databases.listDocuments(
+      // Fetch all events for the current period
+      const events = await databases.listDocuments(
         databaseId,
         eventCollectionId,
         [
@@ -233,161 +250,202 @@ export default function EventAnalysis() {
       );
 
       // Get all event IDs
-      const eventIds = eventsResponse.documents.map((event) => event.$id);
+      const eventIds = events.documents.map((event) => event.$id);
 
-      // Fetch all types of participants in parallel
-      const [studentsResponse, staffResponse, communityResponse] =
-        await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("eventId", eventIds),
-          ]),
-          databases.listDocuments(databaseId, staffFacultyCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("eventId", eventIds),
-          ]),
-          databases.listDocuments(databaseId, communityCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("eventId", eventIds),
-          ]),
-        ]);
+      // Fetch all types of participants in parallel with proper queries
+      const [students, staffFaculty, communityMembers] = await Promise.all([
+        databases.listDocuments(databaseId, studentCollectionId, [
+          Query.equal("isArchived", false),
+          Query.equal("eventId", eventIds),
+        ]),
+        databases.listDocuments(databaseId, staffFacultyCollectionId, [
+          Query.equal("isArchived", false),
+          Query.equal("eventId", eventIds),
+        ]),
+        databases.listDocuments(databaseId, communityCollectionId, [
+          Query.equal("isArchived", false),
+          Query.equal("eventId", eventIds),
+        ]),
+      ]);
 
-      // Combine all participants with their types
+      // Combine all participants with their types and additional info
       const allParticipants = [
-        ...studentsResponse.documents.map((p) => ({
+        ...students.documents.map((p) => ({
           ...p,
           participantType: "Student",
+          organization: p.school || "Not Specified",
+          occupation: "Student",
+          eventName:
+            events.documents.find((e) => e.$id === p.eventId)?.eventName ||
+            "Unknown Event",
         })),
-        ...staffResponse.documents.map((p) => ({
+        ...staffFaculty.documents.map((p) => ({
           ...p,
           participantType: "Staff/Faculty",
+          organization: p.department || "Not Specified",
+          occupation: p.position || "Staff/Faculty",
+          eventName:
+            events.documents.find((e) => e.$id === p.eventId)?.eventName ||
+            "Unknown Event",
         })),
-        ...communityResponse.documents.map((p) => ({
+        ...communityMembers.documents.map((p) => ({
           ...p,
           participantType: "Community Member",
+          organization: p.organization || "Not Specified",
+          occupation: p.occupation || "Not Specified",
+          eventName:
+            events.documents.find((e) => e.$id === p.eventId)?.eventName ||
+            "Unknown Event",
         })),
-      ];
+      ].filter((p) => eventIds.includes(p.eventId));
 
-      // Map events with their participants
-      const events = eventsResponse.documents.map((event) => ({
-        ...event,
-        participants: allParticipants.filter((p) => p.eventId === event.$id),
-      }));
+      // Apply filters if any
+      let filtered = allParticipants;
+      if (filters.participantType !== "all") {
+        filtered = filtered.filter(
+          (p) =>
+            p.participantType.toLowerCase() ===
+            filters.participantType.toLowerCase()
+        );
+      }
+      if (filters.gender !== "all") {
+        filtered = filtered.filter(
+          (p) => p.sex?.toLowerCase() === filters.gender.toLowerCase()
+        );
+      }
 
-      // Calculate gender counts across all participants
-      const genderStats = allParticipants.reduce(
+      // Set filtered participants state
+      setFilteredParticipants(filtered);
+
+      // Calculate gender stats
+      const genderStats = filtered.reduce(
         (acc, participant) => {
-          const gender = participant.sex.toLowerCase();
+          const gender = participant.sex?.toLowerCase() || "not specified";
           acc[gender] = (acc[gender] || 0) + 1;
           return acc;
         },
         { male: 0, female: 0 }
       );
 
-      // Calculate basic stats
-      const totalEvents = events.length;
-      const totalParticipants = allParticipants.length;
-      const averageParticipants =
-        totalEvents > 0 ? (totalParticipants / totalEvents).toFixed(1) : 0;
-
-      // Process participants by event with detailed breakdown
-      const participantsByEvent = events.map((event) => {
-        const eventParticipants = event.participants || [];
-        const breakdown = {
-          name: event.eventName,
-          date: event.eventDate,
-          total: eventParticipants.length,
-          male: eventParticipants.filter((p) => p.sex?.toLowerCase() === "male")
-            .length,
-          female: eventParticipants.filter(
-            (p) => p.sex?.toLowerCase() === "female"
-          ).length,
-          students: eventParticipants.filter(
-            (p) => p.participantType === "Student"
-          ).length,
-          staffFaculty: eventParticipants.filter(
-            (p) => p.participantType === "Staff/Faculty"
-          ).length,
-          community: eventParticipants.filter(
-            (p) => p.participantType === "Community Member"
-          ).length,
-        };
-        return breakdown;
-      });
-
-      // Process school distribution
-      const schoolData = allParticipants.reduce((acc, participant) => {
-        if (participant.participantType === "Student") {
-          const school = participant.school || "Not Specified";
-          if (!acc[school]) {
-            acc[school] = { male: 0, female: 0, total: 0 };
-          }
-          const gender = participant.sex?.toLowerCase();
-          if (gender === "male") acc[school].male++;
-          if (gender === "female") acc[school].female++;
-          acc[school].total++;
-        }
-        return acc;
-      }, {});
-
-      const participantsBySchool = Object.entries(schoolData)
-        .map(([name, counts]) => ({
-          name,
-          male: counts.male,
-          female: counts.female,
-          total: counts.total,
-        }))
-        .sort((a, b) => b.total - a.total);
-
-      // Process event types
-      const eventTypeCount = events.reduce((acc, event) => {
-        const type = event.eventType || "Not Specified";
+      // Process participants by type
+      const participantTypeCount = filtered.reduce((acc, participant) => {
+        const type = participant.participantType;
         acc[type] = (acc[type] || 0) + 1;
         return acc;
       }, {});
 
-      const eventTypes = Object.entries(eventTypeCount)
+      const participantsByType = Object.entries(participantTypeCount)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
 
+      // Process participants by organization/school
+      const organizationData = filtered.reduce((acc, participant) => {
+        const org = participant.organization;
+        if (!acc[org]) {
+          acc[org] = {
+            total: 0,
+            byType: {},
+            byGender: { male: 0, female: 0 },
+          };
+        }
+        acc[org].total++;
+        acc[org].byType[participant.participantType] =
+          (acc[org].byType[participant.participantType] || 0) + 1;
+        const gender = participant.sex?.toLowerCase();
+        if (gender === "male") acc[org].byGender.male++;
+        if (gender === "female") acc[org].byGender.female++;
+        return acc;
+      }, {});
+
+      const participantsByOrganization = Object.entries(organizationData)
+        .map(([name, data]) => ({
+          name,
+          total: data.total,
+          ...data.byGender,
+          ...data.byType,
+        }))
+        .sort((a, b) => b.total - a.total);
+
+      // Process participants by occupation
+      const occupationData = filtered.reduce((acc, participant) => {
+        const occupation = participant.occupation;
+        if (!acc[occupation]) {
+          acc[occupation] = { total: 0, male: 0, female: 0 };
+        }
+        acc[occupation].total++;
+        const gender = participant.sex?.toLowerCase();
+        if (gender === "male") acc[occupation].male++;
+        if (gender === "female") acc[occupation].female++;
+        return acc;
+      }, {});
+
+      const participantsByOccupation = Object.entries(occupationData)
+        .map(([name, counts]) => ({
+          name,
+          total: counts.total,
+          male: counts.male,
+          female: counts.female,
+        }))
+        .sort((a, b) => b.total - a.total);
+
       // Calculate trend data
-      const trendData = calculateTrendData(events, allParticipants);
+      const trendData = calculateTrendData(events.documents, filtered);
       setTrendData(trendData);
 
       // Calculate summary metrics
-      const summaryMetrics = calculateSummary(events, allParticipants);
+      const summaryMetrics = calculateSummary(events.documents, filtered);
       setSummary(summaryMetrics);
 
+      // Update all stats
       setStats({
-        totalParticipants,
-        averageParticipants,
-        totalEvents,
+        ...stats,
+        participantsByType,
+        participantsByOrganization,
+        participantsByOccupation,
         genderStats,
-        eventTypes,
-        participantsByEvent,
-        participantsBySchool,
-        participantTypes: {
-          students: allParticipants.filter(
-            (p) => p.participantType === "Student"
-          ).length,
-          staffFaculty: allParticipants.filter(
-            (p) => p.participantType === "Staff/Faculty"
-          ).length,
-          community: allParticipants.filter(
-            (p) => p.participantType === "Community Member"
-          ).length,
-        },
+        totalParticipants: filtered.length,
+      });
+
+      toast({
+        title: "Data Loaded",
+        description: `Successfully loaded data for ${period.schoolYear}`,
       });
     } catch (error) {
       console.error("Error fetching event statistics:", error);
+      toast({
+        title: "Error Loading Data",
+        description:
+          error.message || "Failed to load event statistics. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  // Add effect for filters
   useEffect(() => {
-    fetchEventStats();
-  }, []);
+    const applyFilters = async () => {
+      try {
+        setLoading(true);
+        await fetchEventStats();
+      } catch (error) {
+        console.error("Error applying filters:", error);
+        toast({
+          title: "Error",
+          description: "Failed to apply filters. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    applyFilters();
+  }, [
+    filters.eventType,
+    filters.participantType,
+    filters.gender,
+    filters.timeRange,
+  ]);
 
   if (loading) {
     return <AnalyticsSkeleton />;
@@ -473,21 +531,39 @@ export default function EventAnalysis() {
         </CardHeader>
         <CardContent className="flex gap-4">
           <Select
-            value={filters.eventType}
+            value={filters.participantType}
             onValueChange={(value) =>
-              setFilters((prev) => ({ ...prev, eventType: value }))
+              setFilters((prev) => ({ ...prev, participantType: value }))
             }
           >
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Event Type" />
+              <SelectValue placeholder="Participant Type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="academic">Academic</SelectItem>
-              <SelectItem value="non-academic">Non-Academic</SelectItem>
+              <SelectItem value="student">Students</SelectItem>
+              <SelectItem value="staff/faculty">Staff/Faculty</SelectItem>
+              <SelectItem value="community member">
+                Community Members
+              </SelectItem>
             </SelectContent>
           </Select>
-          {/* Add similar Select components for school and gender filters */}
+
+          <Select
+            value={filters.gender}
+            onValueChange={(value) =>
+              setFilters((prev) => ({ ...prev, gender: value }))
+            }
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Gender" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Genders</SelectItem>
+              <SelectItem value="male">Male</SelectItem>
+              <SelectItem value="female">Female</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
@@ -529,18 +605,18 @@ export default function EventAnalysis() {
         </CardContent>
       </Card>
 
-      {/* Event Type Distribution */}
+      {/* New Participant Distribution Charts */}
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Event Type Distribution</CardTitle>
+            <CardTitle>Participant Type Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={stats.eventTypes}
+                    data={stats.participantsByType}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -550,7 +626,7 @@ export default function EventAnalysis() {
                       `${name} (${(percent * 100).toFixed(0)}%)`
                     }
                   >
-                    {stats.eventTypes.map((entry, index) => (
+                    {stats.participantsByType.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={SCHOOL_COLORS[index % SCHOOL_COLORS.length]}
@@ -564,29 +640,35 @@ export default function EventAnalysis() {
           </CardContent>
         </Card>
 
-        {/* Gender Distribution by School */}
         <Card>
           <CardHeader>
-            <CardTitle>Gender Distribution by School</CardTitle>
+            <CardTitle>Participants by Organization</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.participantsBySchool}>
+                <BarChart data={stats.participantsByOrganization.slice(0, 10)}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="name"
                     angle={-45}
                     textAnchor="end"
-                    height={70}
+                    height={100}
+                    interval={0}
                   />
                   <YAxis />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Bar dataKey="male" name="Male" fill={GENDER_COLORS.Male} />
+                  <Bar
+                    dataKey="male"
+                    name="Male"
+                    stackId="a"
+                    fill={GENDER_COLORS.Male}
+                  />
                   <Bar
                     dataKey="female"
                     name="Female"
+                    stackId="a"
                     fill={GENDER_COLORS.Female}
                   />
                 </BarChart>
@@ -596,74 +678,36 @@ export default function EventAnalysis() {
         </Card>
       </div>
 
-      {/* Participants by Event */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Participants by Event</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.participantsByEvent}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="name"
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                  interval={0}
-                />
-                <YAxis />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Bar
-                  dataKey="male"
-                  name="Male"
-                  stackId="a"
-                  fill={GENDER_COLORS.Male}
-                />
-                <Bar
-                  dataKey="female"
-                  name="Female"
-                  stackId="a"
-                  fill={GENDER_COLORS.Female}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Detailed Statistics Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Detailed Event Statistics</CardTitle>
+          <CardTitle>Participant Details</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Showing {Math.min(filteredParticipants.length, 100)} of{" "}
+            {filteredParticipants.length} participants
+          </p>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Event Name</TableHead>
-                <TableHead className="text-right">Total Participants</TableHead>
-                <TableHead className="text-right">Male</TableHead>
-                <TableHead className="text-right">Female</TableHead>
-                <TableHead className="text-right">Date</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Organization</TableHead>
+                <TableHead>Occupation</TableHead>
+                <TableHead>Gender</TableHead>
+                <TableHead>Event</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {stats.participantsByEvent.map((event, index) => (
+              {filteredParticipants.slice(0, 100).map((participant, index) => (
                 <TableRow key={index}>
-                  <TableCell className="font-medium">{event.name}</TableCell>
-                  <TableCell className="text-right">{event.total}</TableCell>
-                  <TableCell className="text-right text-blue-600">
-                    {event.male}
-                  </TableCell>
-                  <TableCell className="text-right text-pink-600">
-                    {event.female}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {new Date(event.date).toLocaleDateString()}
-                  </TableCell>
+                  <TableCell>{participant.name}</TableCell>
+                  <TableCell>{participant.participantType}</TableCell>
+                  <TableCell>{participant.organization}</TableCell>
+                  <TableCell>{participant.occupation}</TableCell>
+                  <TableCell>{participant.sex}</TableCell>
+                  <TableCell>{participant.eventName}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

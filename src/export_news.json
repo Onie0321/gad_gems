@@ -1,0 +1,36 @@
+[
+  {
+    "title": "Second Semester Enrollment",
+    "description": "Holidays are over",
+    "date": "2025-01-15T00:00:00.000+00:00",
+    "imageUrl": null,
+    "showOnHomepage": true,
+    "$id": "677e496c00201092e47a",
+    "$createdAt": "2025-01-08T09:46:22.386+00:00",
+    "$updatedAt": "2025-02-20T13:21:47.117+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "6730581e000676341bc6"
+  },
+  {
+    "title": "Intership Seminar",
+    "description": "Attendance is a must, no certificate means no deployment.",
+    "date": "2025-01-27T00:00:00.000+00:00",
+    "imageUrl": null,
+    "showOnHomepage": false,
+    "$id": "677e4b6b00307812faee",
+    "$createdAt": "2025-01-08T09:54:52.478+00:00",
+    "$updatedAt": "2025-01-26T05:44:24.862+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "6730581e000676341bc6"
+  }
+]

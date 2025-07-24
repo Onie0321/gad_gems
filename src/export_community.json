@@ -1,0 +1,71 @@
+[
+  {
+    "name": "Mark Pakig Maggay",
+    "age": 49,
+    "sex": "Male",
+    "address": "Manila",
+    "eventId": "67a8a45d0024a830cc8e",
+    "ethnicGroup": "Kankana-Ey",
+    "otherEthnicGroup": null,
+    "createdBy": "675de7bd001df0be5473",
+    "participantType": "community",
+    "academicPeriodId": "679ba6c2dff117d41a86",
+    "isArchived": false,
+    "$id": "67a8a467001b9c857134",
+    "$createdAt": "2025-02-09T12:49:43.942+00:00",
+    "$updatedAt": "2025-02-09T12:49:43.942+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "6762ecb3000290b743bf"
+  },
+  {
+    "name": "Mendez Arvin",
+    "age": 25,
+    "sex": "Male",
+    "address": "Lublub",
+    "eventId": "67a8a45d0024a830cc8e",
+    "ethnicGroup": "Tagalog",
+    "otherEthnicGroup": null,
+    "createdBy": "675de7bd001df0be5473",
+    "participantType": "community",
+    "academicPeriodId": "679ba6c2dff117d41a86",
+    "isArchived": false,
+    "$id": "67a8a4680026d85af51e",
+    "$createdAt": "2025-02-09T12:49:44.778+00:00",
+    "$updatedAt": "2025-02-09T12:49:44.778+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "6762ecb3000290b743bf"
+  },
+  {
+    "name": "Captain America",
+    "age": 65,
+    "sex": "Male",
+    "address": "Europe",
+    "eventId": "67a8a57a002caa62665c",
+    "ethnicGroup": "Cebuano",
+    "otherEthnicGroup": "",
+    "createdBy": "675de7bd001df0be5473",
+    "participantType": "community",
+    "academicPeriodId": "679ba6c2dff117d41a86",
+    "isArchived": false,
+    "$id": "67a8a70b001ff8c27966",
+    "$createdAt": "2025-02-09T13:01:00.257+00:00",
+    "$updatedAt": "2025-02-09T13:01:00.257+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "6762ecb3000290b743bf"
+  }
+]

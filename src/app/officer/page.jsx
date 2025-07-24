@@ -13,6 +13,8 @@ import {
   databases,
   databaseId,
   userCollectionId,
+  account,
+  signOut,
 } from "@/lib/appwrite";
 import { useRouter, useSearchParams } from "next/navigation";
 import WelcomeModal from "@/components/modals/welcome";
@@ -32,6 +34,7 @@ function OfficerDashboardContent() {
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const primaryButton = "bg-[#2D89EF] text-white hover:bg-[#2D89EF]/90";
   const secondaryButton = "bg-[#4DB6AC] text-white hover:bg-[#4DB6AC]/90";
@@ -39,23 +42,59 @@ function OfficerDashboardContent() {
   const ctaArea = "bg-[#F9A825]";
   const successIndicator = "bg-[#A7FFEB]";
 
+  const handleSignOut = async () => {
+    try {
+      // Only try to sign out if we have a valid session
+      const currentSession = await account
+        .getSession("current")
+        .catch(() => null);
+      if (currentSession) {
+        await signOut();
+      }
+    } catch (error) {
+      console.error("Error signing out:", error);
+    } finally {
+      // Always redirect to sign-in page
+      setIsRedirecting(true);
+      window.location.href = "/sign-in";
+    }
+  };
+
   useEffect(() => {
+    let isMounted = true;
     const checkUserRole = async () => {
+      if (isRedirecting) return;
+
       try {
+        console.log("Checking user role...");
         const currentUser = await getCurrentUser();
-        const isAdminViewing =
-          sessionStorage.getItem("adminViewingOfficer") === "true";
+        console.log("Current user:", currentUser);
+
+        if (!isMounted) return;
 
         if (!currentUser) {
-          router.replace("/sign-in");
+          console.log("No user found, redirecting to sign-in");
+          setIsRedirecting(true);
+          window.location.href = "/sign-in";
+          return;
+        }
+
+        // Check if user is pending approval
+        if (currentUser.approvalStatus === "pending") {
+          console.log("User is pending approval, signing out...");
+          toast({
+            title: "Account Pending Approval",
+            description:
+              "Your account is still pending approval. Please wait for admin approval.",
+            variant: "destructive",
+          });
+          await handleSignOut();
           return;
         }
 
         // Check if user is admin viewing officer dashboard or is a regular user
-        if (
-          (currentUser.role === "admin" && isAdminViewing) ||
-          currentUser.role === "user"
-        ) {
+        if (currentUser.role === "admin" || currentUser.role === "user") {
+          console.log("User role verified:", currentUser.role);
           setUser(currentUser);
 
           // Show welcome toast if coming from login
@@ -72,19 +111,38 @@ function OfficerDashboardContent() {
             currentUser.role === "user" &&
             currentUser.isFirstLogin === true
           ) {
+            console.log("Showing welcome modal for first-time user");
             setShowWelcomeModal(true);
             await updateUserFirstLogin(currentUser.$id);
           }
         } else {
-          router.replace("/sign-in");
+          console.log("Invalid user role, redirecting to sign-in");
+          setIsRedirecting(true);
+          window.location.href = "/sign-in";
         }
       } catch (err) {
+        if (!isMounted) return;
+
         console.error("Error checking user role:", err);
+        if (err.message.includes("missing scope (account)")) {
+          console.log("Session expired or invalid, redirecting to sign-in");
+          setIsRedirecting(true);
+          window.location.href = "/sign-in";
+          return;
+        }
+
         setError(
           "An error occurred while checking your access. Please try again."
         );
+        toast({
+          title: "Error",
+          description: "Failed to verify your access. Please try again.",
+          variant: "destructive",
+        });
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -93,9 +151,10 @@ function OfficerDashboardContent() {
 
     // Cleanup function
     return () => {
+      isMounted = false;
       sessionStorage.removeItem("adminViewingOfficer");
     };
-  }, []);
+  }, [router, toast, searchParams, isRedirecting]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -152,10 +211,11 @@ function OfficerDashboardContent() {
 
   if (error) {
     return (
-      <div
-        className={`flex h-screen items-center justify-center bg-[#F5F5F5] ${linkColor}`}
-      >
-        {error}
+      <div className="flex h-screen items-center justify-center bg-[#F5F5F5]">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={handleSignOut}>Return to Sign In</Button>
+        </div>
       </div>
     );
   }

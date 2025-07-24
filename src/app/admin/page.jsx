@@ -14,12 +14,15 @@ import {
   Loader2,
   ImageIcon,
   Clock,
+  Archive,
+  Menu,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "./user-menu/UserMenu";
 import NotificationButton from "./Notifications";
-import { Suspense } from "react";
 
 import EventsSection from "./Events";
 import DemographicAnalysis from "./Demographics";
@@ -33,7 +36,7 @@ import {
   databases,
   userCollectionId,
   eventCollectionId,
-  studentsCollectionId,
+  studentCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
   getCurrentAcademicPeriod,
@@ -56,9 +59,55 @@ import AcademicPeriodManagement from "./Academic-Period";
 import TimeoutWarningModal from "@/components/modals/TimeoutWarningModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardOverview from "./Dashboard";
+import { cn } from "@/lib/utils";
 
-// Create a wrapper component for the parts using useSearchParams
-function AdminDashboardContent() {
+// Helper to fetch all documents from a collection (cursor-based pagination for >5000 records)
+async function fetchAllDocuments(studentCollectionId, onProgress = null) {
+  const limit = 100;
+  let allDocs = [];
+  let cursor = undefined;
+  let hasMore = true;
+  let batch = 0;
+
+  while (hasMore) {
+    try {
+      const queries = [Query.limit(limit)];
+      if (cursor) queries.push(Query.cursorAfter(cursor));
+
+      const response = await databases.listDocuments(
+        databaseId,
+        studentCollectionId,
+        queries
+      );
+
+      allDocs = allDocs.concat(response.documents);
+
+      // Update progress if callback provided
+      if (onProgress) {
+        onProgress({
+          collection: studentCollectionId,
+          batch: batch + 1,
+          documentsInBatch: response.documents.length,
+          totalDocuments: allDocs.length,
+        });
+      }
+
+      if (response.documents.length < limit) {
+        hasMore = false;
+      } else {
+        cursor = response.documents[response.documents.length - 1].$id;
+        batch++;
+      }
+    } catch (error) {
+      console.error(`Error fetching batch ${batch + 1}:`, error);
+      throw error;
+    }
+  }
+
+  return allDocs;
+}
+
+export default function AdminDashboard() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
   const [isLocked, setIsLocked] = React.useState(false);
   const [inactivityTimeout, setInactivityTimeout] = React.useState(
@@ -78,6 +127,7 @@ function AdminDashboardContent() {
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
   const WARNING_DURATION = 60; // 60 seconds
@@ -103,7 +153,6 @@ function AdminDashboardContent() {
           setShowWelcomeModal(true);
         }
       } catch (err) {
-        console.error("Error checking user role:", err);
         setError(
           "An error occurred while checking your access. Please try again."
         );
@@ -185,10 +234,16 @@ function AdminDashboardContent() {
     setLastActivity(Date.now());
   };
 
+  const retryDataFetch = () => {
+    setError(null);
+    // The useEffect will re-run when retryCount changes
+  };
+
   useEffect(() => {
     const fetchAllData = async () => {
       try {
         setLoading(true);
+
         const user = await getCurrentUser();
         const account = await getAccount();
         if (user && account) {
@@ -200,7 +255,7 @@ function AdminDashboardContent() {
             throw new Error("No active academic period found");
           }
 
-          // Fetch all data in parallel
+          // Fetch all data in parallel using cursor-based pagination
           const [
             fetchedUsers,
             fetchedStudents,
@@ -208,50 +263,46 @@ function AdminDashboardContent() {
             fetchedCommunity,
             fetchedEvents,
           ] = await Promise.all([
-            databases.listDocuments(databaseId, userCollectionId, [
-              Query.limit(100),
-            ]),
-            // Fetch students
-            databases.listDocuments(databaseId, studentsCollectionId, [
-              Query.limit(100),
-            ]),
-            // Fetch staff/faculty
-            databases.listDocuments(databaseId, staffFacultyCollectionId, [
-              Query.limit(100),
-            ]),
-            // Fetch community members
-            databases.listDocuments(databaseId, communityCollectionId, [
-              Query.limit(100),
-            ]),
-            // Fetch events
-            databases.listDocuments(databaseId, eventCollectionId, [
-              Query.limit(100),
-            ]),
+            // Fetch all users (using cursor-based pagination)
+            fetchAllDocuments(userCollectionId),
+            // Fetch all students (using cursor-based pagination)
+            fetchAllDocuments(studentCollectionId),
+            // Fetch all staff/faculty (using cursor-based pagination)
+            fetchAllDocuments(staffFacultyCollectionId),
+            // Fetch all community members (using cursor-based pagination)
+            fetchAllDocuments(communityCollectionId),
+            // Fetch all events (using cursor-based pagination)
+            fetchAllDocuments(eventCollectionId),
           ]);
 
           // Combine all participants with their respective types
           const allParticipants = [
-            ...fetchedStudents.documents.map((p) => ({
+            ...fetchedStudents.map((p) => ({
               ...p,
               participantType: "Student",
             })),
-            ...fetchedStaffFaculty.documents.map((p) => ({
+            ...fetchedStaffFaculty.map((p) => ({
               ...p,
               participantType: "Staff/Faculty",
             })),
-            ...fetchedCommunity.documents.map((p) => ({
+            ...fetchedCommunity.map((p) => ({
               ...p,
               participantType: "Community Member",
             })),
           ];
 
-          setUsers(fetchedUsers.documents);
+          setUsers(fetchedUsers);
           setParticipants(allParticipants);
-          setEvents(fetchedEvents.documents);
+          setEvents(fetchedEvents);
         }
       } catch (err) {
         console.error("Error fetching data:", err);
         setError(err.message);
+        toast({
+          title: "Error Loading Data",
+          description: err.message,
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -297,10 +348,14 @@ function AdminDashboardContent() {
         return <HomepageSettings />;
       case "academic Period":
         return <AcademicPeriodManagement />;
-     
+      
       default:
         return <DashboardOverview {...props} />;
     }
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
   };
 
   if (loading) {
@@ -331,23 +386,84 @@ function AdminDashboardContent() {
             </div>
           </header>
 
-          {/* Main Content Skeleton */}
+          {/* Main Content with Progress */}
           <main className="flex-1 overflow-y-auto p-6">
-            {/* Stats Cards */}
+            {/* Stats Cards Skeleton */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
               {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-32 w-full" />
+                <div
+                  key={i}
+                  className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm p-6"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-4 rounded" />
+                  </div>
+                  <Skeleton className="h-8 w-16 mb-4" />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-5 w-12" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-5 w-12" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-5 w-12" />
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
 
-            {/* Charts/Tables Skeleton */}
-            <div className="grid gap-4 md:grid-cols-2 mb-6">
-              <Skeleton className="h-[300px] w-full" />
-              <Skeleton className="h-[300px] w-full" />
+            {/* Recent Events Table Skeleton */}
+            <div className="mb-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm p-6">
+                <Skeleton className="h-6 w-32 mb-4" />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-7 gap-4 pb-2 border-b">
+                    {[...Array(7)].map((_, i) => (
+                      <Skeleton key={i} className="h-4 w-full" />
+                    ))}
+                  </div>
+                  {[...Array(5)].map((_, rowIndex) => (
+                    <div key={rowIndex} className="grid grid-cols-7 gap-4 py-2">
+                      {[...Array(7)].map((_, colIndex) => (
+                        <Skeleton key={colIndex} className="h-4 w-full" />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Table Skeleton */}
-            <Skeleton className="h-[400px] w-full" />
+            {/* Demographic Analysis Skeleton */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm p-6">
+              <Skeleton className="h-6 w-40 mb-4" />
+              <div className="space-y-4">
+                <div className="flex space-x-2 mb-4">
+                  <Skeleton className="h-10 w-32" />
+                  <Skeleton className="h-10 w-40" />
+                </div>
+                <Skeleton className="h-[300px] w-full" />
+                <div className="space-y-2">
+                  <div className="grid grid-cols-5 gap-4 pb-2 border-b">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-4 w-full" />
+                    ))}
+                  </div>
+                  {[...Array(6)].map((_, rowIndex) => (
+                    <div key={rowIndex} className="grid grid-cols-5 gap-4 py-2">
+                      {[...Array(5)].map((_, colIndex) => (
+                        <Skeleton key={colIndex} className="h-4 w-full" />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </main>
         </div>
       </div>
@@ -356,9 +472,94 @@ function AdminDashboardContent() {
 
   if (error) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center">
-        <h1 className="text-2xl font-bold text-red-600">Error</h1>
-        <p className="mt-2 text-gray-600">{error}</p>
+      <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+        {/* Sidebar Skeleton */}
+        <aside className="hidden w-64 overflow-y-auto bg-white dark:bg-gray-800 md:block">
+          <div className="flex h-full flex-col">
+            <div className="p-5">
+              <Skeleton className="h-8 w-32 mx-auto" />
+            </div>
+            <div className="space-y-4 p-5">
+              {[...Array(7)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Top Bar Skeleton */}
+          <header className="flex h-16 items-center justify-between border-b bg-white px-6 dark:border-gray-700 dark:bg-gray-800">
+            <Skeleton className="h-8 w-48" />
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
+            </div>
+          </header>
+
+          {/* Error Content */}
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="text-center max-w-md">
+                <div className="mb-6">
+                  <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                    <svg
+                      className="h-8 w-8 text-red-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    Failed to Load Dashboard Data
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    {error}
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <Button
+                    onClick={retryDataFetch}
+                    className="w-full"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Retrying...
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          className="mr-2 h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                          />
+                        </svg>
+                        Retry
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -424,65 +625,124 @@ function AdminDashboardContent() {
         warningDuration={WARNING_DURATION}
       />
       {/* Sidebar */}
-      <aside className="hidden w-64 overflow-y-auto bg-white dark:bg-gray-800 md:block">
+      <aside
+        className={cn(
+          "hidden md:block bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out relative",
+          isSidebarOpen ? "w-64" : "w-20"
+        )}
+      >
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-center p-5">
-            <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              GADConnect
-            </h1>
+          <div className="flex items-center justify-between p-4 border-b">
+            <div className="flex items-center space-x-2">
+              <div className="flex-shrink-0">
+                <img
+                  src="/logo/gad.png"
+                  alt="GAD Logo"
+                  className="h-10 w-10 object-contain rounded-full"
+                  style={{ aspectRatio: "1/1" }}
+                />
+              </div>
+              {isSidebarOpen && (
+                <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                  GADConnect
+                </h1>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="h-8 w-8 flex-shrink-0"
+            >
+              {isSidebarOpen ? (
+                <ChevronLeft className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </Button>
           </div>
-          <nav className="flex-1 space-y-2 p-5">
+          <nav className="flex-1 space-y-2 p-4">
             <Button
               variant={activeSection === "dashboard" ? "default" : "ghost"}
-              className="w-full justify-start"
+              className={cn(
+                "w-full justify-start",
+                !isSidebarOpen && "justify-center px-2"
+              )}
               onClick={() => setActiveSection("dashboard")}
             >
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
+              <LayoutDashboard className="h-5 w-5" />
+              {isSidebarOpen && <span className="ml-2">Dashboard</span>}
             </Button>
             <Button
               variant={activeSection === "users" ? "default" : "ghost"}
-              className="w-full justify-start"
+              className={cn(
+                "w-full justify-start",
+                !isSidebarOpen && "justify-center px-2"
+              )}
               onClick={() => setActiveSection("users")}
             >
-              <UserPlus className="mr-2 h-4 w-4" />
-              User Management
+              <UserPlus className="h-5 w-5" />
+              {isSidebarOpen && <span className="ml-2">User Management</span>}
             </Button>
             <Button
               variant={activeSection === "events" ? "default" : "ghost"}
-              className="w-full justify-start"
+              className={cn(
+                "w-full justify-start",
+                !isSidebarOpen && "justify-center px-2"
+              )}
               onClick={() => setActiveSection("events")}
             >
-              <Calendar className="mr-2 h-4 w-4" />
-              Event Management
+              <Calendar className="h-5 w-5" />
+              {isSidebarOpen && <span className="ml-2">Event Management</span>}
             </Button>
             <Button
               variant={activeSection === "demographics" ? "default" : "ghost"}
-              className="w-full justify-start mb-2"
+              className={cn(
+                "w-full justify-start",
+                !isSidebarOpen && "justify-center px-2"
+              )}
               onClick={() => setActiveSection("demographics")}
             >
-              <Users className="mr-2 h-4 w-4" />
-              Demographics
+              <Users className="h-5 w-5" />
+              {isSidebarOpen && <span className="ml-2">Demographics</span>}
             </Button>
             <Button
               variant={activeSection === "homepage" ? "default" : "ghost"}
-              className="w-full justify-start mb-2"
+              className={cn(
+                "w-full justify-start",
+                !isSidebarOpen && "justify-center px-2"
+              )}
               onClick={() => setActiveSection("homepage")}
             >
-              <ImageIcon className="mr-2 h-4 w-4" />
-              Content Management
+              <ImageIcon className="h-5 w-5" />
+              {isSidebarOpen && (
+                <span className="ml-2">Content Management</span>
+              )}
             </Button>
             <Button
               variant={
                 activeSection === "academic Period" ? "default" : "ghost"
               }
-              className="w-full justify-start"
+              className={cn(
+                "w-full justify-start",
+                !isSidebarOpen && "justify-center px-2"
+              )}
               onClick={() => setActiveSection("academic Period")}
             >
-              <Clock className="mr-2 h-4 w-4" />
-              Academic Period
+              <Clock className="h-5 w-5" />
+              {isSidebarOpen && <span className="ml-2">Academic Period</span>}
             </Button>
-           
+            <Button
+              variant={activeSection === "archives" ? "default" : "ghost"}
+              className={cn(
+                "w-full justify-start",
+                !isSidebarOpen && "justify-center px-2"
+              )}
+              onClick={() => setActiveSection("archives")}
+            >
+              <Archive className="h-5 w-5" />
+              {isSidebarOpen && <span className="ml-2">Archives</span>}
+            </Button>
           </nav>
         </div>
       </aside>
@@ -491,9 +751,19 @@ function AdminDashboardContent() {
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Bar */}
         <header className="flex h-16 items-center justify-between border-b bg-white px-6 dark:border-gray-700 dark:bg-gray-800">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
-            {activeSection.charAt(0).toUpperCase() + activeSection.slice(1)}
-          </h2>
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="md:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
+              {activeSection.charAt(0).toUpperCase() + activeSection.slice(1)}
+            </h2>
+          </div>
           <div className="flex items-center space-x-4">
             <NotificationButton notifications={[]} />
             <UserMenu currentUser={currentUser} />
@@ -505,18 +775,5 @@ function AdminDashboardContent() {
         </main>
       </div>
     </div>
-  );
-}
-
-// Main component with Suspense boundary
-export default function AdminDashboard() {
-  return (
-    <Suspense fallback={
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    }>
-      <AdminDashboardContent />
-    </Suspense>
   );
 }

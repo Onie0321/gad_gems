@@ -20,6 +20,7 @@ import {
 import { Query } from "appwrite";
 import { ParticipantList } from "./demographics/ParticipantList";
 import { DemographicsSearch } from "./demographics/Search";
+import { FuseSearch } from "./demographics/FuseSearch";
 
 export default function DemographicAnalysis() {
   const [loading, setLoading] = useState(true);
@@ -36,14 +37,25 @@ export default function DemographicAnalysis() {
           academicPeriodCollectionId,
           [Query.orderDesc("startDate")]
         );
+
+        console.log("Fetched academic periods:", response.documents);
         setAcademicPeriods(response.documents);
 
         // Set the current period as default
         const currentPeriod = response.documents.find(
           (period) => period.isActive
         );
+
+        console.log("Current active period:", currentPeriod);
+
         if (currentPeriod) {
+          console.log("Setting selectedPeriod to:", currentPeriod.$id);
           setSelectedPeriod(currentPeriod.$id);
+        } else {
+          console.log("No active period found, using first period");
+          if (response.documents.length > 0) {
+            setSelectedPeriod(response.documents[0].$id);
+          }
         }
         setLoading(false);
       } catch (error) {
@@ -54,6 +66,11 @@ export default function DemographicAnalysis() {
 
     initializeData();
   }, []);
+
+  // Debug selectedPeriod changes
+  useEffect(() => {
+    console.log("SelectedPeriod changed to:", selectedPeriod);
+  }, [selectedPeriod]);
 
   if (loading) {
     return (
@@ -78,7 +95,10 @@ export default function DemographicAnalysis() {
         <h2 className="text-lg font-semibold">Select Academic Period:</h2>
         <Select
           value={selectedPeriod}
-          onValueChange={(value) => setSelectedPeriod(value)}
+          onValueChange={(value) => {
+            console.log("Period selector changed to:", value);
+            setSelectedPeriod(value);
+          }}
         >
           <SelectTrigger className="w-[300px]">
             <SelectValue placeholder="Select academic period" />
@@ -104,6 +124,7 @@ export default function DemographicAnalysis() {
           <TabsTrigger value="detailed">Detailed Analysis</TabsTrigger>
           <TabsTrigger value="participants">Participant List</TabsTrigger>
           <TabsTrigger value="search">Search</TabsTrigger>
+         
         </TabsList>
 
         <TabsContent value="overview">
@@ -124,6 +145,10 @@ export default function DemographicAnalysis() {
 
         <TabsContent value="search">
           <DemographicsSearch selectedPeriod={selectedPeriod} />
+        </TabsContent>
+
+        <TabsContent value="fuse-search">
+          <FuseSearch />
         </TabsContent>
       </Tabs>
     </div>

@@ -30,6 +30,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import React from "react";
+import { processEthnicityData } from "@/utils/participantUtils";
 
 const COLORS = {
   male: "#2196F3",
@@ -39,38 +40,55 @@ const COLORS = {
 export default function EthnicGroupAnalysis({ data }) {
   const [showMaximized, setShowMaximized] = useState(false);
 
-  // Process data to include otherEthnicGroup entries
+  // Process data using the improved ethnicity processing function
   const processedData = React.useMemo(() => {
-    if (!data) return [];
+    if (!data || !Array.isArray(data)) return [];
 
-    // First, get all regular ethnic groups
-    const regularGroups = data
-      .filter((item) => item.name !== "Other")
-      .map((item) => ({
-        ...item,
-        id: `regular-${item.name}`, // Add unique id
-      }));
-
-    // Then, get all "Other" entries and their specific ethnic groups
-    const otherEntries = data.find((item) => item.name === "Other");
-
-    if (otherEntries?.otherGroups) {
-      // Add each other ethnic group as a separate entry
-      const otherGroups = Object.entries(otherEntries.otherEthnicGroup).map(
-        ([name, counts], index) => ({
-          id: `other-${name}`, // Add unique id
-          name,
-          male: counts.male || 0,
-          female: counts.female || 0,
-          value: (counts.male || 0) + (counts.female || 0),
-        })
-      );
-
-      return [...regularGroups, ...otherGroups];
+    // If data is already processed (has name, male, female properties), use it directly
+    if (
+      data.length > 0 &&
+      data[0].hasOwnProperty("male") &&
+      data[0].hasOwnProperty("female")
+    ) {
+      return data;
     }
 
-    return regularGroups;
+    // If data is raw participant data, process it
+    return processEthnicityData(data);
   }, [data]);
+
+  console.log("Ethnic Group Analysis Data:", processedData);
+  console.log("Ethnic Group Analysis Data Length:", processedData?.length);
+
+  if (
+    !processedData ||
+    processedData.length === 0 ||
+    processedData.every(
+      (item) =>
+        (item.male === 0 || !item.male) && (item.female === 0 || !item.female)
+    )
+  ) {
+    console.log("Triggering empty state because:", {
+      noData: !processedData,
+      emptyLength: processedData?.length === 0,
+      allZeros: processedData?.every(
+        (item) =>
+          (item.male === 0 || !item.male) && (item.female === 0 || !item.female)
+      ),
+    });
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Ethnic Group Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+            <p>No data available for the selected ethnic group filters</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -89,56 +107,65 @@ export default function EthnicGroupAnalysis({ data }) {
     return null;
   };
 
-  const ChartContent = ({ data, height = 300 }) => (
+  // Adjust font size based on label length, and avoid rotation
+  const getLabelStyle = (label) => {
+    if (label.length <= 5) {
+      return { fontSize: "14px" }; // Larger font size for shorter labels
+    } else if (label.length <= 10) {
+      return { fontSize: "12px" }; // Medium font size for medium-length labels
+    } else {
+      return {
+        fontSize: "10px",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }; // Smaller font size + ellipsis for long labels
+    }
+  };
+
+  const ChartContent = ({ height = 300 }) => (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} layout="vertical">
+      <BarChart data={processedData}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" />
-        <YAxis dataKey="name" type="category" width={150} />
-        <Tooltip content={CustomTooltip} />
-        <Legend
-          iconType="circle"
-          formatter={(value, entry) => (
-            <span className="flex items-center">
-              {value === "male" ? (
-                <Male size={16} className="mr-2" />
-              ) : (
-                <Female size={16} className="mr-2" />
-              )}
-              {value.charAt(0).toUpperCase() + value.slice(1)}
-            </span>
+        <XAxis
+          dataKey="name"
+          tick={({ x, y, payload }) => (
+            <g transform={`translate(${x},${y})`}>
+              <text
+                x={0}
+                y={0}
+                dy={16}
+                textAnchor="middle"
+                fill="#666"
+                {...getLabelStyle(payload.value)}
+              >
+                {payload.value}
+              </text>
+            </g>
           )}
         />
-        <Bar dataKey="male" name="Male" fill={COLORS.male} />
-        <Bar dataKey="female" name="Female" fill={COLORS.female} />
+        <YAxis />
+        <Tooltip content={<CustomTooltip />} />
+        <Legend
+          iconType="circle"
+          formatter={(value) => (
+            <span style={{ color: COLORS[value.toLowerCase()] }}>{value}</span>
+          )}
+        />
+        <Bar
+          dataKey="male"
+          fill={COLORS.male}
+          name="Male"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="female"
+          fill={COLORS.female}
+          name="Female"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ResponsiveContainer>
   );
-
-  const MaximizeButton = () => (
-    <button
-      type="button"
-      onClick={() => setShowMaximized(true)}
-      className="p-2 hover:bg-gray-100 rounded-full inline-flex items-center justify-center bg-white"
-    >
-      <Maximize2 className="h-5 w-5 text-gray-600" />
-    </button>
-  );
-
-  if (!processedData || processedData.length === 0) {
-    return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Ethnic Group Analysis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
-            <p>No data available for the selected ethnic group filters</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <>
@@ -147,7 +174,8 @@ export default function EthnicGroupAnalysis({ data }) {
           <div>
             <CardTitle>Ethnic Group Analysis</CardTitle>
             <CardDescription>
-              Distribution of participants by ethnic group
+              Distribution of participants by ethnic group (filtered and
+              grouped)
             </CardDescription>
           </div>
           <button
@@ -158,54 +186,7 @@ export default function EthnicGroupAnalysis({ data }) {
           </button>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={processedData}
-              margin={{
-                top: 5,
-                right: 30,
-                left: 20,
-                bottom: 5,
-              }}
-              layout="vertical"
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis
-                dataKey="name"
-                type="category"
-                width={150}
-                tickFormatter={(value, index) => value}
-                key="yAxis"
-              />
-              <Tooltip content={CustomTooltip} />
-              <Legend
-                iconType="circle"
-                formatter={(value, entry) => (
-                  <span className="flex items-center">
-                    {value === "male" ? (
-                      <Male size={16} className="mr-2" />
-                    ) : (
-                      <Female size={16} className="mr-2" />
-                    )}
-                    {value.charAt(0).toUpperCase() + value.slice(1)}
-                  </span>
-                )}
-              />
-              <Bar
-                dataKey="male"
-                name="Male"
-                fill={COLORS.male}
-                key="male-bar"
-              />
-              <Bar
-                dataKey="female"
-                name="Female"
-                fill={COLORS.female}
-                key="female-bar"
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <ChartContent />
           <DataTable data={processedData} />
         </CardContent>
       </Card>
@@ -214,60 +195,14 @@ export default function EthnicGroupAnalysis({ data }) {
         <DialogContent className="max-w-[80vw] w-[800px] my-6">
           <DialogHeader className="mb-4">
             <DialogTitle>Ethnic Group Analysis</DialogTitle>
-            <CardDescription>
-              Distribution of participants by ethnic group
-            </CardDescription>
+            <DialogDescription>
+              Distribution of participants by ethnic group (filtered and
+              grouped)
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="h-[350px]">
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart
-                  data={processedData}
-                  margin={{
-                    top: 5,
-                    right: 30,
-                    left: 20,
-                    bottom: 5,
-                  }}
-                  layout="vertical"
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    width={150}
-                    tickFormatter={(value, index) => value}
-                    key="yAxis-max"
-                  />
-                  <Tooltip content={CustomTooltip} />
-                  <Legend
-                    iconType="circle"
-                    formatter={(value, entry) => (
-                      <span className="flex items-center">
-                        {value === "male" ? (
-                          <Male size={16} className="mr-2" />
-                        ) : (
-                          <Female size={16} className="mr-2" />
-                        )}
-                        {value.charAt(0).toUpperCase() + value.slice(1)}
-                      </span>
-                    )}
-                  />
-                  <Bar
-                    dataKey="male"
-                    name="Male"
-                    fill={COLORS.male}
-                    key="male-bar-max"
-                  />
-                  <Bar
-                    dataKey="female"
-                    name="Female"
-                    fill={COLORS.female}
-                    key="female-bar-max"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <ChartContent height={350} />
             </div>
             <div className="max-h-[250px] overflow-auto">
               <DataTable data={processedData} />

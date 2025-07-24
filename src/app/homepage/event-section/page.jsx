@@ -1,64 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  CalendarIcon,
-  MapPinIcon,
-  UsersIcon,
-  Calendar,
-  Sparkles,
-} from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import React, { useState, useEffect } from "react";
 import { databases, databaseId, eventCollectionId } from "@/lib/appwrite";
 import { Query } from "appwrite";
-import { motion } from "framer-motion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import Link from "next/link";
+import { EventSearch } from "./EventSearch";
 
-const formatEventDate = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "2-digit",
-  });
-};
-
-export default function RecentEvents() {
-  const [mounted, setMounted] = useState(false);
+export default function EventSection() {
   const [events, setEvents] = useState([]);
-  const [visibleEvents, setVisibleEvents] = useState(3);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -66,207 +20,100 @@ export default function RecentEvents() {
         const response = await databases.listDocuments(
           databaseId,
           eventCollectionId,
-          [Query.equal("showOnHomepage", true), Query.orderDesc("eventDate")]
+          [
+            Query.equal("isArchived", false),
+            Query.equal("showOnHomepage", true),
+            Query.orderDesc("eventDate"),
+          ]
         );
 
-        // Transform the data to match your component's expectations
-        const formattedEvents = response.documents.map((event) => ({
-          id: event.$id,
-          name: event.eventName,
-          description: event.eventDescription || "",
-          date: event.eventDate,
-          location: event.eventVenue,
-          attendees: event.participants?.length || 0,
-        }));
-
-        setEvents(formattedEvents);
+        // Get only the 3 most recent events
+        const recentEvents = response.documents.slice(0, 3);
+        setEvents(recentEvents);
       } catch (error) {
         console.error("Error fetching events:", error);
+        setError("Failed to load events");
+      } finally {
+        setLoading(false);
       }
     };
 
-    setMounted(true);
     fetchEvents();
   }, []);
 
-  const loadMore = () => {
-    setVisibleEvents((prevVisible) => prevVisible + 3);
+  const handleSearchResults = (results) => {
+    setEvents(results);
   };
 
-  if (!mounted) {
+  if (loading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <div className="animate-pulse space-y-8 w-full max-w-6xl">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-gray-200 h-48 rounded-xl"></div>
-          ))}
-        </div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">Loading events...</div>
       </div>
     );
   }
 
-  const NoEventsDisplay = () => (
-    <div className="min-h-[400px] flex flex-col items-center justify-center p-8 rounded-2xl bg-[#CBF1F5]/30">
-      <h3 className="text-2xl font-semibold text-[#71C9CE] mb-2">
-        No Events Currently
-      </h3>
-      <p className="text-[#71C9CE]/90 text-center max-w-md">
-        Stay tuned! New events will be posted here soon. Check back later for
-        upcoming activities and programs.
-      </p>
-    </div>
-  );
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center text-red-500">{error}</div>
+      </div>
+    );
+  }
 
   return (
-    <section
-      className="py-16 bg-gradient-to-br from-[#E3FDFD] via-[#CBF1F5] to-[#E3FDFD]"
-      id="events"
-    >
+    <section className="bg-white py-16">
       <div className="container mx-auto px-4">
-        <motion.div
-          className="text-center mb-12"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Calendar className="w-8 h-8 text-[#71C9CE]" />
-            <h2 className="text-4xl font-bold text-[#71C9CE]">Recent Events</h2>
-          </div>
-          <p className="text-[#71C9CE]/90 max-w-2xl mx-auto">
-            Discover our latest activities and programs promoting gender
-            equality and inclusive development.
-          </p>
-        </motion.div>
+        <h2 className="text-3xl font-bold text-center mb-12">
+          Upcoming Events
+        </h2>
 
-        {events.length === 0 ? (
-          <NoEventsDisplay />
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {events.slice(0, visibleEvents).map((event) => (
-                <motion.div
-                  key={event.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <Card className="group h-full hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-0 ring-1 ring-[#CBF1F5]">
-                    {event.imageUrl && (
-                      <div className="relative h-48 overflow-hidden rounded-t-xl">
-                        <Image
-                          src={event.imageUrl}
-                          alt={event.name}
-                          fill
-                          className="object-cover transform group-hover:scale-105 transition-transform duration-500"
-                        />
-                      </div>
-                    )}
-                    <CardHeader>
-                      <CardTitle className="text-xl font-semibold text-[#71C9CE] line-clamp-2">
-                        {event.name}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p className="text-[#71C9CE]/90 line-clamp-3">
-                        {event.description}
-                      </p>
-                      <div className="space-y-2">
-                        <div className="flex items-center text-[#71C9CE]">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          <span className="text-sm">
-                            {formatEventDate(event.date)}
-                          </span>
-                        </div>
-                        <div className="flex items-center text-[#71C9CE]">
-                          <MapPinIcon className="mr-2 h-4 w-4" />
-                          <span className="text-sm">{event.location}</span>
-                        </div>
-                        <div className="flex items-center text-[#71C9CE]">
-                          <UsersIcon className="mr-2 h-4 w-4" />
-                          <span className="text-sm">
-                            {event.attendees} attendees
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full bg-[#71C9CE] hover:bg-[#A6E3E9] text-white border border-[#CBF1F5]"
-                          >
-                            View Details
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl">
-                          <DialogHeader>
-                            <DialogTitle>{event.name} - Details</DialogTitle>
-                          </DialogHeader>
-                          <Tabs defaultValue="table" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2">
-                              <TabsTrigger value="table">Table</TabsTrigger>
-                              <TabsTrigger value="graph">Graph</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="table">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Event Name</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Location</TableHead>
-                                    <TableHead>Attendees</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  <TableRow>
-                                    <TableCell className="font-medium">
-                                      {event.name}
-                                    </TableCell>
-                                    <TableCell>
-                                      {formatEventDate(event.date)}
-                                    </TableCell>
-                                    <TableCell>{event.location}</TableCell>
-                                    <TableCell>{event.attendees}</TableCell>
-                                  </TableRow>
-                                </TableBody>
-                              </Table>
-                            </TabsContent>
-                            <TabsContent value="graph">
-                              <div className="h-[300px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart data={[event]}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Bar dataKey="attendees" fill="#8884d8" />
-                                  </BarChart>
-                                </ResponsiveContainer>
-                              </div>
-                            </TabsContent>
-                          </Tabs>
-                        </DialogContent>
-                      </Dialog>
-                    </CardFooter>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-            {visibleEvents < events.length && (
-              <div className="mt-12 text-center">
-                <Button
-                  onClick={loadMore}
-                  className="bg-[#71C9CE] hover:bg-[#A6E3E9] text-white px-8 py-2"
-                >
-                  Load More Events
-                </Button>
-              </div>
-            )}
-          </>
+        <div className="mb-8">
+          <EventSearch onSearchResults={handleSearchResults} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {events.map((event) => (
+            <Card key={event.$id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold">
+                  {event.eventName}
+                </CardTitle>
+                <p className="text-sm text-gray-500">
+                  {format(new Date(event.eventDate), "MMMM d, yyyy")}
+                </p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 mb-4 line-clamp-3">
+                  {event.eventDescription}
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {event.eventType}
+                  </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    {event.eventVenue}
+                  </span>
+                </div>
+                <Link href={`/events/${event.$id}`}>
+                  <Button className="w-full">View Details</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {events.length === 0 && (
+          <div className="text-center text-gray-500 mt-8">
+            No events found. Please try a different search term.
+          </div>
         )}
+
+        <div className="text-center mt-8">
+          <Link href="/events">
+            <Button variant="outline">View All Events</Button>
+          </Link>
+        </div>
       </div>
     </section>
   );

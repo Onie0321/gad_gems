@@ -33,6 +33,7 @@ import {
   Cell,
 } from "recharts";
 import stringSimilarity from "string-similarity";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
 
@@ -42,6 +43,7 @@ export function SearchFilter({ activeTab }) {
     eventType: "all",
     sexAtBirth: "all",
     ethnicGroup: "all",
+    participantType: "all",
   });
   const [events, setEvents] = useState([]);
   const [participants, setParticipants] = useState([]);
@@ -51,11 +53,31 @@ export function SearchFilter({ activeTab }) {
     ethnicGroups: [],
     genderDistribution: [],
     ageGroups: [],
+    participantTypes: [],
+    organizationDistribution: [],
   });
   const [searchTerms, setSearchTerms] = useState([]);
   const [searchMode, setSearchMode] = useState("simple");
   const [hasSearched, setHasSearched] = useState(false);
   const [processedQuery, setProcessedQuery] = useState(null);
+  const [selectedCollection, setSelectedCollection] = useState("students");
+  const [collectionFilters, setCollectionFilters] = useState({
+    students: {
+      course: "all",
+      yearLevel: "all",
+      section: "all",
+      college: "all",
+    },
+    staffFaculty: {
+      department: "all",
+      position: "all",
+      employmentStatus: "all",
+    },
+    community: {
+      occupation: "all",
+      residentialStatus: "all",
+    },
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -147,30 +169,63 @@ export function SearchFilter({ activeTab }) {
         ? processSearchTerms(searchTerm)
         : [searchTerm.toLowerCase()];
 
-    return participants.filter((participant) => {
+    // Filter participants based on collection type first
+    let collectionParticipants = participants;
+
+    // Apply participant type filter if not set to "all"
+    if (filters.participantType !== "all") {
+      collectionParticipants = collectionParticipants.filter(
+        (p) =>
+          p.participantType?.toLowerCase() ===
+          filters.participantType.toLowerCase()
+      );
+    }
+
+    // Apply text search and other filters
+    return collectionParticipants.filter((participant) => {
+      // Apply common filters
+      const matchesGender =
+        filters.sexAtBirth === "all" || participant.sex === filters.sexAtBirth;
+      const matchesEthnic =
+        filters.ethnicGroup === "all" ||
+        participant.ethnicGroup === filters.ethnicGroup;
+
+      // Apply text search
       if (searchMode === "simple") {
         return (
-          participant.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-          (filters.sexAtBirth === "all" ||
-            participant.sex === filters.sexAtBirth) &&
-          (filters.ethnicGroup === "all" ||
-            participant.ethnicGroup === filters.ethnicGroup)
+          (participant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            participant.organization
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+            participant.occupation
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+            participant.eventName
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase())) &&
+          matchesGender &&
+          matchesEthnic
         );
       }
 
+      // For advanced search, search across all fields
       const fieldsToSearch = [
         participant.name,
         participant.ethnicGroup,
         participant.sex,
         participant.age?.toString(),
+        participant.participantType,
+        participant.organization,
+        participant.occupation,
+        participant.eventName,
       ];
 
       return (
-        fieldsToSearch.some((field) => matchesSearchTerms(field, terms)) &&
-        (filters.sexAtBirth === "all" ||
-          participant.sex === filters.sexAtBirth) &&
-        (filters.ethnicGroup === "all" ||
-          participant.ethnicGroup === filters.ethnicGroup)
+        fieldsToSearch.some(
+          (field) => field && matchesSearchTerms(field, terms)
+        ) &&
+        matchesGender &&
+        matchesEthnic
       );
     });
   };
@@ -217,9 +272,27 @@ export function SearchFilter({ activeTab }) {
       value,
     }));
 
+    // Participant Type Distribution
+    const participantTypeCounts = filteredParticipants.reduce(
+      (acc, participant) => {
+        const type = participant.participantType || "Unknown";
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    const participantTypes = Object.entries(participantTypeCounts).map(
+      ([name, value]) => ({
+        name,
+        value,
+      })
+    );
+
     // Ethnic Groups Distribution
     const ethnicCounts = filteredParticipants.reduce((acc, participant) => {
-      acc[participant.ethnicGroup] = (acc[participant.ethnicGroup] || 0) + 1;
+      const group = participant.ethnicGroup || "Not Specified";
+      acc[group] = (acc[group] || 0) + 1;
       return acc;
     }, {});
 
@@ -229,15 +302,40 @@ export function SearchFilter({ activeTab }) {
     }));
 
     // Gender Distribution
-    const genderCounts = filteredParticipants.reduce((acc, participant) => {
-      acc[participant.sex] = (acc[participant.sex] || 0) + 1;
-      return acc;
-    }, { Male: 0, Female: 0 });
+    const genderCounts = filteredParticipants.reduce(
+      (acc, participant) => {
+        const gender = participant.sex || "Not Specified";
+        acc[gender] = (acc[gender] || 0) + 1;
+        return acc;
+      },
+      { Male: 0, Female: 0 }
+    );
 
-    const genderDistribution = Object.entries(genderCounts).map(([name, value]) => ({
-      name,
-      value,
-    }));
+    const genderDistribution = Object.entries(genderCounts).map(
+      ([name, value]) => ({
+        name,
+        value,
+      })
+    );
+
+    // Add organization distribution
+    const organizationCounts = filteredParticipants.reduce(
+      (acc, participant) => {
+        const org =
+          participant.organization ||
+          participant.school ||
+          participant.department ||
+          "Not Specified";
+        acc[org] = (acc[org] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    const organizationDistribution = Object.entries(organizationCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10); // Just get top 10
 
     // Age Groups Distribution
     const ageGroups = filteredParticipants.reduce((acc, participant) => {
@@ -263,19 +361,23 @@ export function SearchFilter({ activeTab }) {
       ethnicGroups,
       genderDistribution,
       ageGroups: ageGroupsData,
+      participantTypes,
+      organizationDistribution,
     });
   };
 
   const handleSearch = (searchText) => {
     setSearchTerm(searchText);
     const nlpResults = processNaturalLanguage(searchText);
-    setProcessedQuery(nlpResults || {
-      dates: [],
-      types: [],
-      locations: [],
-      names: [],
-      keywords: [],
-    });
+    setProcessedQuery(
+      nlpResults || {
+        dates: [],
+        types: [],
+        locations: [],
+        names: [],
+        keywords: [],
+      }
+    );
     setHasSearched(true);
 
     // Process chart data with filtered results
@@ -477,7 +579,7 @@ export function SearchFilter({ activeTab }) {
             cx={150}
             cy={150}
             labelLine={false}
-            label={({ name, percent }) => 
+            label={({ name, percent }) =>
               hasSearched ? `${name} (${(percent * 100).toFixed(0)}%)` : ""
             }
             outerRadius={80}
@@ -485,7 +587,10 @@ export function SearchFilter({ activeTab }) {
             dataKey="value"
           >
             {(hasSearched ? chartData.eventTypes : []).map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[index % COLORS.length]}
+              />
             ))}
           </Pie>
           <Tooltip />
@@ -505,16 +610,21 @@ export function SearchFilter({ activeTab }) {
             cx={150}
             cy={150}
             labelLine={false}
-            label={({ name, percent }) => 
+            label={({ name, percent }) =>
               hasSearched ? `${name} (${(percent * 100).toFixed(0)}%)` : ""
             }
             outerRadius={80}
             fill="#8884d8"
             dataKey="value"
           >
-            {(hasSearched ? chartData.genderDistribution : []).map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
+            {(hasSearched ? chartData.genderDistribution : []).map(
+              (entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
+              )
+            )}
           </Pie>
           <Tooltip />
         </PieChart>
@@ -527,14 +637,21 @@ export function SearchFilter({ activeTab }) {
 
       <div className="p-4 border rounded-lg">
         <h3 className="text-lg font-semibold mb-4">Age Distribution</h3>
-        <BarChart width={300} height={300} data={hasSearched ? chartData.ageGroups : []}>
+        <BarChart
+          width={300}
+          height={300}
+          data={hasSearched ? chartData.ageGroups : []}
+        >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
           <YAxis />
           <Tooltip />
           <Bar dataKey="value" fill="#8884d8">
             {(hasSearched ? chartData.ageGroups : []).map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[index % COLORS.length]}
+              />
             ))}
           </Bar>
         </BarChart>
@@ -546,15 +663,24 @@ export function SearchFilter({ activeTab }) {
       </div>
 
       <div className="p-4 border rounded-lg">
-        <h3 className="text-lg font-semibold mb-4">Ethnic Groups Distribution</h3>
-        <BarChart width={300} height={300} data={hasSearched ? chartData.ethnicGroups : []}>
+        <h3 className="text-lg font-semibold mb-4">
+          Ethnic Groups Distribution
+        </h3>
+        <BarChart
+          width={300}
+          height={300}
+          data={hasSearched ? chartData.ethnicGroups : []}
+        >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
           <YAxis />
           <Tooltip />
           <Bar dataKey="value" fill="#8884d8">
             {(hasSearched ? chartData.ethnicGroups : []).map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[index % COLORS.length]}
+              />
             ))}
           </Bar>
         </BarChart>
@@ -606,156 +732,453 @@ export function SearchFilter({ activeTab }) {
     </div>
   );
 
+  const CollectionFilters = () => {
+    switch (selectedCollection) {
+      case "students":
+        return (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="course">Course</Label>
+              <Select
+                value={collectionFilters.students.course}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    students: { ...prev.students, course: value },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select course" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="BSIT">BSIT</SelectItem>
+                  <SelectItem value="BSCS">BSCS</SelectItem>
+                  <SelectItem value="BSCE">BSCE</SelectItem>
+                  {/* Add more courses as needed */}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="yearLevel">Year Level</Label>
+              <Select
+                value={collectionFilters.students.yearLevel}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    students: { ...prev.students, yearLevel: value },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select year level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="1">1st Year</SelectItem>
+                  <SelectItem value="2">2nd Year</SelectItem>
+                  <SelectItem value="3">3rd Year</SelectItem>
+                  <SelectItem value="4">4th Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="section">Section</Label>
+              <Select
+                value={collectionFilters.students.section}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    students: { ...prev.students, section: value },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                  {/* Add more sections as needed */}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="college">College</Label>
+              <Select
+                value={collectionFilters.students.college}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    students: { ...prev.students, college: value },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select college" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="CET">Engineering & Technology</SelectItem>
+                  <SelectItem value="CAS">Arts & Sciences</SelectItem>
+                  <SelectItem value="COE">Education</SelectItem>
+                  {/* Add more colleges as needed */}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+
+      case "staffFaculty":
+        return (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="department">Department</Label>
+              <Select
+                value={collectionFilters.staffFaculty.department}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    staffFaculty: { ...prev.staffFaculty, department: value },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="IT">Information Technology</SelectItem>
+                  <SelectItem value="CS">Computer Science</SelectItem>
+                  <SelectItem value="MATH">Mathematics</SelectItem>
+                  {/* Add more departments */}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="position">Position</Label>
+              <Select
+                value={collectionFilters.staffFaculty.position}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    staffFaculty: { ...prev.staffFaculty, position: value },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select position" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="professor">Professor</SelectItem>
+                  <SelectItem value="instructor">Instructor</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                  {/* Add more positions */}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="employmentStatus">Employment Status</Label>
+              <Select
+                value={collectionFilters.staffFaculty.employmentStatus}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    staffFaculty: {
+                      ...prev.staffFaculty,
+                      employmentStatus: value,
+                    },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="regular">Regular</SelectItem>
+                  <SelectItem value="contractual">Contractual</SelectItem>
+                  <SelectItem value="partTime">Part Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+
+      case "community":
+        return (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="occupation">Occupation</Label>
+              <Select
+                value={collectionFilters.community.occupation}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    community: { ...prev.community, occupation: value },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select occupation" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="business">Business Owner</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="retired">Retired</SelectItem>
+                  {/* Add more occupations */}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="residentialStatus">Residential Status</Label>
+              <Select
+                value={collectionFilters.community.residentialStatus}
+                onValueChange={(value) =>
+                  setCollectionFilters((prev) => ({
+                    ...prev,
+                    community: { ...prev.community, residentialStatus: value },
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="resident">Resident</SelectItem>
+                  <SelectItem value="nonResident">Non-Resident</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-semibold">Natural Language Search</h2>
+      <h2 className="text-2xl font-semibold">Search and Filter</h2>
 
-      <div className="grid grid-cols-1 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="search">Natural Language Search</Label>
-          <Input
-            id="search"
-            placeholder={
-              activeTab === "events"
-                ? "Try: 'Show me all academic events in January' or 'Find workshops next week'"
-                : "Try: 'Find participants named John' or 'Show female participants from Tagalog region'"
-            }
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full"
-          />
-          <SearchSuggestions />
-        </div>
+      <Tabs defaultValue="natural" className="w-full">
+        <TabsList>
+          <TabsTrigger value="natural">Natural Language Search</TabsTrigger>
+          <TabsTrigger value="filter">Advanced Filters</TabsTrigger>
+        </TabsList>
 
-        {activeTab === "events" ? (
-          <div>
-            <Label htmlFor="eventType">Event Type</Label>
-            <Select
-              value={filters.eventType}
-              onValueChange={(value) => handleFilterChange("eventType", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select event type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="Academic">Academic</SelectItem>
-                <SelectItem value="Non-Academic">Non-Academic</SelectItem>
-              </SelectContent>
-            </Select>
+        <TabsContent value="natural">
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold">Natural Language Search</h2>
+
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="search">Natural Language Search</Label>
+                <Input
+                  id="search"
+                  placeholder={
+                    activeTab === "events"
+                      ? "Try: 'Show me all academic events in January' or 'Find workshops next week'"
+                      : "Try: 'Find participants named John' or 'Show female participants from Tagalog region'"
+                  }
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full"
+                />
+                <SearchSuggestions />
+              </div>
+
+              {activeTab === "events" ? (
+                <div>
+                  <Label htmlFor="eventType">Event Type</Label>
+                  <Select
+                    value={filters.eventType}
+                    onValueChange={(value) =>
+                      handleFilterChange("eventType", value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select event type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="Academic">Academic</SelectItem>
+                      <SelectItem value="Non-Academic">Non-Academic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="sexAtBirth">Sex at Birth</Label>
+                    <Select
+                      value={filters.sexAtBirth}
+                      onValueChange={(value) =>
+                        handleFilterChange("sexAtBirth", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select sex" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="ethnicGroup">Ethnic Group</Label>
+                    <Select
+                      value={filters.ethnicGroup}
+                      onValueChange={(value) =>
+                        handleFilterChange("ethnicGroup", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select ethnic group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="Tagalog">Tagalog</SelectItem>
+                        <SelectItem value="Cebuano">Cebuano</SelectItem>
+                        <SelectItem value="Ilocano">Ilocano</SelectItem>
+                        <SelectItem value="Bicolano">Bicolano</SelectItem>
+                        <SelectItem value="Waray">Waray</SelectItem>
+                        <SelectItem value="Others">Others</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {hasSearched && !loading && (
+              <div className="space-y-4">
+                <div className="text-sm text-gray-600">
+                  Showing{" "}
+                  {activeTab === "events"
+                    ? getFilteredEvents().length
+                    : getFilteredParticipants().length}{" "}
+                  results
+                </div>
+
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {(activeTab === "events"
+                          ? eventColumns
+                          : participantColumns
+                        ).map((column) => (
+                          <TableHead key={column.accessorKey}>
+                            {column.header}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(activeTab === "events"
+                        ? getFilteredEvents()
+                        : getFilteredParticipants()
+                      ).map((row) => (
+                        <TableRow key={row.$id}>
+                          {(activeTab === "events"
+                            ? eventColumns
+                            : participantColumns
+                          ).map((column) => (
+                            <TableCell key={`${row.$id}-${column.accessorKey}`}>
+                              {row[column.accessorKey]}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <Button onClick={handleExport}>Export Data</Button>
+
+                <DataCharts />
+              </div>
+            )}
+
+            {loading && <div className="text-center py-4">Loading...</div>}
+
+            {hasSearched &&
+              !loading &&
+              (activeTab === "events"
+                ? getFilteredEvents()
+                : getFilteredParticipants()
+              ).length === 0 && (
+                <div className="text-center py-4 text-gray-500">
+                  No results found. Try adjusting your search or filters.
+                </div>
+              )}
           </div>
-        ) : (
-          <>
-            <div>
-              <Label htmlFor="sexAtBirth">Sex at Birth</Label>
+        </TabsContent>
+
+        <TabsContent value="filter">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label>Select Collection</Label>
               <Select
-                value={filters.sexAtBirth}
-                onValueChange={(value) =>
-                  handleFilterChange("sexAtBirth", value)
-                }
+                value={selectedCollection}
+                onValueChange={setSelectedCollection}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select sex" />
+                  <SelectValue placeholder="Select collection" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="Male">Male</SelectItem>
-                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="students">Students</SelectItem>
+                  <SelectItem value="staffFaculty">Staff/Faculty</SelectItem>
+                  <SelectItem value="community">Community</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="ethnicGroup">Ethnic Group</Label>
+
+            <CollectionFilters />
+
+            <div className="flex flex-wrap gap-4 mt-4">
               <Select
-                value={filters.ethnicGroup}
+                value={filters.participantType}
                 onValueChange={(value) =>
-                  handleFilterChange("ethnicGroup", value)
+                  setFilters((prev) => ({ ...prev, participantType: value }))
                 }
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select ethnic group" />
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Participant Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="Tagalog">Tagalog</SelectItem>
-                  <SelectItem value="Cebuano">Cebuano</SelectItem>
-                  <SelectItem value="Ilocano">Ilocano</SelectItem>
-                  <SelectItem value="Bicolano">Bicolano</SelectItem>
-                  <SelectItem value="Waray">Waray</SelectItem>
-                  <SelectItem value="Others">Others</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="student">Students</SelectItem>
+                  <SelectItem value="staff/faculty">Staff/Faculty</SelectItem>
+                  <SelectItem value="community member">
+                    Community Members
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </>
-        )}
-      </div>
-
-      {hasSearched && !loading && (
-        <div className="space-y-4">
-          <div className="text-sm text-gray-600">
-            Showing{" "}
-            {activeTab === "events"
-              ? getFilteredEvents().length
-              : getFilteredParticipants().length}{" "}
-            results
           </div>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {(activeTab === "events"
-                    ? eventColumns
-                    : participantColumns
-                  ).map((column) => (
-                    <TableHead key={column.accessorKey}>
-                      {column.header}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(activeTab === "events"
-                  ? getFilteredEvents()
-                  : getFilteredParticipants()
-                ).map((row) => (
-                  <TableRow key={row.$id}>
-                    {(activeTab === "events"
-                      ? eventColumns
-                      : participantColumns
-                    ).map((column) => (
-                      <TableCell key={`${row.$id}-${column.accessorKey}`}>
-                        {row[column.accessorKey]}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <Button onClick={handleExport}>Export Data</Button>
-
-          <DataCharts />
-        </div>
-      )}
-
-      {loading && <div className="text-center py-4">Loading...</div>}
-
-      {hasSearched &&
-        !loading &&
-        (activeTab === "events"
-          ? getFilteredEvents()
-          : getFilteredParticipants()
-        ).length === 0 && (
-          <div className="text-center py-4 text-gray-500">
-            No results found. Try adjusting your search or filters.
-          </div>
-        )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

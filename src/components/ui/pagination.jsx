@@ -1,100 +1,129 @@
-import * as React from "react"
-import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
+import React from "react";
+import { Button } from "./button";
+import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 
-import { cn } from "@/lib/utils"
-import { buttonVariants } from "@/components/ui/button";
+export const Pagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  loading = false,
+  showPageNumbers = true,
+  maxPageNumbers = 5,
+}) => {
+  if (totalPages <= 1) return null;
 
-const Pagination = ({
-  className,
-  ...props
-}) => (
-  <nav
-    role="navigation"
-    aria-label="pagination"
-    className={cn("mx-auto flex w-full justify-center", className)}
-    {...props} />
-)
-Pagination.displayName = "Pagination"
+  const getPageNumbers = () => {
+    const pages = [];
+    const halfMax = Math.floor(maxPageNumbers / 2);
 
-const PaginationContent = React.forwardRef(({ className, ...props }, ref) => (
-  <ul
-    ref={ref}
-    className={cn("flex flex-row items-center gap-1", className)}
-    {...props} />
-))
-PaginationContent.displayName = "PaginationContent"
+    let startPage = Math.max(1, currentPage - halfMax);
+    let endPage = Math.min(totalPages, startPage + maxPageNumbers - 1);
 
-const PaginationItem = React.forwardRef(({ className, ...props }, ref) => (
-  <li ref={ref} className={cn("", className)} {...props} />
-))
-PaginationItem.displayName = "PaginationItem"
+    // Adjust start page if we're near the end
+    if (endPage - startPage < maxPageNumbers - 1) {
+      startPage = Math.max(1, endPage - maxPageNumbers + 1);
+    }
 
-const PaginationLink = ({
-  className,
-  isActive,
-  size = "icon",
-  ...props
-}) => (
-  <a
-    aria-current={isActive ? "page" : undefined}
-    className={cn(buttonVariants({
-      variant: isActive ? "outline" : "ghost",
-      size,
-    }), className)}
-    {...props} />
-)
-PaginationLink.displayName = "PaginationLink"
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
 
-const PaginationPrevious = ({
-  className,
-  ...props
-}) => (
-  <PaginationLink
-    aria-label="Go to previous page"
-    size="default"
-    className={cn("gap-1 pl-2.5", className)}
-    {...props}>
-    <ChevronLeft className="h-4 w-4" />
-    <span>Previous</span>
-  </PaginationLink>
-)
-PaginationPrevious.displayName = "PaginationPrevious"
+    return pages;
+  };
 
-const PaginationNext = ({
-  className,
-  ...props
-}) => (
-  <PaginationLink
-    aria-label="Go to next page"
-    size="default"
-    className={cn("gap-1 pr-2.5", className)}
-    {...props}>
-    <span>Next</span>
-    <ChevronRight className="h-4 w-4" />
-  </PaginationLink>
-)
-PaginationNext.displayName = "PaginationNext"
+  const pageNumbers = getPageNumbers();
 
-const PaginationEllipsis = ({
-  className,
-  ...props
-}) => (
-  <span
-    aria-hidden
-    className={cn("flex h-9 w-9 items-center justify-center", className)}
-    {...props}>
-    <MoreHorizontal className="h-4 w-4" />
-    <span className="sr-only">More pages</span>
-  </span>
-)
-PaginationEllipsis.displayName = "PaginationEllipsis"
+  return (
+    <div className="flex items-center justify-between px-2">
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1 || loading}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
 
-export {
-  Pagination,
-  PaginationContent,
-  PaginationLink,
-  PaginationItem,
-  PaginationPrevious,
-  PaginationNext,
-  PaginationEllipsis,
-}
+        {showPageNumbers && (
+          <div className="flex items-center space-x-1">
+            {pageNumbers[0] > 1 && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange(1)}
+                  disabled={loading}
+                >
+                  1
+                </Button>
+                {pageNumbers[0] > 2 && (
+                  <div className="flex items-center px-2">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </div>
+                )}
+              </>
+            )}
+
+            {pageNumbers.map((page) => (
+              <Button
+                key={page}
+                variant={page === currentPage ? "default" : "outline"}
+                size="sm"
+                onClick={() => onPageChange(page)}
+                disabled={loading}
+              >
+                {page}
+              </Button>
+            ))}
+
+            {pageNumbers[pageNumbers.length - 1] < totalPages && (
+              <>
+                {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
+                  <div className="flex items-center px-2">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange(totalPages)}
+                  disabled={loading}
+                >
+                  {totalPages}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || loading}
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="text-sm text-gray-500">
+        Page {currentPage} of {totalPages}
+      </div>
+    </div>
+  );
+};
+
+export const PaginationInfo = ({ pagination, loading = false }) => {
+  if (!pagination || pagination.totalItems === 0) return null;
+
+  return (
+    <div className="text-sm text-gray-500">
+      {loading
+        ? "Loading..."
+        : `Showing ${pagination.startIndex} to ${pagination.endIndex} of ${pagination.totalItems} entries`}
+    </div>
+  );
+};

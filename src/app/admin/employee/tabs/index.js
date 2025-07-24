@@ -1,0 +1,11 @@
+export { default as PersonalTab } from "./PersonalTab";
+export { default as DemographicsTab } from "./DemographicsTab";
+export { default as EmploymentTab } from "./EmploymentTab";
+export { default as GenderAwarenessTab } from "./GenderAwarenessTab";
+export { default as FamilyFinancialTab } from "./FamilyFinancialTab";
+export { default as ChildFamPlanTab } from "./ChildFamPlanTab";
+export { default as HealthMedInfoTab } from "./HealthMedInfoTab";
+export { default as LifestyleTab } from "./LifestyleTab";
+export { default as WorkplaceTab } from "./WorkplaceTab";
+export { default as AccessTab } from "./AccessTab";
+export { default as PhysicalTab } from "./PhysicalTab";

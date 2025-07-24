@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EventParticipationTrends } from "./trends/EventParticipation"
 import { DemographicTrends } from "./trends/DemographicTrends"
 import { ActionableInsights } from "./trends/ActionableInsights"
-import { databases, databaseId, studentsCollectionId, eventCollectionId } from '@/lib/appwrite'
+import { databases, databaseId, studentCollectionId, eventCollectionId } from '@/lib/appwrite'
 import { Query } from 'appwrite'
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading"
@@ -24,7 +24,7 @@ export const Trends = () => {
       // Fetch participants within date range
       const participantsResponse = await databases.listDocuments(
         databaseId,
-        studentsCollectionId,
+        studentCollectionId,
         [
           Query.greaterThanEqual('$createdAt', dateRange.from.toISOString()),
           Query.lessThanEqual('$createdAt', dateRange.to.toISOString()),

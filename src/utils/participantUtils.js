@@ -5,7 +5,7 @@ import {
   fetchParticipantData,
   databases,
   databaseId,
-  studentsCollectionId,
+  studentCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
 } from "@/lib/appwrite";
@@ -114,20 +114,24 @@ export const requiredFields = {
 export const validateParticipantForm = (data, type) => {
   console.log("Starting validation for type:", type);
   console.log("Data to validate:", data);
-  console.log("staffFacultyId type:", typeof data.staffFacultyId);
-  console.log("staffFacultyId value:", data.staffFacultyId);
-  
+
   const errors = {};
 
-  // Common validations
-  if (!data.name?.trim()) {
-    errors.name = "Name is required";
+  // Name validations
+  if (!data.firstName?.trim()) {
+    errors.firstName = "First name is required";
   }
 
-  if (!data.sex) {
-    errors.sex = "Sex is required";
+  if (!data.lastName?.trim()) {
+    errors.lastName = "Last name is required";
   }
 
+  // Gender validation
+  if (!data.gender) {
+    errors.gender = "Gender is required";
+  }
+
+  // Age validation
   if (!data.age) {
     errors.age = "Age is required";
   } else {
@@ -137,14 +141,33 @@ export const validateParticipantForm = (data, type) => {
     }
   }
 
+  // Address validation
   if (!data.address?.trim()) {
     errors.address = "Address is required";
   }
 
+  // Ethnic group validation
   if (!data.ethnicGroup) {
     errors.ethnicGroup = "Ethnic group is required";
   } else if (data.ethnicGroup === "Other" && !data.otherEthnicGroup?.trim()) {
     errors.otherEthnicGroup = "Please specify your ethnic group";
+  }
+
+  // Demographic field validations
+  if (!data.orientation) {
+    errors.orientation = "Sexual orientation is required";
+  } else if (!["Straight", "Bi-Sexual", "Lesbian"].includes(data.orientation)) {
+    errors.orientation = "Please select a valid sexual orientation";
+  }
+
+  if (!data.religion?.trim()) {
+    errors.religion = "Religion is required";
+  }
+
+  if (!data.firstGen) {
+    errors.firstGen = "First generation student status is required";
+  } else if (!["Yes", "No"].includes(data.firstGen)) {
+    errors.firstGen = "Please select Yes or No";
   }
 
   // Type-specific validations
@@ -157,20 +180,16 @@ export const validateParticipantForm = (data, type) => {
       }
       if (!data.school) errors.school = "School is required";
       if (!data.year) errors.year = "Year level is required";
-      if (!data.section) errors.section = "Section is required";
       break;
 
     case "staff":
       if (!data.staffFacultyId) {
         errors.staffFacultyId = "Staff/Faculty ID is required";
       } else {
-        // Handle both string and number types
-        const staffId = typeof data.staffFacultyId === 'string' 
-          ? data.staffFacultyId.replace(/\D/g, '')
-          : data.staffFacultyId.toString();
-
-        console.log("Processed staffId:", staffId);
-        console.log("staffId length:", staffId.length);
+        const staffId =
+          typeof data.staffFacultyId === "string"
+            ? data.staffFacultyId.replace(/\D/g, "")
+            : data.staffFacultyId.toString();
 
         if (staffId.length !== 3) {
           errors.staffFacultyId = "Staff/Faculty ID must be exactly 3 digits";
@@ -201,7 +220,12 @@ export const schoolOptions = [
   { name: "School of Information Technology", abbr: "SITech" },
 ];
 
-export const checkDuplicates = async (field, value, currentEventId, participantType) => {
+export const checkDuplicates = async (
+  field,
+  value,
+  currentEventId,
+  participantType
+) => {
   if (!field || !value || !currentEventId || value.trim() === "") {
     return { error: "", participant: null };
   }
@@ -212,18 +236,19 @@ export const checkDuplicates = async (field, value, currentEventId, participantT
 
     switch (participantType) {
       case "student":
-        collectionId = studentsCollectionId;
-        query = field === "studentId" ? 
-          Query.equal("studentId", value) : 
-          Query.equal("name", value);
+        collectionId = studentCollectionId;
+        query =
+          field === "studentId"
+            ? Query.equal("studentId", value)
+            : Query.equal("name", value);
         break;
       case "staff":
         collectionId = staffFacultyCollectionId;
-        // For staff ID, ensure we're sending an integer
+        // For staff ID, ensure we're sending a string
         if (field === "staffFacultyId") {
-          const staffId = parseInt(value.replace(/\D/g, ''));
-          // Only proceed if we have a valid number
-          if (isNaN(staffId)) {
+          const staffId = value.replace(/\D/g, "");
+          // Only proceed if we have a valid string
+          if (!staffId) {
             return { error: "", participant: null };
           }
           query = Query.equal("staffFacultyId", staffId);
@@ -239,21 +264,21 @@ export const checkDuplicates = async (field, value, currentEventId, participantT
         throw new Error("Invalid participant type");
     }
 
-    const response = await databases.listDocuments(
-      databaseId,
-      collectionId,
-      [
-        Query.equal("eventId", currentEventId),
-        query
-      ]
-    );
+    const response = await databases.listDocuments(databaseId, collectionId, [
+      Query.equal("eventId", currentEventId),
+      query,
+    ]);
 
     if (response.documents.length > 0) {
       return {
-        error: `This ${field === "studentId" ? "Student ID" : 
-               field === "staffFacultyId" ? "Staff/Faculty ID" : 
-               "Name"} is already registered for this event.`,
-        participant: response.documents[0]
+        error: `This ${
+          field === "studentId"
+            ? "Student ID"
+            : field === "staffFacultyId"
+            ? "Staff/Faculty ID"
+            : "Name"
+        } is already registered for this event.`,
+        participant: response.documents[0],
       };
     }
 
@@ -261,16 +286,13 @@ export const checkDuplicates = async (field, value, currentEventId, participantT
     const otherEventsResponse = await databases.listDocuments(
       databaseId,
       collectionId,
-      [
-        Query.notEqual("eventId", currentEventId),
-        query
-      ]
+      [Query.notEqual("eventId", currentEventId), query]
     );
 
     if (otherEventsResponse.documents.length > 0) {
       return {
         error: "",
-        participant: otherEventsResponse.documents[0]
+        participant: otherEventsResponse.documents[0],
       };
     }
 
@@ -279,7 +301,7 @@ export const checkDuplicates = async (field, value, currentEventId, participantT
     console.error("Error checking duplicates:", error);
     return {
       error: "Error checking for duplicates",
-      participant: null
+      participant: null,
     };
   }
 };
@@ -304,15 +326,15 @@ export const isIdComplete = (id, type) => {
   if (!id) return false;
 
   // Remove any non-digit characters
-  const cleanId = id.replace(/\D/g, '');
+  const cleanId = id.replace(/\D/g, "");
 
   // For student IDs, we expect 8 digits (XX-XX-XXXX format)
-  if (type === 'student') {
+  if (type === "student") {
     return cleanId.length === 8;
   }
 
   // For staff IDs, we expect 6 digits (XX-XXXX format)
-  if (type === 'staff') {
+  if (type === "staff") {
     return cleanId.length === 6;
   }
 
@@ -321,13 +343,13 @@ export const isIdComplete = (id, type) => {
 
 export const isStudentIdComplete = (studentId) => {
   if (!studentId) return false;
-  const cleanId = studentId.replace(/\D/g, '');
+  const cleanId = studentId.replace(/\D/g, "");
   return cleanId.length === 8;
 };
 
 export const isStaffIdComplete = (staffId) => {
   if (!staffId) return false;
-  const numbers = staffId.replace(/\D/g, '');
+  const numbers = staffId.replace(/\D/g, "");
   return numbers.length === 3;
 };
 
@@ -404,15 +426,56 @@ export const handleAutofill = async (
   }
 };
 
-// Add a new function to handle the autofill confirmation
+// Update getInitialParticipantData function
+export const getInitialParticipantData = (type) => {
+  const baseData = {
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    gender: "",
+    age: "",
+    address: "",
+    ethnicGroup: "",
+    otherEthnicGroup: "",
+    orientation: "",
+    religion: "",
+    firstGen: "",
+  };
+
+  switch (type) {
+    case "student":
+      return {
+        ...baseData,
+        studentId: "",
+        school: "",
+        year: "",
+      };
+    case "staff":
+      return {
+        ...baseData,
+        staffFacultyId: "",
+      };
+    case "community":
+      return baseData;
+    default:
+      return baseData;
+  }
+};
+
+// Update handleAutofillConfirm function
 export const handleAutofillConfirm = (autofillData, setParticipantData) => {
   const mappedData = {
-    name: autofillData.name,
-    sex: autofillData.sex,
+    firstName: autofillData.firstName,
+    middleName: autofillData.middleName || "",
+    lastName: autofillData.lastName,
+    gender: autofillData.gender,
     age: autofillData.age,
     address: autofillData.address,
     ethnicGroup: autofillData.ethnicGroup,
     otherEthnicGroup: autofillData.otherEthnicGroup || "",
+    orientation: autofillData.orientation || "",
+    religion: autofillData.religion || "",
+    firstGen: autofillData.firstGen || "",
   };
 
   // Add type-specific fields
@@ -421,7 +484,6 @@ export const handleAutofillConfirm = (autofillData, setParticipantData) => {
       mappedData.studentId = autofillData.studentId;
       mappedData.school = autofillData.school;
       mappedData.year = autofillData.year;
-      mappedData.section = autofillData.section;
       break;
     case "staff":
       mappedData.staffFacultyId = autofillData.staffFacultyId;
@@ -438,38 +500,6 @@ export const formatStaffFacultyId = (input) => {
   if (!input) return "";
   // Only keep first 3 digits, no prefix
   return input.replace(/\D/g, "").slice(0, 3);
-};
-
-// Update initial state helper
-export const getInitialParticipantData = (participantType) => {
-  const baseFields = {
-    name: "",
-    sex: "",
-    age: "",
-    address: "",
-    ethnicGroup: "",
-    otherEthnicGroup: "",
-  };
-
-  switch (participantType) {
-    case "student":
-      return {
-        ...baseFields,
-        studentId: "",
-        school: "",
-        year: "",
-        section: "",
-      };
-    case "staff":
-      return {
-        ...baseFields,
-        staffFacultyId: "",
-      };
-    case "community":
-      return baseFields;
-    default:
-      return baseFields;
-  }
 };
 
 // Helper function to clean participant data before submission
@@ -506,11 +536,12 @@ export const cleanParticipantData = (data, participantType) => {
 
     case "staff":
       // Handle staffFacultyId conversion safely
-      const staffId = typeof data.staffFacultyId === 'string' 
-        ? parseInt(data.staffFacultyId.replace(/\D/g, '') || '0')
-        : typeof data.staffFacultyId === 'number' 
-          ? data.staffFacultyId 
-          : 0;
+      const staffId =
+        typeof data.staffFacultyId === "string"
+          ? data.staffFacultyId.replace(/\D/g, "")
+          : typeof data.staffFacultyId === "number"
+          ? data.staffFacultyId.toString()
+          : "";
 
       console.log("Processed staffId:", staffId);
       console.log("staffId type:", typeof staffId);
@@ -570,7 +601,7 @@ export const checkDuplicateParticipantInEvent = async (
   try {
     const participants = await databases.listDocuments(
       databaseId,
-      studentsCollectionId,
+      studentCollectionId,
       [
         Query.notEqual("eventId", eventId),
         type === "student"
@@ -587,3 +618,231 @@ export const checkDuplicateParticipantInEvent = async (
     return null;
   }
 };
+
+// Utility: Check if an ethnicity is valid based on exclusion rules
+export function isValidEthnicity(ethnicity) {
+  if (!ethnicity) return false;
+  const value = ethnicity.trim().toLowerCase();
+
+  // Exclude variations of "Not Applicable" and "Not Specified"
+  const notApplicablePatterns = [
+    "na",
+    "n/a",
+    "none",
+    "n.a",
+    "na",
+    "no",
+    "not applicable",
+    "notapplicable",
+    "not-applicable",
+    "not specified",
+    "notspecified",
+    "not-specified",
+    "unspecified",
+    "unknown",
+    "unkown",
+    "n/a",
+    "n.a",
+    "na",
+  ];
+  if (notApplicablePatterns.includes(value.replace(/[\s\-]/g, "")))
+    return false;
+
+  // Exclude special characters or symbols
+  if (/^[\*\-]+$/.test(value)) return false;
+
+  // Exclude numeric values or pure numbers
+  if (/^\d+$/.test(value)) return false;
+
+  // Exclude religious identifiers
+  const religiousTerms = [
+    "catholic",
+    "roman catholic",
+    "christian",
+    "iglesia",
+    "islam",
+    "muslim",
+    "baptist",
+    "born again",
+    "adventist",
+    "protestant",
+    "methodist",
+    "lutheran",
+    "anglican",
+    "orthodox",
+    "hindu",
+    "buddhist",
+    "jewish",
+    "sikh",
+  ];
+  if (religiousTerms.some((term) => value.includes(term))) return false;
+
+  // Exclude government programs or organizations
+  const govTerms = [
+    "4ps",
+    "dswd",
+    "pantawid",
+    "lgu",
+    "barangay",
+    "gov",
+    "government",
+    "municipal",
+    "provincial",
+    "national",
+    "department",
+    "office",
+    "bureau",
+    "agency",
+  ];
+  if (govTerms.some((term) => value.includes(term))) return false;
+
+  // Exclude obvious typos or unrelated roles
+  const unrelatedTerms = [
+    "tgn volunteer",
+    "kankanaey-sin",
+    "volunteer",
+    "student",
+    "teacher",
+    "faculty",
+    "staff",
+    "employee",
+    "worker",
+    "member",
+    "participant",
+    "resident",
+    "citizen",
+    "person",
+    "individual",
+    "human",
+    "people",
+    "group",
+    "community",
+    "organization",
+    "association",
+    "club",
+    "team",
+    "committee",
+    "board",
+    "council",
+  ];
+  if (unrelatedTerms.some((term) => value.includes(term))) return false;
+
+  // Exclude empty or whitespace-only
+  if (value === "" || value === "-") return false;
+
+  // Exclude single characters or very short meaningless entries
+  if (value.length <= 1) return false;
+
+  return true;
+}
+
+// Utility: Process ethnicity data with proper filtering and grouping
+export function processEthnicityData(participants) {
+  const allowedEthnicities = [
+    "Agta",
+    "Aeta",
+    "Alta",
+    "Bag-O",
+    "Bicolano",
+    "Bisaya",
+    "Bugkalot",
+    "Casiguranin",
+    "Dumagat",
+    "Egongot",
+    "Filipino",
+    "Gaddang",
+    "Ibanag",
+    "Ifugao",
+    "Igorot",
+    "Ilocano",
+    "Ilongot",
+    "Isinay",
+    "Itawes",
+    "Itneg",
+    "Kankana-ey",
+    "Mangyan",
+    "Tagalog",
+  ];
+  const allowedSet = new Set(allowedEthnicities.map((e) => e.toLowerCase()));
+
+  const validEthnicities = {};
+  let notSpecifiedCount = 0;
+  let notSpecifiedMale = 0;
+  let notSpecifiedFemale = 0;
+
+  participants.forEach((participant) => {
+    const ethnicity = participant.ethnicGroup?.trim() || "";
+    const sex = participant.sex?.toLowerCase() || "unknown";
+
+    if (isValidEthnicity(ethnicity)) {
+      const normalizedEthnicity =
+        ethnicity.charAt(0).toUpperCase() + ethnicity.slice(1).toLowerCase();
+      const ethnicityKey = ethnicity.toLowerCase();
+      if (allowedSet.has(ethnicityKey)) {
+        if (!validEthnicities[normalizedEthnicity]) {
+          validEthnicities[normalizedEthnicity] = {
+            name: normalizedEthnicity,
+            male: 0,
+            female: 0,
+            total: 0,
+          };
+        }
+        if (sex === "male" || sex === "female") {
+          validEthnicities[normalizedEthnicity][sex]++;
+          validEthnicities[normalizedEthnicity].total++;
+        }
+      } else {
+        // Valid but not in allowed list
+        if (sex === "male") notSpecifiedMale++;
+        else if (sex === "female") notSpecifiedFemale++;
+        notSpecifiedCount++;
+      }
+    } else {
+      // Invalid ethnicity
+      if (sex === "male") notSpecifiedMale++;
+      else if (sex === "female") notSpecifiedFemale++;
+      notSpecifiedCount++;
+    }
+  });
+
+  // Convert to array and sort by total count (descending)
+  const result = Object.values(validEthnicities).sort(
+    (a, b) => b.total - a.total
+  );
+
+  // Add "Not Specified" entry if there are any invalid or not-allowed entries
+  if (notSpecifiedCount > 0) {
+    result.push({
+      name: "Not Specified",
+      male: notSpecifiedMale,
+      female: notSpecifiedFemale,
+      total: notSpecifiedCount,
+    });
+  }
+
+  return result;
+}
+
+// Utility: Count top valid ethnicities from a participant array
+export function countTopEthnicities(participants, topN = 5) {
+  const processedData = processEthnicityData(participants);
+
+  // Return top N ethnicities (excluding "Unspecified" from top N count)
+  const validEthnicities = processedData.filter(
+    (item) => item.name !== "Unspecified"
+  );
+  const topEthnicities = validEthnicities.slice(0, topN);
+
+  // Add "Unspecified" if it exists and has count > 0
+  const unspecified = processedData.find((item) => item.name === "Unspecified");
+  if (unspecified && unspecified.total > 0) {
+    topEthnicities.push(unspecified);
+  }
+
+  return topEthnicities.map((item) => ({
+    ethnicity: item.name,
+    count: item.total,
+    male: item.male,
+    female: item.female,
+  }));
+}

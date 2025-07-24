@@ -91,15 +91,19 @@ export default function SignInPage() {
       try {
         const user = await getCurrentUser();
         if (user && user.role !== "guest" && !isRedirected) {
-          handleUserStatus(user);
+          // Only redirect if approved, but do NOT show any toast here
+          if (user.approvalStatus === "approved") {
+            router.push(user.role === "admin" ? "/admin" : "/officer");
+          }
           setIsRedirected(true);
         }
       } catch (error) {
+        // No toast here
         console.error("Error checking existing session:", error);
       }
     };
     checkSession();
-  }, [isRedirected, handleUserStatus]);
+  }, [isRedirected, router]);
 
   const handleGoogleSignIn = async () => {
     try {

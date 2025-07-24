@@ -32,6 +32,7 @@ import {
   schoolOptions,
 } from "../../../utils/participantUtils";
 import { updateParticipant } from "@/lib/appwrite"; // Adjust import based on your file structure
+import EthnicitySelect from "@/components/shared/EthnicitySelect";
 
 export default function EditParticipantDialog({
   participant,
@@ -265,9 +266,9 @@ export default function EditParticipantDialog({
             <Label htmlFor="ethnicGroup" className="text-right">
               Ethnic Group
             </Label>
-            <Select
+            <EthnicitySelect
               value={editedParticipant.ethnicGroup}
-              onValueChange={(value) =>
+              onChange={(value) =>
                 setEditedParticipant({
                   ...editedParticipant,
                   ethnicGroup: value,
@@ -275,19 +276,7 @@ export default function EditParticipantDialog({
                     value === "Other" ? "" : editedParticipant.otherEthnicGroup,
                 })
               }
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select ethnic group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Tagalog">Tagalog</SelectItem>
-                <SelectItem value="Cebuano">Cebuano</SelectItem>
-                <SelectItem value="Ilocano">Ilocano</SelectItem>
-                <SelectItem value="Bicolano">Bicolano</SelectItem>
-                <SelectItem value="Waray">Waray</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+            />
             {errors.ethnicGroup && (
               <p className="text-sm text-red-500">{errors.ethnicGroup}</p>
             )}

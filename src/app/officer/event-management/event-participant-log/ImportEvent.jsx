@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/accordion";
 import { getCurrentAcademicPeriod } from "@/lib/appwrite";
 import { createNotification } from "@/lib/appwrite";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Info } from "lucide-react";
+import * as XLSX from "xlsx";
 
 export default function ImportEventData({ onSuccess }) {
   const [file, setFile] = useState(null);
@@ -41,6 +44,78 @@ export default function ImportEventData({ onSuccess }) {
     loadCurrentPeriod();
   }, []);
 
+  const validateExcelFormat = async (file) => {
+    try {
+      const data = await importUtils.readFile(file);
+
+      // Check if the file has the minimum required rows
+      if (!Array.isArray(data) || data.length < 5) {
+        throw new Error(
+          "The file format is incorrect. It must have at least 5 rows of data."
+        );
+      }
+
+      // Check required cells in Column B (index 1)
+      const requiredCellsB = [
+        { row: 0, value: "School Year" },
+        { row: 1, value: "Period Type" },
+        { row: 2, value: "Event Name" },
+        { row: 3, value: "Event Venue" },
+        { row: 4, value: "Event Category" },
+      ];
+
+      // Check required cells in Column F (index 5)
+      const requiredCellsF = [
+        { row: 0, value: "Event Type" },
+        { row: 1, value: "Event Time Range" },
+        { row: 2, value: "Event Date" },
+      ];
+
+      // Validate Column B cells
+      for (const cell of requiredCellsB) {
+        if (!data[cell.row] || !data[cell.row][1]) {
+          throw new Error(
+            `Missing required information in Column B, Row ${
+              cell.row + 1
+            }. Please check the file format.`
+          );
+        }
+      }
+
+      // Validate Column F cells
+      for (const cell of requiredCellsF) {
+        if (!data[cell.row] || !data[cell.row][5]) {
+          throw new Error(
+            `Missing required information in Column F, Row ${
+              cell.row + 1
+            }. Please check the file format.`
+          );
+        }
+      }
+
+      // Check time format in Column F, Row 2
+      const timeRange = data[1][5];
+      if (!timeRange || !timeRange.includes("-")) {
+        throw new Error(
+          "Invalid time range format in Column F, Row 2. Expected format: HH:MM AM/PM - HH:MM AM/PM"
+        );
+      }
+
+      // Check date format in Column F, Row 3
+      const date = data[2][5];
+      if (!date || !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(date)) {
+        throw new Error(
+          "Invalid date format in Column F, Row 3. Expected format: MM/DD/YYYY"
+        );
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Validation error:", error);
+      throw new Error(`Invalid file format: ${error.message}`);
+    }
+  };
+
   const handleFileChange = async (e) => {
     if (!e.target.files || e.target.files.length === 0) {
       return;
@@ -49,14 +124,27 @@ export default function ImportEventData({ onSuccess }) {
     const selectedFile = e.target.files[0];
     setFile(selectedFile);
     setError(null);
+    setPreviewData(null);
 
     try {
+      // First validate the file type
       validateFileType(selectedFile);
+
+      // Then validate the Excel format
+      await validateExcelFormat(selectedFile);
+
+      // If validation passes, proceed with data extraction
       const data = await importUtils.handleFileChange(selectedFile);
       const formattedData = importUtils.formatEventPreview(data);
       setPreviewData(formattedData);
     } catch (error) {
+      console.error("File validation error:", error);
       setError(error.message);
+      toast.error(error.message);
+      setFile(null);
+      setPreviewData(null);
+      // Reset the file input
+      e.target.value = "";
     }
   };
 
@@ -87,11 +175,9 @@ export default function ImportEventData({ onSuccess }) {
 
       validateFileType(file);
 
-      // Extract event metadata from file
       const data = await importUtils.handleFileChange(file);
       const eventMetadata = data.eventMetadata;
 
-      // Check for duplicate event
       const duplicateCheck = await importUtils.checkForDuplicateEvent({
         eventName: eventMetadata.eventName,
         eventDate: eventMetadata.eventDate,
@@ -104,7 +190,6 @@ export default function ImportEventData({ onSuccess }) {
         );
       }
 
-      // Continue with import if no duplicate found
       const result = await importUtils.importEventAndParticipants(
         file,
         currentPeriod.$id
@@ -116,7 +201,6 @@ export default function ImportEventData({ onSuccess }) {
         setPreviewData(null);
         setIsDialogOpen(false);
 
-        // Create notification (only if notifications collection exists)
         try {
           await createNotification({
             userId: "admin",
@@ -130,10 +214,8 @@ export default function ImportEventData({ onSuccess }) {
           });
         } catch (notifError) {
           console.error("Error creating notification:", notifError);
-          // Continue even if notification fails
         }
 
-        // Call onSuccess callback if provided
         if (onSuccess) {
           onSuccess(result.event);
         }
@@ -183,12 +265,84 @@ export default function ImportEventData({ onSuccess }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="format-guide">
+                <AccordionTrigger className="text-sm font-medium">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4" />
+                    Required Excel Format Guide
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="text-sm space-y-2 text-muted-foreground">
+                    <p>Your Excel file must follow this format:</p>
+                    <div className="pl-4 space-y-2">
+                      <p>
+                        <strong>Row 1:</strong> School Year (Column B)
+                      </p>
+                      <p>
+                        <strong>Row 2:</strong> Period Type (Column B)
+                      </p>
+                      <p>
+                        <strong>Row 3:</strong> Event Name (Column B)
+                      </p>
+                      <p>
+                        <strong>Row 4:</strong> Event Venue (Column B)
+                      </p>
+                      <p>
+                        <strong>Row 5:</strong> Event Category (Column B)
+                      </p>
+                      <p>
+                        <strong>Row 1:</strong> Event Type (Column F)
+                      </p>
+                      <p>
+                        <strong>Row 2:</strong> Event Time Range (Column F) -
+                        Format: HH:MM AM/PM - HH:MM AM/PM
+                      </p>
+                      <p>
+                        <strong>Row 3:</strong> Event Date (Column F) - Format:
+                        MM/DD/YYYY
+                      </p>
+                    </div>
+                    <p className="mt-2">Participant Information:</p>
+                    <div className="pl-4 space-y-2">
+                      <p>
+                        <strong>Required Fields:</strong>
+                      </p>
+                      <ul className="list-disc pl-4">
+                        <li>Name</li>
+                        <li>Student ID (for students)</li>
+                        <li>Sex (Male/Female)</li>
+                        <li>Age</li>
+                        <li>Address</li>
+                      </ul>
+                    </div>
+                    <Alert className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Important</AlertTitle>
+                      <AlertDescription>
+                        All required fields must be filled. Missing or invalid
+                        data will prevent the import.
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
             <input
               type="file"
               accept=".xlsx, .xls, .csv"
               onChange={handleFileChange}
               className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"
             />
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Import Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
             {previewData && previewData.participantDetails ? (
               <div className="overflow-y-auto max-h-[50vh]">
                 <Card className="mt-4">
@@ -196,7 +350,6 @@ export default function ImportEventData({ onSuccess }) {
                     <CardTitle>Preview</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Event Details Section */}
                     <div className="grid gap-2 sm:grid-cols-2">
                       <div>
                         <p>
@@ -243,7 +396,6 @@ export default function ImportEventData({ onSuccess }) {
                       </p>
                     </div>
 
-                    {/* Participant Summary Section */}
                     <div className="mt-4 p-4 bg-muted rounded-lg">
                       <h3 className="font-semibold text-lg text-center mb-3">
                         Participant Summary
@@ -289,11 +441,6 @@ export default function ImportEventData({ onSuccess }) {
               <p className="text-center text-gray-500">
                 No file chosen. Upload a file to see the preview.
               </p>
-            )}
-            {error && (
-              <div className="text-red-500 mt-2" role="alert">
-                Error: {error}
-              </div>
             )}
             <div className="flex justify-end">
               <Button onClick={handleImport} disabled={isImporting || !file}>

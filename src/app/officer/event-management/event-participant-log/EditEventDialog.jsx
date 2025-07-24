@@ -39,12 +39,40 @@ import {
 import { editEvent } from "@/lib/appwrite";
 
 const EditEvent = ({ event, onUpdateEvent }) => {
-  const [editingEvent, setEditingEvent] = useState(() => ({
-    eventTimeFrom: event?.eventTimeFrom || null,
-    eventTimeTo: event?.eventTimeTo || null,
-    numberOfHours: event?.numberOfHours || 0,
-    ...event,
-  }));
+  const [editingEvent, setEditingEvent] = useState(() => {
+    // Safely parse the dates and times
+    let eventTimeFrom = null;
+    let eventTimeTo = null;
+
+    if (event?.eventTimeFrom) {
+      try {
+        const date = new Date(event.eventTimeFrom);
+        if (!isNaN(date.getTime())) {
+          eventTimeFrom = date;
+        }
+      } catch (error) {
+        console.error("Error parsing eventTimeFrom:", error);
+      }
+    }
+
+    if (event?.eventTimeTo) {
+      try {
+        const date = new Date(event.eventTimeTo);
+        if (!isNaN(date.getTime())) {
+          eventTimeTo = date;
+        }
+      } catch (error) {
+        console.error("Error parsing eventTimeTo:", error);
+      }
+    }
+
+    return {
+      eventTimeFrom,
+      eventTimeTo,
+      numberOfHours: event?.numberOfHours || 0,
+      ...event,
+    };
+  });
 
   const [duration, setDuration] = useState("");
   const [errors, setErrors] = useState({});
@@ -55,66 +83,70 @@ const EditEvent = ({ event, onUpdateEvent }) => {
   const calculateDuration = (startTime, endTime) => {
     if (!startTime || !endTime) return "";
 
-    const start = new Date(`1970-01-01T${startTime}`);
-    const end = new Date(`1970-01-01T${endTime}`);
+    try {
+      const start = new Date(`1970-01-01T${startTime}`);
+      const end = new Date(`1970-01-01T${endTime}`);
 
-    // Handle case where end time is on the next day
-    if (end < start) {
-      end.setDate(end.getDate() + 1);
+      // Handle case where end time is on the next day
+      if (end < start) {
+        end.setDate(end.getDate() + 1);
+      }
+
+      const diffInMinutes = (end - start) / (1000 * 60);
+      const hours = Math.floor(diffInMinutes / 60);
+      const minutes = Math.floor(diffInMinutes % 60);
+
+      return `${hours} hours ${minutes} minutes`;
+    } catch (error) {
+      console.error("Error calculating duration:", error);
+      return "";
     }
-
-    const diffInMinutes = (end - start) / (1000 * 60);
-    const hours = Math.floor(diffInMinutes / 60);
-    const minutes = Math.floor(diffInMinutes % 60);
-
-    return `${hours} hours ${minutes} minutes`;
   };
 
   useEffect(() => {
-    if (event?.eventTimeFrom && event?.eventTimeTo) {
-      const start = new Date(event.eventTimeFrom);
-      const end = new Date(event.eventTimeTo);
-
-      const startTime = start.toTimeString().slice(0, 5);
-      const endTime = end.toTimeString().slice(0, 5);
-      const calculatedDuration = calculateDuration(startTime, endTime);
-      setDuration(calculatedDuration);
-      setIsTimeValid(true);
-    }
-  }, [event]);
-
-  useEffect(() => {
     if (!isDialogOpen) {
-      return; // Skip validation if dialog is not open
+      return;
     }
 
     if (!editingEvent.eventTimeFrom || !editingEvent.eventTimeTo) {
-      setDuration(duration || ""); // Keep existing duration if times haven't changed
+      setDuration(duration || "");
       setIsTimeValid(true);
       return;
     }
 
-    const start = new Date(editingEvent.eventTimeFrom);
-    const end = new Date(editingEvent.eventTimeTo);
+    try {
+      const start = new Date(editingEvent.eventTimeFrom);
+      const end = new Date(editingEvent.eventTimeTo);
 
-    const startTime = start.toTimeString().slice(0, 5);
-    const endTime = end.toTimeString().slice(0, 5);
-    const calculatedDuration = calculateDuration(startTime, endTime);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        setIsTimeValid(false);
+        setDuration("");
+        return;
+      }
 
-    if (calculatedDuration) {
-      setIsTimeValid(true);
-      setDuration(calculatedDuration);
-      const [hours, minutes] = calculatedDuration.match(/\d+/g).map(Number);
-      setEditingEvent((prev) => ({
-        ...prev,
-        numberOfHours: hours + minutes / 60,
-      }));
-    } else {
+      const startTime = start.toTimeString().slice(0, 5);
+      const endTime = end.toTimeString().slice(0, 5);
+      const calculatedDuration = calculateDuration(startTime, endTime);
+
+      if (calculatedDuration) {
+        setIsTimeValid(true);
+        setDuration(calculatedDuration);
+        const [hours, minutes] = calculatedDuration.match(/\d+/g).map(Number);
+        setEditingEvent((prev) => ({
+          ...prev,
+          numberOfHours: hours + minutes / 60,
+        }));
+      } else {
+        setIsTimeValid(false);
+        setDuration("");
+        if (isTimeValid) {
+          toast.warning("Invalid time range");
+        }
+      }
+    } catch (error) {
+      console.error("Error processing time:", error);
       setIsTimeValid(false);
       setDuration("");
-      if (isTimeValid) {
-        toast.warning("Invalid time range");
-      }
     }
   }, [
     editingEvent.eventTimeFrom,
@@ -123,6 +155,47 @@ const EditEvent = ({ event, onUpdateEvent }) => {
     isTimeValid,
     duration,
   ]);
+
+  const formatTimeForInput = (date) => {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+      return "";
+    }
+    // Format time as HH:mm
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
+  const handleTimeChange = (field, value) => {
+    if (!editingEvent.eventDate) {
+      toast.warning("Please select a date first");
+      return;
+    }
+
+    try {
+      // Parse the time value (HH:mm format)
+      const [hours, minutes] = value.split(":").map(Number);
+      if (isNaN(hours) || isNaN(minutes)) {
+        throw new Error("Invalid time format");
+      }
+
+      // Create a new date using the event date and the new time
+      const newDate = new Date(editingEvent.eventDate);
+      newDate.setHours(hours, minutes, 0, 0);
+
+      if (isNaN(newDate.getTime())) {
+        throw new Error("Invalid date");
+      }
+
+      setEditingEvent((prev) => ({
+        ...prev,
+        [field]: newDate,
+      }));
+    } catch (error) {
+      console.error("Error setting time:", error);
+      toast.error("Invalid time format");
+    }
+  };
 
   const handleSave = async () => {
     if (!validateEventForm(editingEvent)) {
@@ -240,18 +313,9 @@ const EditEvent = ({ event, onUpdateEvent }) => {
               <Input
                 id="eventTimeFrom"
                 type="time"
-                value={
-                  editingEvent.eventTimeFrom
-                    ? new Date(editingEvent.eventTimeFrom)
-                        .toISOString()
-                        .substring(11, 16)
-                    : ""
-                }
+                value={formatTimeForInput(editingEvent.eventTimeFrom)}
                 onChange={(e) =>
-                  setEditingEvent({
-                    ...editingEvent,
-                    eventTimeFrom: `${editingEvent.eventDate}T${e.target.value}:00.000Z`,
-                  })
+                  handleTimeChange("eventTimeFrom", e.target.value)
                 }
               />
               {errors.eventTimeFrom && (
@@ -263,18 +327,9 @@ const EditEvent = ({ event, onUpdateEvent }) => {
               <Input
                 id="eventTimeTo"
                 type="time"
-                value={
-                  editingEvent.eventTimeTo
-                    ? new Date(editingEvent.eventTimeTo)
-                        .toISOString()
-                        .substring(11, 16)
-                    : ""
-                }
+                value={formatTimeForInput(editingEvent.eventTimeTo)}
                 onChange={(e) =>
-                  setEditingEvent({
-                    ...editingEvent,
-                    eventTimeTo: `${editingEvent.eventDate}T${e.target.value}:00.000Z`,
-                  })
+                  handleTimeChange("eventTimeTo", e.target.value)
                 }
               />
               {errors.eventTimeTo && (

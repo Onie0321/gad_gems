@@ -1,0 +1,75 @@
+[
+  {
+    "eventName": "Forestry Week",
+    "eventDate": "2024-12-31T00:00:00.000+00:00",
+    "eventTimeFrom": "2024-12-31T08:00:00.000+00:00",
+    "eventTimeTo": "2024-12-30T17:00:00.000+00:00",
+    "eventVenue": "Gymnasium",
+    "eventType": "Academic",
+    "eventCategory": "School of Information Technology",
+    "numberOfHours": "9",
+    "participants": [
+      "student_67a8a45d0024bc788665",
+      "student_67a8a45e000fc53fe6c1",
+      "student_67a8a45f0017d5dcfb21",
+      "student_67a8a461000b27cf0c12",
+      "student_67a8a46100258eccd2b1",
+      "student_67a8a46200237de1e7b2",
+      "student_67a8a462003a0712f307",
+      "student_67a8a4640020a4b187a3",
+      "staff_67a8a4650039ec3390d5",
+      "staff_67a8a4670006700a7d69",
+      "community_67a8a467001b9c857134",
+      "community_67a8a4680026d85af51e"
+    ],
+    "createdBy": "675de7bd001df0be5473",
+    "showOnHomepage": true,
+    "isArchived": false,
+    "academicPeriodId": "679ba6c2dff117d41a86",
+    "archivedAt": "",
+    "createdAt": "2025-02-09T12:49:44.993Z",
+    "source": "imported",
+    "$id": "67a8a45d0024a830cc8e",
+    "$createdAt": "2025-02-09T12:49:45.686+00:00",
+    "$updatedAt": "2025-02-20T13:17:19.058+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67616db5001a7e8442b8"
+  },
+  {
+    "eventName": "IT Week",
+    "eventDate": "2025-03-12T00:00:00.000+00:00",
+    "eventTimeFrom": "2025-02-09T20:52:00.000+00:00",
+    "eventTimeTo": "2025-02-09T21:52:00.000+00:00",
+    "eventVenue": "Ascot Gym",
+    "eventType": "Non-Academic",
+    "eventCategory": "Admission Office, Budget Unit",
+    "numberOfHours": "1 hours 0 minutes",
+    "participants": [
+      "student_67a8a5ac002f7550b6c8",
+      "staff_67a8a6e60018b5b91666",
+      "community_67a8a70b001ff8c27966"
+    ],
+    "createdBy": "675de7bd001df0be5473",
+    "showOnHomepage": false,
+    "isArchived": false,
+    "academicPeriodId": "679ba6c2dff117d41a86",
+    "archivedAt": "",
+    "createdAt": "2025-02-09T12:54:18.713Z",
+    "source": "created",
+    "$id": "67a8a57a002caa62665c",
+    "$createdAt": "2025-02-09T12:54:19.120+00:00",
+    "$updatedAt": "2025-02-09T13:01:02.055+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67616db5001a7e8442b8"
+  }
+]

@@ -41,7 +41,7 @@ import {
   checkDuplicateEvent,
   checkTimeConflict,
   getCurrentAcademicPeriod,
-  studentsCollectionId,
+  studentCollectionId,
 } from "@/lib/appwrite";
 import { schoolOptions, getNonAcademicCategories } from "@/utils/eventUtils";
 import { useTabContext } from "@/context/TabContext"; // Import the context hook
@@ -330,13 +330,11 @@ export default function CreateEvent({
         eventType: eventType.join(", "),
         eventCategory: selectedCategories.join(", "),
         numberOfHours: duration,
-        participants: [],
         createdBy: user.$id,
-        showOnHomepage: false,
         isArchived: false,
         academicPeriodId: currentAcademicPeriod.$id,
         archivedAt: "",
-        createdAt: new Date().toISOString(),
+        
         source: "created",
       };
 
@@ -481,65 +479,54 @@ export default function CreateEvent({
         : []),
       ...(eventType.includes("Non-Academic") ? getNonAcademicCategories() : []),
     ];
-    if (tempSelectedCategories.length === allCategories.length) {
-      setTempSelectedCategories([]);
-      setSelectAllAcademic(false);
-      setSelectAllNonAcademic(false);
-    } else {
-      setTempSelectedCategories(allCategories);
-      if (eventType.includes("Academic")) setSelectAllAcademic(true);
-      if (eventType.includes("Non-Academic")) setSelectAllNonAcademic(true);
-    }
+
+    setTempSelectedCategories((prev) => {
+      if (prev.length === allCategories.length) {
+        return [];
+      } else {
+        return allCategories;
+      }
+    });
+
+    setSelectAllAcademic(eventType.includes("Academic"));
+    setSelectAllNonAcademic(eventType.includes("Non-Academic"));
   };
 
   const handleSelectAllAcademic = (checked) => {
-    if (checked) {
-      setTempSelectedCategories((prev) => {
-        const nonAcademicSelected = prev.filter(
-          (cat) => !schoolOptions.map((school) => school.name).includes(cat)
-        );
-        return [
-          ...nonAcademicSelected,
-          ...schoolOptions.map((school) => school.name),
-        ];
-      });
-    } else {
-      setTempSelectedCategories((prev) =>
-        prev.filter(
-          (cat) => !schoolOptions.map((school) => school.name).includes(cat)
-        )
+    const academicCategories = schoolOptions.map((school) => school.name);
+    setTempSelectedCategories((prev) => {
+      const nonAcademicSelected = prev.filter(
+        (cat) => !academicCategories.includes(cat)
       );
-    }
+      return checked
+        ? [...nonAcademicSelected, ...academicCategories]
+        : nonAcademicSelected;
+    });
     setSelectAllAcademic(checked);
   };
 
   const handleSelectAllNonAcademic = (checked) => {
-    if (checked) {
-      setTempSelectedCategories((prev) => {
-        const academicSelected = prev.filter((cat) =>
-          schoolOptions.map((school) => school.name).includes(cat)
-        );
-        return [...academicSelected, ...getNonAcademicCategories()];
-      });
-    } else {
-      setTempSelectedCategories((prev) =>
-        prev.filter((cat) =>
-          schoolOptions.map((school) => school.name).includes(cat)
-        )
+    const nonAcademicCategories = getNonAcademicCategories();
+    setTempSelectedCategories((prev) => {
+      const academicSelected = prev.filter(
+        (cat) => !nonAcademicCategories.includes(cat)
       );
-    }
+      return checked
+        ? [...academicSelected, ...nonAcademicCategories]
+        : academicSelected;
+    });
     setSelectAllNonAcademic(checked);
   };
 
   const handleCategoryClick = (category) => {
-    const isSelected = tempSelectedCategories.includes(category);
-    if (isSelected) {
-      setTempSelectedCategories((prev) =>
-        prev.filter((cat) => cat !== category)
-      );
-    } else {
-      setTempSelectedCategories((prev) => [...prev, category]);
-    }
+    setTempSelectedCategories((prev) => {
+      const isSelected = prev.includes(category);
+      if (isSelected) {
+        return prev.filter((cat) => cat !== category);
+      } else {
+        return [...prev, category];
+      }
+    });
   };
 
   // Add console.log to debug

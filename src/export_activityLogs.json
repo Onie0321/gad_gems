@@ -1,0 +1,377 @@
+[
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "user_signin",
+    "timestamp": null,
+    "$id": "675f11660021239148be",
+    "$createdAt": "2024-12-15T17:27:03.477+00:00",
+    "$updatedAt": "2024-12-15T17:27:03.477+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "user_signin",
+    "timestamp": null,
+    "$id": "675f11850012a147c788",
+    "$createdAt": "2024-12-15T17:27:34.090+00:00",
+    "$updatedAt": "2024-12-15T17:27:34.090+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-15T18:46:32.772+00:00",
+    "$id": "675f2408003040eec39f",
+    "$createdAt": "2024-12-15T18:46:33.584+00:00",
+    "$updatedAt": "2024-12-15T18:46:33.584+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "User status updated to pending",
+    "timestamp": "2024-12-15T18:59:32.060+00:00",
+    "$id": "675f27140003c889b9d2",
+    "$createdAt": "2024-12-15T18:59:32.820+00:00",
+    "$updatedAt": "2024-12-15T18:59:32.820+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "User status updated to approved",
+    "timestamp": "2024-12-15T18:59:38.417+00:00",
+    "$id": "675f271a001a04199641",
+    "$createdAt": "2024-12-15T18:59:39.177+00:00",
+    "$updatedAt": "2024-12-15T18:59:39.177+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "User status updated to declined",
+    "timestamp": "2024-12-15T18:59:46.904+00:00",
+    "$id": "675f27220038842438a4",
+    "$createdAt": "2024-12-15T18:59:47.687+00:00",
+    "$updatedAt": "2024-12-15T18:59:47.687+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "User status updated to pending",
+    "timestamp": "2024-12-15T18:59:53.245+00:00",
+    "$id": "675f2729000f5a041c71",
+    "$createdAt": "2024-12-15T18:59:54.043+00:00",
+    "$updatedAt": "2024-12-15T18:59:54.043+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "User status updated to approved",
+    "timestamp": "2024-12-15T18:59:57.223+00:00",
+    "$id": "675f272d000df6b2a76c",
+    "$createdAt": "2024-12-15T18:59:57.761+00:00",
+    "$updatedAt": "2024-12-15T18:59:57.761+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-15T20:17:44.875+00:00",
+    "$id": "675f39680036bce39da1",
+    "$createdAt": "2024-12-15T20:17:45.694+00:00",
+    "$updatedAt": "2024-12-15T20:17:45.694+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-15T20:19:05.401+00:00",
+    "$id": "675f39b90019174dd4d6",
+    "$createdAt": "2024-12-15T20:19:06.603+00:00",
+    "$updatedAt": "2024-12-15T20:19:06.603+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-15T20:19:46.602+00:00",
+    "$id": "675f39e20025ac91563c",
+    "$createdAt": "2024-12-15T20:19:47.368+00:00",
+    "$updatedAt": "2024-12-15T20:19:47.368+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-15T20:24:22.700+00:00",
+    "$id": "675f3af6002bc1bf72d7",
+    "$createdAt": "2024-12-15T20:24:23.472+00:00",
+    "$updatedAt": "2024-12-15T20:24:23.472+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "admin Sign Out",
+    "timestamp": "2024-12-15T20:31:13.128+00:00",
+    "$id": "675f3c910008071f6335",
+    "$createdAt": "2024-12-15T20:31:14.079+00:00",
+    "$updatedAt": "2024-12-15T20:31:14.079+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-15T20:31:29.780+00:00",
+    "$id": "675f3ca10030c238d3db",
+    "$createdAt": "2024-12-15T20:31:30.551+00:00",
+    "$updatedAt": "2024-12-15T20:31:30.551+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "admin Sign Out",
+    "timestamp": "2024-12-15T20:42:18.995+00:00",
+    "$id": "675f3f2a003e3062ed82",
+    "$createdAt": "2024-12-15T20:42:19.753+00:00",
+    "$updatedAt": "2024-12-15T20:42:19.753+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-15T20:42:48.099+00:00",
+    "$id": "675f3f48000639191668",
+    "$createdAt": "2024-12-15T20:42:48.901+00:00",
+    "$updatedAt": "2024-12-15T20:42:48.901+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-15T20:43:30.248+00:00",
+    "$id": "675f3f72000f8dabb324",
+    "$createdAt": "2024-12-15T20:43:31.032+00:00",
+    "$updatedAt": "2024-12-15T20:43:31.032+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "admin Sign Out",
+    "timestamp": "2024-12-15T20:53:27.935+00:00",
+    "$id": "675f41c7003a7f1c3af5",
+    "$createdAt": "2024-12-15T20:53:28.772+00:00",
+    "$updatedAt": "2024-12-15T20:53:28.772+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-16T02:00:32.336+00:00",
+    "$id": "675f89c00015035e7acd",
+    "$createdAt": "2024-12-16T02:00:32.872+00:00",
+    "$updatedAt": "2024-12-16T02:00:32.872+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-16T02:11:00.057+00:00",
+    "$id": "675f8c340003926af23f",
+    "$createdAt": "2024-12-16T02:11:00.586+00:00",
+    "$updatedAt": "2024-12-16T02:11:00.586+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-16T04:09:58.453+00:00",
+    "$id": "675fa816001c57cac5c2",
+    "$createdAt": "2024-12-16T04:09:59.024+00:00",
+    "$updatedAt": "2024-12-16T04:09:59.024+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de5f80011263be242",
+    "activityType": "admin Sign Out",
+    "timestamp": "2024-12-16T04:19:33.978+00:00",
+    "$id": "675faa55003d289632d6",
+    "$createdAt": "2024-12-16T04:19:34.497+00:00",
+    "$updatedAt": "2024-12-16T04:19:34.497+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-16T04:23:26.784+00:00",
+    "$id": "675fab3e003104b18736",
+    "$createdAt": "2024-12-16T04:23:27.332+00:00",
+    "$updatedAt": "2024-12-16T04:23:27.332+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "user Sign Out",
+    "timestamp": "2024-12-16T07:24:52.096+00:00",
+    "$id": "675fd5c4000602d3da81",
+    "$createdAt": "2024-12-16T07:24:52.644+00:00",
+    "$updatedAt": "2024-12-16T07:24:52.644+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  },
+  {
+    "userId": "675de7bd001df0be5473",
+    "activityType": "user_signin",
+    "timestamp": "2024-12-16T07:25:36.975+00:00",
+    "$id": "675fd5f0003cf9ca6640",
+    "$createdAt": "2024-12-16T07:25:37.502+00:00",
+    "$updatedAt": "2024-12-16T07:25:37.502+00:00",
+    "$permissions": [
+      "read(\"user:675de7bb001477752942\")",
+      "update(\"user:675de7bb001477752942\")",
+      "delete(\"user:675de7bb001477752942\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "675f09820022b40d678c"
+  }
+]

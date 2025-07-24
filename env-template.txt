@@ -1,0 +1,22 @@
+# Appwrite Configuration
+NEXT_PUBLIC_APPWRITE_ENDPOINT=https://your-appwrite-endpoint.com/v1
+NEXT_PUBLIC_APPWRITE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_APPWRITE_DATABASE_ID=your-database-id
+
+# Appwrite API Key (for server-side operations like migration)
+APPWRITE_API_KEY=your-api-key
+
+# Collection IDs
+NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID=your-event-collection-id
+NEXT_PUBLIC_APPWRITE_NEWS_COLLECTION_ID=your-news-collection-id
+NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID=your-user-collection-id
+NEXT_PUBLIC_APPWRITE_STAFF_FACULTY_COLLECTION_ID=your-staff-faculty-collection-id
+NEXT_PUBLIC_APPWRITE_COMMUNITY_COLLECTION_ID=your-community-collection-id
+NEXT_PUBLIC_APPWRITE_ACADEMIC_PERIOD_COLLECTION_ID=your-academic-period-collection-id
+NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID=your-notifications-collection-id
+
+# Employee-related collection IDs
+NEXT_PUBLIC_APPWRITE_EPERSONAL_COLLECTION_ID=your-personal-collection-id
+NEXT_PUBLIC_APPWRITE_EEMPLOYMENT_DETAILS_COLLECTION_ID=your-employment-details-collection-id
+NEXT_PUBLIC_APPWRITE_ACTIVITY_COLLECTION_ID=your-activity-collection-id
+NEXT_PUBLIC_APPWRITE_ACTIVITY_LOGS_COLLECTION_ID=your-activity-logs-collection-id 

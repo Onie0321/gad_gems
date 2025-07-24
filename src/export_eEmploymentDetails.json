@@ -1,0 +1,452 @@
+[
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Forestry and Environmental Sciences",
+    "isArchived": false,
+    "employeeId": "27",
+    "year": 2025,
+    "$id": "67cbed0c0012325ee44b",
+    "$createdAt": "2025-03-08T07:09:00.974+00:00",
+    "$updatedAt": "2025-03-08T07:09:00.974+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Education",
+    "isArchived": false,
+    "employeeId": "57",
+    "year": 2025,
+    "$id": "67cbed21001605c42541",
+    "$createdAt": "2025-03-08T07:09:22.776+00:00",
+    "$updatedAt": "2025-03-08T07:09:22.776+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Information Technology",
+    "isArchived": false,
+    "employeeId": "61",
+    "year": 2025,
+    "$id": "67cbed3d00161c22268d",
+    "$createdAt": "2025-03-08T07:09:49.807+00:00",
+    "$updatedAt": "2025-03-08T07:09:49.807+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Industrial Technology",
+    "isArchived": false,
+    "employeeId": "67",
+    "year": 2025,
+    "$id": "67cbed5300165c353b76",
+    "$createdAt": "2025-03-08T07:10:11.894+00:00",
+    "$updatedAt": "2025-03-08T07:10:11.894+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "Information Unit/DRRM",
+    "isArchived": false,
+    "employeeId": "87",
+    "year": 2025,
+    "$id": "67cbed6900170903f132",
+    "$createdAt": "2025-03-08T07:10:33.924+00:00",
+    "$updatedAt": "2025-03-08T07:10:33.924+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Non-Teaching",
+    "assignment": "Zabali Campus",
+    "office": "Research & Development",
+    "isArchived": false,
+    "employeeId": "91",
+    "year": 2025,
+    "$id": "67cbed8700160c7b3ccd",
+    "$createdAt": "2025-03-08T07:11:03.790+00:00",
+    "$updatedAt": "2025-03-08T07:11:03.790+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Non-Teaching",
+    "assignment": "Zabali Campus",
+    "office": "Office of the President",
+    "isArchived": false,
+    "employeeId": "98",
+    "year": 2025,
+    "$id": "67cbed9f001661d09f21",
+    "$createdAt": "2025-03-08T07:11:27.813+00:00",
+    "$updatedAt": "2025-03-08T07:11:27.813+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS faculty",
+    "assignment": "Zabali Campus",
+    "office": "GAD",
+    "isArchived": false,
+    "employeeId": "102",
+    "year": 2025,
+    "$id": "67cbedb50015c5ea6461",
+    "$createdAt": "2025-03-08T07:11:49.797+00:00",
+    "$updatedAt": "2025-03-08T07:11:49.797+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Forestry and Environmental Sciences",
+    "isArchived": false,
+    "employeeId": "105",
+    "year": 2025,
+    "$id": "67cbedd3001640b2dfe0",
+    "$createdAt": "2025-03-08T07:12:19.872+00:00",
+    "$updatedAt": "2025-03-08T07:12:19.872+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Industrial Technology",
+    "isArchived": false,
+    "employeeId": "106",
+    "year": 2025,
+    "$id": "67cbede9000605e6e200",
+    "$createdAt": "2025-03-08T07:12:44.527+00:00",
+    "$updatedAt": "2025-03-08T07:12:44.527+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Industrial Technology",
+    "isArchived": false,
+    "employeeId": "120",
+    "year": 2025,
+    "$id": "67cbee090015c2845b46",
+    "$createdAt": "2025-03-08T07:13:13.776+00:00",
+    "$updatedAt": "2025-03-08T07:13:13.776+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Industrial Technology",
+    "isArchived": false,
+    "employeeId": "157",
+    "year": 2025,
+    "$id": "67cbee0f001628505a32",
+    "$createdAt": "2025-03-08T07:13:19.790+00:00",
+    "$updatedAt": "2025-03-08T07:13:19.790+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Information Technology",
+    "isArchived": false,
+    "employeeId": "163",
+    "year": 2025,
+    "$id": "67cbee140015f2d4c8cb",
+    "$createdAt": "2025-03-08T07:13:24.573+00:00",
+    "$updatedAt": "2025-03-08T07:13:24.573+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "NSTP",
+    "isArchived": false,
+    "employeeId": "201",
+    "year": 2025,
+    "$id": "67cbee1b0016121977a5",
+    "$createdAt": "2025-03-08T07:13:31.798+00:00",
+    "$updatedAt": "2025-03-08T07:13:31.798+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "GAD",
+    "isArchived": false,
+    "employeeId": "214",
+    "year": 2025,
+    "$id": "67cbee210015dff59667",
+    "$createdAt": "2025-03-08T07:13:38.479+00:00",
+    "$updatedAt": "2025-03-08T07:13:38.479+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Industrial Technology",
+    "isArchived": false,
+    "employeeId": "237",
+    "year": 2025,
+    "$id": "67cbee270016290e9cd5",
+    "$createdAt": "2025-03-08T07:13:43.868+00:00",
+    "$updatedAt": "2025-03-08T07:13:43.868+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "Office of the President",
+    "isArchived": false,
+    "employeeId": "238",
+    "year": 2025,
+    "$id": "67cbee2d0015bebdd658",
+    "$createdAt": "2025-03-08T07:13:49.925+00:00",
+    "$updatedAt": "2025-03-08T07:13:49.925+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Non-Teaching",
+    "assignment": "Zabali Campus",
+    "office": "GSU",
+    "isArchived": false,
+    "employeeId": "239",
+    "year": 2025,
+    "$id": "67cbee320015d5b372ff",
+    "$createdAt": "2025-03-08T07:13:54.569+00:00",
+    "$updatedAt": "2025-03-08T07:13:54.569+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Forestry and Environmental Sciences",
+    "isArchived": false,
+    "employeeId": "240",
+    "year": 2025,
+    "$id": "67cbee36001636ca7aa5",
+    "$createdAt": "2025-03-08T07:13:58.800+00:00",
+    "$updatedAt": "2025-03-08T07:13:58.800+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "Legal Office",
+    "isArchived": false,
+    "employeeId": "258",
+    "year": 2025,
+    "$id": "67cbee3c001665194ec1",
+    "$createdAt": "2025-03-08T07:14:04.789+00:00",
+    "$updatedAt": "2025-03-08T07:14:04.789+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Forestry and Environmental Sciences",
+    "isArchived": false,
+    "employeeId": "273",
+    "year": 2025,
+    "$id": "67cbee420015b54dd2ac",
+    "$createdAt": "2025-03-08T07:14:10.803+00:00",
+    "$updatedAt": "2025-03-08T07:14:10.803+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Forestry and Environmental Sciences",
+    "isArchived": false,
+    "employeeId": "275",
+    "year": 2025,
+    "$id": "67cbee4f00165aaf4131",
+    "$createdAt": "2025-03-08T07:14:24.459+00:00",
+    "$updatedAt": "2025-03-08T07:14:24.459+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Forestry and Environmental Sciences",
+    "isArchived": false,
+    "employeeId": "27",
+    "year": 2025,
+    "$id": "67cbeee70018da06515c",
+    "$createdAt": "2025-03-08T07:16:55.975+00:00",
+    "$updatedAt": "2025-03-08T07:16:55.975+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "COS Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Education",
+    "isArchived": false,
+    "employeeId": "57",
+    "year": 2025,
+    "$id": "67cbeeff0016a1d9a9a0",
+    "$createdAt": "2025-03-08T07:17:19.797+00:00",
+    "$updatedAt": "2025-03-08T07:17:19.797+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  },
+  {
+    "eStatus": "Permanent Faculty",
+    "assignment": "Zabali Campus",
+    "office": "School of Information Technology",
+    "isArchived": false,
+    "employeeId": "61",
+    "year": 2025,
+    "$id": "67cbef1e000c94e383d0",
+    "$createdAt": "2025-03-08T07:17:50.794+00:00",
+    "$updatedAt": "2025-03-08T07:17:50.794+00:00",
+    "$permissions": [
+      "read(\"user:675de5f5001d56b6317d\")",
+      "update(\"user:675de5f5001d56b6317d\")",
+      "delete(\"user:675de5f5001d56b6317d\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "67c929320037e6a4dc2c"
+  }
+]

@@ -32,7 +32,7 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  studentsCollectionId,
+  studentCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
 } from "@/lib/appwrite";
@@ -194,7 +194,7 @@ export default function EventParticipantLog() {
       // Fetch participants for all events
       const [studentsResponse, staffFacultyResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
+          databases.listDocuments(databaseId, studentCollectionId, [
             Query.equal("eventId", eventIds),
             Query.equal("isArchived", false),
             Query.equal("createdBy", user.$id),
@@ -455,7 +455,7 @@ export default function EventParticipantLog() {
       // Update the participant in the database
       const response = await databases.updateDocument(
         databaseId,
-        studentsCollectionId,
+        studentCollectionId,
         editedParticipant.$id,
         editedParticipant
       );

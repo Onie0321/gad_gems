@@ -1,0 +1,22 @@
+{
+  "name": "student-migration",
+  "version": "1.0.0",
+  "description": "Migration scripts for student collection",
+  "main": "migrate-students.js",
+  "scripts": {
+    "check-env": "node check-env.js",
+    "migrate": "node migrate-students.js",
+    "update-config": "node update-appwrite-config.js",
+    "delete-old": "node delete-old-collection.js",
+    "delete-old-confirm": "node delete-old-collection.js --confirm",
+    "delete-old-force": "node delete-old-collection.js --confirm --force",
+    "migrate-complete": "npm run migrate && npm run update-config"
+  },
+  "dependencies": {
+    "node-appwrite": "^13.0.1",
+    "dotenv": "^16.3.1"
+  },
+  "keywords": ["appwrite", "migration", "database"],
+  "author": "",
+  "license": "MIT"
+}

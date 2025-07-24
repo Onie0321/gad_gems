@@ -2,32 +2,31 @@ import { NextResponse } from "next/server";
 
 export function middleware(request) {
   const path = request.nextUrl.pathname;
+  console.log("=== Middleware Processing ===");
+  console.log("Current path:", path);
 
   // Define public paths that don't require authentication
   const isPublicPath =
-    path == "/" ||
+    path === "/" ||
     path === "/sign-in" ||
     path === "/sign-up" ||
-    path === "/forgot-password";
+    path === "/forgot-password" ||
+    path === "/auth-callback";
 
-  // Get the token from the cookies
-  const token = request.cookies.get("authToken")?.value;
-
-  // Allow access to admin and officer routes without redirection
-  if (path.startsWith("/admin") || path.startsWith("/officer")) {
+  // Handle auth callback path
+  if (path === "/auth-callback") {
+    console.log("Handling auth callback path");
     return NextResponse.next();
   }
 
-  // Redirect authenticated users away from auth pages
-  if (isPublicPath && token) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // For public paths, allow access
+  if (isPublicPath) {
+    console.log("Public path, allowing access");
+    return NextResponse.next();
   }
 
-  // Redirect unauthenticated users to sign-in
-  if (!isPublicPath && !token) {
-    return NextResponse.redirect(new URL("/sign-in", request.url));
-  }
-
+  // For protected paths, let the client-side handle auth check
+  console.log("Protected path, proceeding with request");
   return NextResponse.next();
 }
 
@@ -38,6 +37,7 @@ export const config = {
     "/sign-in",
     "/sign-up",
     "/forgot-password",
+    "/auth-callback",
     "/admin/:path*",
     "/officer/:path*",
   ],

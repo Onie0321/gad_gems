@@ -1,0 +1,427 @@
+[
+  {
+    "answer": "male",
+    "userId": "670e8f260014545613f4",
+    "name": "Daniel Vetriolo Jr.",
+    "age": 24,
+    "sex": "female",
+    "$id": "6753fd8a001202b5568b",
+    "$createdAt": "2024-12-07T07:47:23.607+00:00",
+    "$updatedAt": "2024-12-07T07:47:23.607+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "hey",
+    "userId": "670e8f260014545613f4",
+    "name": "Daniel Vetriolo Jr.",
+    "age": 24,
+    "sex": "female",
+    "$id": "6753fd8b0006eea52abf",
+    "$createdAt": "2024-12-07T07:47:23.988+00:00",
+    "$updatedAt": "2024-12-07T07:47:23.988+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "hey",
+    "userId": "670e8f260014545613f4",
+    "name": "Daniel Vetriolo Jr.",
+    "age": 24,
+    "sex": "female",
+    "$id": "6753fd8b001cc31c3f49",
+    "$createdAt": "2024-12-07T07:47:24.302+00:00",
+    "$updatedAt": "2024-12-07T07:47:24.302+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "a",
+    "userId": "670e8f260014545613f4",
+    "name": "Daniel Vetriolo Jr.",
+    "age": 24,
+    "sex": "female",
+    "$id": "6753fd8b0037752f147b",
+    "$createdAt": "2024-12-07T07:47:24.714+00:00",
+    "$updatedAt": "2024-12-07T07:47:24.714+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "male",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "67540677000bac0e6fdb",
+    "$createdAt": "2024-12-07T08:25:28.997+00:00",
+    "$updatedAt": "2024-12-07T08:25:28.997+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "y",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "67540678002079cffe43",
+    "$createdAt": "2024-12-07T08:25:29.400+00:00",
+    "$updatedAt": "2024-12-07T08:25:29.400+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "r",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "6754067800396e58d1ae",
+    "$createdAt": "2024-12-07T08:25:29.774+00:00",
+    "$updatedAt": "2024-12-07T08:25:29.774+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "b",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "67540679000e1a913b62",
+    "$createdAt": "2024-12-07T08:25:30.079+00:00",
+    "$updatedAt": "2024-12-07T08:25:30.079+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "male",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "6754078a002d5d7d5a95",
+    "$createdAt": "2024-12-07T08:30:03.925+00:00",
+    "$updatedAt": "2024-12-07T08:30:03.925+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "y",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "6754078b00191ef7cfff",
+    "$createdAt": "2024-12-07T08:30:04.316+00:00",
+    "$updatedAt": "2024-12-07T08:30:04.316+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "r",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "6754078b0030780965d1",
+    "$createdAt": "2024-12-07T08:30:04.677+00:00",
+    "$updatedAt": "2024-12-07T08:30:04.677+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "d",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "6754078c0008eb34a17a",
+    "$createdAt": "2024-12-07T08:30:04.994+00:00",
+    "$updatedAt": "2024-12-07T08:30:04.994+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "female",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "67540a02002399e9928d",
+    "$createdAt": "2024-12-07T08:40:36.888+00:00",
+    "$updatedAt": "2024-12-07T08:40:36.888+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "y",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "67540a040015ee91cc42",
+    "$createdAt": "2024-12-07T08:40:37.226+00:00",
+    "$updatedAt": "2024-12-07T08:40:37.226+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "r",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "67540a04002a702187be",
+    "$createdAt": "2024-12-07T08:40:37.535+00:00",
+    "$updatedAt": "2024-12-07T08:40:37.535+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "a",
+    "userId": "670e8f260014545613f4",
+    "name": "Liegh Villacorte",
+    "age": 24,
+    "sex": "male",
+    "$id": "67540a04003dcf630f63",
+    "$createdAt": "2024-12-07T08:40:37.883+00:00",
+    "$updatedAt": "2024-12-07T08:40:37.883+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "female",
+    "userId": "670e8f260014545613f4",
+    "name": "Ella Johnson",
+    "age": 24,
+    "sex": "male",
+    "$id": "675424bc002bedffaa2e",
+    "$createdAt": "2024-12-07T10:34:38.471+00:00",
+    "$updatedAt": "2024-12-07T10:34:38.471+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "y",
+    "userId": "670e8f260014545613f4",
+    "name": "Ella Johnson",
+    "age": 24,
+    "sex": "male",
+    "$id": "675424be0000f046dfd5",
+    "$createdAt": "2024-12-07T10:34:38.850+00:00",
+    "$updatedAt": "2024-12-07T10:34:38.850+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "r",
+    "userId": "670e8f260014545613f4",
+    "name": "Ella Johnson",
+    "age": 24,
+    "sex": "male",
+    "$id": "675424be0014874114c6",
+    "$createdAt": "2024-12-07T10:34:39.182+00:00",
+    "$updatedAt": "2024-12-07T10:34:39.182+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "c",
+    "userId": "670e8f260014545613f4",
+    "name": "Ella Johnson",
+    "age": 24,
+    "sex": "male",
+    "$id": "675424be002c443cc774",
+    "$createdAt": "2024-12-07T10:34:39.575+00:00",
+    "$updatedAt": "2024-12-07T10:34:39.575+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "male",
+    "userId": "670e8f260014545613f4",
+    "name": "ASASD",
+    "age": 24,
+    "sex": "male",
+    "$id": "67542b1e002eea58506d",
+    "$createdAt": "2024-12-07T11:01:52.605+00:00",
+    "$updatedAt": "2024-12-07T11:01:52.605+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "y",
+    "userId": "670e8f260014545613f4",
+    "name": "ASASD",
+    "age": 24,
+    "sex": "male",
+    "$id": "67542b20000629129eeb",
+    "$createdAt": "2024-12-07T11:01:53.034+00:00",
+    "$updatedAt": "2024-12-07T11:01:53.034+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "r",
+    "userId": "670e8f260014545613f4",
+    "name": "ASASD",
+    "age": 24,
+    "sex": "male",
+    "$id": "67542b20002059a63b7a",
+    "$createdAt": "2024-12-07T11:01:53.429+00:00",
+    "$updatedAt": "2024-12-07T11:01:53.429+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "b",
+    "userId": "670e8f260014545613f4",
+    "name": "ASASD",
+    "age": 24,
+    "sex": "male",
+    "$id": "67542b20003ddaf7973b",
+    "$createdAt": "2024-12-07T11:01:53.853+00:00",
+    "$updatedAt": "2024-12-07T11:01:53.853+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  },
+  {
+    "answer": "male",
+    "userId": "670e8f260014545613f4",
+    "name": "yamete",
+    "age": 24,
+    "sex": "male",
+    "$id": "67542bb5001b06b6e3b6",
+    "$createdAt": "2024-12-07T11:04:23.249+00:00",
+    "$updatedAt": "2024-12-07T11:04:23.249+00:00",
+    "$permissions": [
+      "read(\"user:670e8f24002324bbc3be\")",
+      "update(\"user:670e8f24002324bbc3be\")",
+      "delete(\"user:670e8f24002324bbc3be\")"
+    ],
+    "$databaseId": "670e7b65002731de2383",
+    "$collectionId": "671a71d80006ad49c46c"
+  }
+]

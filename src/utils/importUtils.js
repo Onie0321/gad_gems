@@ -6,7 +6,7 @@ import {
   eventCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
-  studentsCollectionId,
+  studentCollectionId,
   getCurrentUser,
 } from "@/lib/appwrite";
 
@@ -287,6 +287,28 @@ export const extractCommunityMembers = (excelData) => {
   return community;
 };
 
+// Add formatError function at the top level
+const formatError = (error) => {
+  if (error.message.includes("Missing required value")) {
+    const match = error.message.match(/row (\d+), column (\d+)/);
+    if (match) {
+      const [_, row, col] = match;
+      return `The file is missing required information at row ${row}, column ${col}. Please ensure all required fields are filled in the Excel file.`;
+    }
+  }
+  if (error.message.includes("Invalid time range format")) {
+    return "The time range format is incorrect. Please use the format: HH:MM AM/PM - HH:MM AM/PM";
+  }
+  if (error.message.includes("Invalid date format")) {
+    return "The date format is incorrect. Please use a valid date format (e.g., MM/DD/YYYY)";
+  }
+  if (error.message.includes("Missing required field")) {
+    const field = error.message.split(": ")[1];
+    return `The ${field} field is required but missing in the Excel file.`;
+  }
+  return error.message;
+};
+
 // Update the formatEventData function
 const formatEventData = (rawData) => {
   console.log("Raw event data:", rawData);
@@ -372,7 +394,7 @@ export const importEventAndParticipants = async (file, academicPeriodId) => {
 
       await databases.createDocument(
         databaseId,
-        studentsCollectionId,
+        studentCollectionId,
         participantId,
         participantData
       );
@@ -641,7 +663,7 @@ export const extractEventMetadata = (data) => {
     return metadata;
   } catch (error) {
     console.error("Error extracting event metadata:", error);
-    throw new Error(`Failed to extract event data: ${error.message}`);
+    throw new Error(formatError(error));
   }
 };
 
@@ -839,6 +861,7 @@ export const handleFileChange = async (file) => {
       community,
     };
   } catch (error) {
-    throw error;
+    console.error("Import error:", error);
+    throw new Error(formatError(error));
   }
 };

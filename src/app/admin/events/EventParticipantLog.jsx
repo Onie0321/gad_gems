@@ -32,7 +32,7 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  studentsCollectionId,
+  studentCollectionId,
   userCollectionId,
   getCurrentAcademicPeriod,
   staffFacultyCollectionId,
@@ -84,48 +84,90 @@ export default function EventParticipantLog() {
     try {
       setLoading(true);
 
+      // Debug collection IDs
+      console.log("Collection IDs:", {
+        databaseId,
+        eventCollectionId,
+        studentCollectionId,
+        staffFacultyCollectionId,
+        communityCollectionId,
+        userCollectionId,
+        academicPeriodCollectionId,
+      });
+
+      if (!eventCollectionId) {
+        throw new Error("Event collection ID is not defined");
+      }
+
       // Fetch all events without academic period filter for admin
       const response = await databases.listDocuments(
         databaseId,
         eventCollectionId,
-        [Query.equal("isArchived", false), Query.orderDesc("createdAt")]
+        [Query.equal("isArchived", false), Query.orderDesc("$createdAt")]
       );
 
       // Get all unique academic period IDs from events
       const academicPeriodIds = [
         ...new Set(response.documents.map((event) => event.academicPeriodId)),
-      ];
+      ].filter(Boolean); // Filter out any null/undefined values
+
+      // Debug academic period IDs
+      console.log("Academic Period IDs:", academicPeriodIds);
+
+      // Verify collection IDs before fetching participants
+      if (
+        !studentCollectionId ||
+        !staffFacultyCollectionId ||
+        !communityCollectionId
+      ) {
+        throw new Error(
+          "One or more participant collection IDs are not defined"
+        );
+      }
 
       // Fetch all participants across all periods
       const [studentsResponse, staffResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
+          databases.listDocuments(databaseId, studentCollectionId, [
             Query.equal("isArchived", false),
-            Query.equal("academicPeriodId", academicPeriodIds),
+            ...(academicPeriodIds.length > 0
+              ? [Query.equal("academicPeriodId", academicPeriodIds)]
+              : []),
           ]),
           databases.listDocuments(databaseId, staffFacultyCollectionId, [
             Query.equal("isArchived", false),
-            Query.equal("academicPeriodId", academicPeriodIds),
+            ...(academicPeriodIds.length > 0
+              ? [Query.equal("academicPeriodId", academicPeriodIds)]
+              : []),
           ]),
           databases.listDocuments(databaseId, communityCollectionId, [
             Query.equal("isArchived", false),
-            Query.equal("academicPeriodId", academicPeriodIds),
+            ...(academicPeriodIds.length > 0
+              ? [Query.equal("academicPeriodId", academicPeriodIds)]
+              : []),
           ]),
         ]);
 
+      // Debug participant responses
+      console.log("Participant Responses:", {
+        students: studentsResponse?.documents?.length || 0,
+        staff: staffResponse?.documents?.length || 0,
+        community: communityResponse?.documents?.length || 0,
+      });
+
       // Map participants with their specific fields
       const allParticipants = [
-        ...studentsResponse.documents.map((p) => ({
+        ...(studentsResponse?.documents || []).map((p) => ({
           ...p,
           participantType: "Student",
           identifier: p.studentId || null,
         })),
-        ...staffResponse.documents.map((p) => ({
+        ...(staffResponse?.documents || []).map((p) => ({
           ...p,
           participantType: "Staff/Faculty",
           identifier: p.staffFacultyId || null,
         })),
-        ...communityResponse.documents.map((p) => ({
+        ...(communityResponse?.documents || []).map((p) => ({
           ...p,
           participantType: "Community Member",
           identifier: null,
@@ -134,7 +176,7 @@ export default function EventParticipantLog() {
 
       // Process events with participants
       const eventsWithParticipants = await Promise.all(
-        response.documents.map(async (event) => {
+        (response?.documents || []).map(async (event) => {
           try {
             const eventParticipants = allParticipants.filter(
               (p) => p.eventId === event.$id
@@ -161,11 +203,23 @@ export default function EventParticipantLog() {
             };
 
             // Fetch creator information
-            const creatorResponse = await databases.getDocument(
-              databaseId,
-              userCollectionId,
-              event.createdBy
-            );
+            let creatorName = "Unknown";
+            if (event.createdBy) {
+              try {
+                const creatorResponse = await databases.getDocument(
+                  databaseId,
+                  userCollectionId,
+                  event.createdBy
+                );
+                creatorName = creatorResponse?.name || "Unknown";
+              } catch (error) {
+                // Only log if it's not a 404 error (document not found)
+                if (error.code !== 404) {
+                  console.warn(`Error fetching creator for event ${event.$id}:`, error);
+                }
+                creatorName = "Unknown User";
+              }
+            }
 
             // Get academic period info if available
             let academicPeriodInfo = null;
@@ -177,7 +231,10 @@ export default function EventParticipantLog() {
                   event.academicPeriodId
                 );
               } catch (error) {
-                console.error("Error fetching academic period:", error);
+                // Only log if it's not a 404 error (document not found)
+                if (error.code !== 404) {
+                  console.warn("Error fetching academic period:", error);
+                }
               }
             }
 
@@ -185,7 +242,7 @@ export default function EventParticipantLog() {
               ...event,
               participants: eventParticipants,
               participantCounts,
-              creatorName: creatorResponse.name || "Unknown",
+              creatorName,
               academicPeriod: academicPeriodInfo
                 ? {
                     schoolYear: academicPeriodInfo.schoolYear,
@@ -288,7 +345,7 @@ export default function EventParticipantLog() {
       // Create the new participant document
       const response = await databases.createDocument(
         databaseId,
-        studentsCollectionId,
+        studentCollectionId,
         ID.unique(),
         {
           ...newParticipant,

@@ -1,7 +1,13 @@
 "use client";
 
 import React, { createContext, useState, useEffect, useContext } from "react";
-import { account, databases, getCurrentUser, SignOut } from "@/lib/appwrite";
+import {
+  account,
+  databases,
+  getCurrentUser,
+  SignOut,
+  hasValidSession,
+} from "@/lib/appwrite";
 
 // Create AuthContext with initial values
 const AuthContext = createContext({
@@ -20,13 +26,44 @@ export const AuthProvider = ({ children }) => {
 
   const checkUser = async () => {
     try {
+      // Check for existing session in localStorage first
+      const hasSession = localStorage.getItem("session");
+      if (!hasSession) {
+        console.log("No session found in localStorage");
+        setUser(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      // Check if a valid Appwrite session exists before calling getCurrentUser
+      const validSession = await hasValidSession();
+      if (!validSession) {
+        setUser(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      // Only try to get current user if we have a session
       const currentUser = await getCurrentUser();
-      setUser(currentUser);
-      setError(null);
+      if (currentUser) {
+        setUser(currentUser);
+        setError(null);
+      } else {
+        // If no current user but we have a session, clear the session
+        localStorage.removeItem("session");
+        localStorage.removeItem("userRole");
+        setUser(null);
+        setError(null);
+      }
     } catch (error) {
       console.error("Error checking user:", error);
-      setError("Failed to authenticate user");
+      // Clear session if there's an error
+      localStorage.removeItem("session");
+      localStorage.removeItem("userRole");
       setUser(null);
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -39,7 +76,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setLoading(true);
-      await account.createEmailSession(email, password);
+      const session = await account.createEmailSession(email, password);
+      // Store session indicator in localStorage
+      localStorage.setItem("session", "true");
       await checkUser(); // Refresh user data after login
       return true;
     } catch (error) {
@@ -54,7 +93,9 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setLoading(true);
-      await account.deleteSession("current");
+      // Clear session from localStorage
+      localStorage.removeItem("session");
+      localStorage.removeItem("userRole");
       setUser(null);
       setError(null);
     } catch (error) {
@@ -74,11 +115,7 @@ export const AuthProvider = ({ children }) => {
     checkUser,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

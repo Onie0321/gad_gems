@@ -88,7 +88,7 @@ import {
   checkDuplicateParticipant,
   databases,
   databaseId,
-  studentsCollectionId,
+  studentCollectionId,
   eventCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
@@ -114,16 +114,20 @@ import { PreviewDialog } from "@/components/ui/preview-dialog";
 
 // Move initialParticipantData outside the component
 const initialParticipantData = {
-  name: "",
-  sex: "",
-  age: "",
-  address: "",
   studentId: "",
+  firstName: "",
+  middleName: "",
+  lastName: "",
   school: "",
   year: "",
-  section: "",
+  age: "",
+  gender: "",
+  orientation: "",
+  religion: "",
+  address: "",
   ethnicGroup: "",
   otherEthnicGroup: "",
+  firstGen: "",
   staffFacultyId: "",
 };
 
@@ -251,7 +255,7 @@ export default function ParticipantManagement({
       // Fetch participants from all collections
       const [studentsResponse, staffResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
+          databases.listDocuments(databaseId, studentCollectionId, [
             Query.equal("eventId", eventId),
           ]),
           databases.listDocuments(databaseId, staffFacultyCollectionId, [
@@ -488,7 +492,7 @@ export default function ParticipantManagement({
       const baseParticipantData = {
         // User input fields
         name: cleanedData.name,
-        age: parseInt(cleanedData.age),
+        age: cleanedData.age.toString(),
         sex: cleanedData.sex,
         address: cleanedData.address,
         ethnicGroup: cleanedData.ethnicGroup,
@@ -510,7 +514,7 @@ export default function ParticipantManagement({
 
       switch (participantType) {
         case "student":
-          collectionId = studentsCollectionId;
+          collectionId = studentCollectionId;
           participantToAdd = {
             ...baseParticipantData,
             studentId: cleanedData.studentId || "",
@@ -553,25 +557,25 @@ export default function ParticipantManagement({
         // Format the participant ID with type prefix
         const formattedParticipantId = `${participantType}_${participantId}`;
 
-        // Get current event
-        const event = await databases.getDocument(
-          databaseId,
-          eventCollectionId,
-          currentEventId
-        );
+        // Remove the event update since the participants field doesn't exist in the schema
+        // const event = await databases.getDocument(
+        //   databaseId,
+        //   eventCollectionId,
+        //   currentEventId
+        // );
 
-        // Update event's participants array
-        await databases.updateDocument(
-          databaseId,
-          eventCollectionId,
-          currentEventId,
-          {
-            participants: [
-              ...(event.participants || []),
-              formattedParticipantId,
-            ],
-          }
-        );
+        // // Update event's participants array
+        // await databases.updateDocument(
+        //   databaseId,
+        //   eventCollectionId,
+        //   currentEventId,
+        //   {
+        //     participants: [
+        //       ...(event.participants || []),
+        //       formattedParticipantId,
+        //     ],
+        //   }
+        // );
 
         toast.success("Participant added successfully!");
         setParticipantData(getInitialParticipantData(participantType));
@@ -639,7 +643,7 @@ export default function ParticipantManagement({
       let collectionId;
       switch (editedParticipant.type) {
         case "student":
-          collectionId = studentsCollectionId;
+          collectionId = studentCollectionId;
           break;
         case "staff":
           collectionId = staffFacultyCollectionId;
@@ -701,7 +705,7 @@ export default function ParticipantManagement({
       let collectionId;
       switch (participantType) {
         case "student":
-          collectionId = studentsCollectionId;
+          collectionId = studentCollectionId;
           break;
         case "staff":
           collectionId = staffFacultyCollectionId;
@@ -973,49 +977,87 @@ export default function ParticipantManagement({
   const renderCommonFields = () => {
     return (
       <div className="space-y-4">
-        <div>
-          <Label htmlFor="name">Name</Label>
-          <Input
-            id="name"
-            name="name"
-            value={participantData.name || ""}
-            onChange={(e) => handleInputChange("name", e.target.value)}
-            className={cn(
-              errors.name
-                ? "border-red-500"
-                : successMessage.name
-                ? "border-green-500"
-                : ""
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="firstName">First Name</Label>
+            <Input
+              id="firstName"
+              name="firstName"
+              value={participantData.firstName || ""}
+              onChange={(e) => handleInputChange("firstName", e.target.value)}
+              className={cn(
+                errors.firstName
+                  ? "border-red-500"
+                  : successMessage.firstName
+                  ? "border-green-500"
+                  : ""
+              )}
+              placeholder="Enter First Name"
+            />
+            {errors.firstName && (
+              <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>
             )}
-            placeholder="Enter Full Name"
-          />
-          {errors.name && (
-            <p className="text-red-500 text-sm mt-1">{errors.name}</p>
-          )}
-          {duplicateErrors.name && (
-            <p className="text-red-500 text-sm mt-1">{duplicateErrors.name}</p>
-          )}
-          {successMessage.name && !errors.name && !duplicateErrors.name && (
-            <p className="text-green-500 text-sm mt-1">{successMessage.name}</p>
-          )}
+          </div>
+
+          <div>
+            <Label htmlFor="middleName">Middle Name</Label>
+            <Input
+              id="middleName"
+              name="middleName"
+              value={participantData.middleName || ""}
+              onChange={(e) => handleInputChange("middleName", e.target.value)}
+              className={cn(
+                errors.middleName
+                  ? "border-red-500"
+                  : successMessage.middleName
+                  ? "border-green-500"
+                  : ""
+              )}
+              placeholder="Enter Middle Name"
+            />
+            {errors.middleName && (
+              <p className="text-red-500 text-sm mt-1">{errors.middleName}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="lastName">Last Name</Label>
+            <Input
+              id="lastName"
+              name="lastName"
+              value={participantData.lastName || ""}
+              onChange={(e) => handleInputChange("lastName", e.target.value)}
+              className={cn(
+                errors.lastName
+                  ? "border-red-500"
+                  : successMessage.lastName
+                  ? "border-green-500"
+                  : ""
+              )}
+              placeholder="Enter Last Name"
+            />
+            {errors.lastName && (
+              <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>
+            )}
+          </div>
         </div>
 
         <div>
-          <Label htmlFor="sex">Sex at Birth</Label>
+          <Label htmlFor="gender">Gender</Label>
           <Select
-            value={participantData.sex || ""}
-            onValueChange={(value) => handleInputChange("sex", value)}
+            value={participantData.gender || ""}
+            onValueChange={(value) => handleInputChange("gender", value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select sex" />
+              <SelectValue placeholder="Select gender" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Male">Male</SelectItem>
               <SelectItem value="Female">Female</SelectItem>
             </SelectContent>
           </Select>
-          {errors.sex && (
-            <p className="text-red-500 text-sm mt-1">{errors.sex}</p>
+          {errors.gender && (
+            <p className="text-red-500 text-sm mt-1">{errors.gender}</p>
           )}
         </div>
 
@@ -1047,6 +1089,60 @@ export default function ParticipantManagement({
           />
           {errors.address && (
             <p className="text-red-500 text-sm mt-1">{errors.address}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="orientation">Sexual Orientation</Label>
+          <Select
+            value={participantData.orientation || ""}
+            onValueChange={(value) => handleInputChange("orientation", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select sexual orientation" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Straight">Straight</SelectItem>
+              <SelectItem value="Bi-Sexual">Bi-Sexual</SelectItem>
+              <SelectItem value="Lesbian">Lesbian</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.orientation && (
+            <p className="text-red-500 text-sm mt-1">{errors.orientation}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="religion">Religion</Label>
+          <Input
+            id="religion"
+            name="religion"
+            value={participantData.religion || ""}
+            onChange={(e) => handleInputChange("religion", e.target.value)}
+            className={errors.religion ? "border-red-500" : ""}
+            placeholder="Enter religion"
+          />
+          {errors.religion && (
+            <p className="text-red-500 text-sm mt-1">{errors.religion}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="firstGen">First Generation Student</Label>
+          <Select
+            value={participantData.firstGen || ""}
+            onValueChange={(value) => handleInputChange("firstGen", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select option" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Yes">Yes</SelectItem>
+              <SelectItem value="No">No</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.firstGen && (
+            <p className="text-red-500 text-sm mt-1">{errors.firstGen}</p>
           )}
         </div>
       </div>
@@ -1519,6 +1615,34 @@ export default function ParticipantManagement({
                             </p>
                           )}
                         </div>
+
+                        <div>
+                          <Label htmlFor="orientation">
+                            Sexual Orientation
+                          </Label>
+                          <Select
+                            value={participantData.orientation || ""}
+                            onValueChange={(value) =>
+                              handleInputChange("orientation", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select sexual orientation" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Straight">Straight</SelectItem>
+                              <SelectItem value="Bi-Sexual">
+                                Bi-Sexual
+                              </SelectItem>
+                              <SelectItem value="Lesbian">Lesbian</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {errors.orientation && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.orientation}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Right Column */}
@@ -1539,6 +1663,50 @@ export default function ParticipantManagement({
                           {errors.age && (
                             <p className="text-red-500 text-sm mt-1">
                               {errors.age}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label htmlFor="religion">Religion</Label>
+                          <Input
+                            id="religion"
+                            name="religion"
+                            value={participantData.religion || ""}
+                            onChange={(e) =>
+                              handleInputChange("religion", e.target.value)
+                            }
+                            className={errors.religion ? "border-red-500" : ""}
+                            placeholder="Enter religion"
+                          />
+                          {errors.religion && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.religion}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label htmlFor="firstGen">
+                            First Generation Student
+                          </Label>
+                          <Select
+                            value={participantData.firstGen || ""}
+                            onValueChange={(value) =>
+                              handleInputChange("firstGen", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select option" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Yes">Yes</SelectItem>
+                              <SelectItem value="No">No</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {errors.firstGen && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.firstGen}
                             </p>
                           )}
                         </div>
@@ -1610,141 +1778,104 @@ export default function ParticipantManagement({
                       {/* Left Column */}
                       <div className="space-y-4">
                         {renderParticipantTypeFields()}
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="firstName">First Name</Label>
+                            <Input
+                              id="firstName"
+                              name="firstName"
+                              value={participantData.firstName || ""}
+                              onChange={(e) =>
+                                handleInputChange("firstName", e.target.value)
+                              }
+                              className={cn(
+                                errors.firstName
+                                  ? "border-red-500"
+                                  : successMessage.firstName
+                                  ? "border-green-500"
+                                  : ""
+                              )}
+                              placeholder="Enter First Name"
+                            />
+                            {errors.firstName && (
+                              <p className="text-red-500 text-sm mt-1">
+                                {errors.firstName}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label htmlFor="middleName">Middle Name</Label>
+                            <Input
+                              id="middleName"
+                              name="middleName"
+                              value={participantData.middleName || ""}
+                              onChange={(e) =>
+                                handleInputChange("middleName", e.target.value)
+                              }
+                              className={cn(
+                                errors.middleName
+                                  ? "border-red-500"
+                                  : successMessage.middleName
+                                  ? "border-green-500"
+                                  : ""
+                              )}
+                              placeholder="Enter Middle Name"
+                            />
+                            {errors.middleName && (
+                              <p className="text-red-500 text-sm mt-1">
+                                {errors.middleName}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label htmlFor="lastName">Last Name</Label>
+                            <Input
+                              id="lastName"
+                              name="lastName"
+                              value={participantData.lastName || ""}
+                              onChange={(e) =>
+                                handleInputChange("lastName", e.target.value)
+                              }
+                              className={cn(
+                                errors.lastName
+                                  ? "border-red-500"
+                                  : successMessage.lastName
+                                  ? "border-green-500"
+                                  : ""
+                              )}
+                              placeholder="Enter Last Name"
+                            />
+                            {errors.lastName && (
+                              <p className="text-red-500 text-sm mt-1">
+                                {errors.lastName}
+                              </p>
+                            )}
+                          </div>
+                        </div>
 
                         <div>
-                          <Label htmlFor="sex">Sex at Birth</Label>
+                          <Label htmlFor="gender">Gender</Label>
                           <Select
-                            value={participantData.sex || ""}
+                            value={participantData.gender || ""}
                             onValueChange={(value) =>
-                              handleInputChange("sex", value)
+                              handleInputChange("gender", value)
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select sex" />
+                              <SelectValue placeholder="Select gender" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Male">Male</SelectItem>
                               <SelectItem value="Female">Female</SelectItem>
                             </SelectContent>
                           </Select>
-                          {errors.sex && (
+                          {errors.gender && (
                             <p className="text-red-500 text-sm mt-1">
-                              {errors.sex}
+                              {errors.gender}
                             </p>
                           )}
-                        </div>
-
-                        <div>
-                          <Label htmlFor="address">Home Address</Label>
-                          <Input
-                            id="address"
-                            name="address"
-                            value={participantData.address || ""}
-                            onChange={(e) =>
-                              handleInputChange("address", e.target.value)
-                            }
-                            className={errors.address ? "border-red-500" : ""}
-                            placeholder="Enter Complete Address"
-                          />
-                          {errors.address && (
-                            <p className="text-red-500 text-sm mt-1">
-                              {errors.address}
-                            </p>
-                          )}
-                        </div>
-
-                        {participantType === "student" && (
-                          <>
-                            <div>
-                              <Label htmlFor="school">School</Label>
-                              <Select
-                                value={participantData.school || ""}
-                                onValueChange={(value) =>
-                                  handleInputChange("school", value)
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select school" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {schoolOptions.map((school) => (
-                                    <SelectItem
-                                      key={school.name}
-                                      value={school.name}
-                                    >
-                                      {school.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              {errors.school && (
-                                <p className="text-red-500 text-sm mt-1">
-                                  {errors.school}
-                                </p>
-                              )}
-                            </div>
-
-                            <div>
-                              <Label htmlFor="section">Section</Label>
-                              <Input
-                                id="section"
-                                name="section"
-                                value={participantData.section || ""}
-                                onChange={(e) =>
-                                  handleInputChange("section", e.target.value)
-                                }
-                                className={
-                                  errors.section ? "border-red-500" : ""
-                                }
-                                placeholder="Enter section"
-                              />
-                              {errors.section && (
-                                <p className="text-red-500 text-sm mt-1">
-                                  {errors.section}
-                                </p>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Right Column */}
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="name">Name</Label>
-                          <Input
-                            id="name"
-                            name="name"
-                            value={participantData.name || ""}
-                            onChange={(e) =>
-                              handleInputChange("name", e.target.value)
-                            }
-                            className={cn(
-                              errors.name
-                                ? "border-red-500"
-                                : successMessage.name
-                                ? "border-green-500"
-                                : ""
-                            )}
-                            placeholder="Enter Full Name"
-                          />
-                          {errors.name && (
-                            <p className="text-red-500 text-sm mt-1">
-                              {errors.name}
-                            </p>
-                          )}
-                          {duplicateErrors.name && (
-                            <p className="text-red-500 text-sm mt-1">
-                              {duplicateErrors.name}
-                            </p>
-                          )}
-                          {successMessage.name &&
-                            !errors.name &&
-                            !duplicateErrors.name && (
-                              <p className="text-green-500 text-sm mt-1">
-                                {successMessage.name}
-                              </p>
-                            )}
                         </div>
 
                         <div>
@@ -1758,7 +1889,7 @@ export default function ParticipantManagement({
                               handleInputChange("age", e.target.value)
                             }
                             className={errors.age ? "border-red-500" : ""}
-                            placeholder="Enter Age"
+                            placeholder="Age"
                           />
                           {errors.age && (
                             <p className="text-red-500 text-sm mt-1">
@@ -1767,39 +1898,135 @@ export default function ParticipantManagement({
                           )}
                         </div>
 
-                        {participantType === "student" && (
-                          <div>
-                            <Label htmlFor="year">Year Level</Label>
-                            <Select
-                              value={participantData.year || ""}
-                              onValueChange={(value) =>
-                                handleInputChange("year", value)
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select year level" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[
-                                  "First Year",
-                                  "Second Year",
-                                  "Third Year",
-                                  "Fourth Year",
-                                  "Fifth Year",
-                                ].map((year) => (
-                                  <SelectItem key={year} value={year}>
-                                    {year}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {errors.year && (
-                              <p className="text-red-500 text-sm mt-1">
-                                {errors.year}
-                              </p>
-                            )}
-                          </div>
-                        )}
+                        <div>
+                          <Label htmlFor="address">Address</Label>
+                          <Input
+                            id="address"
+                            name="address"
+                            value={participantData.address || ""}
+                            onChange={(e) =>
+                              handleInputChange("address", e.target.value)
+                            }
+                            className={errors.address ? "border-red-500" : ""}
+                            placeholder="Complete Address"
+                          />
+                          {errors.address && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.address}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right Column */}
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="school">School</Label>
+                          <Select
+                            value={participantData.school || ""}
+                            onValueChange={(value) =>
+                              handleInputChange("school", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select school" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {schoolOptions.map((school) => (
+                                <SelectItem
+                                  key={school.name}
+                                  value={school.name}
+                                >
+                                  {school.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {errors.school && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.school}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label htmlFor="year">Year Level</Label>
+                          <Select
+                            value={participantData.year || ""}
+                            onValueChange={(value) =>
+                              handleInputChange("year", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select year level" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[
+                                "First Year",
+                                "Second Year",
+                                "Third Year",
+                                "Fourth Year",
+                                "Fifth Year",
+                              ].map((year) => (
+                                <SelectItem key={year} value={year}>
+                                  {year}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {errors.year && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.year}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label htmlFor="orientation">
+                            Sexual Orientation
+                          </Label>
+                          <Select
+                            value={participantData.orientation || ""}
+                            onValueChange={(value) =>
+                              handleInputChange("orientation", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select sexual orientation" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Straight">Straight</SelectItem>
+                              <SelectItem value="Bi-Sexual">
+                                Bi-Sexual
+                              </SelectItem>
+                              <SelectItem value="Lesbian">Lesbian</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {errors.orientation && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.orientation}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label htmlFor="religion">Religion</Label>
+                          <Input
+                            id="religion"
+                            name="religion"
+                            value={participantData.religion || ""}
+                            onChange={(e) =>
+                              handleInputChange("religion", e.target.value)
+                            }
+                            className={errors.religion ? "border-red-500" : ""}
+                            placeholder="Enter religion"
+                          />
+                          {errors.religion && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.religion}
+                            </p>
+                          )}
+                        </div>
 
                         <div>
                           <Label htmlFor="ethnicGroup">Ethnic Group</Label>
@@ -1860,6 +2087,31 @@ export default function ParticipantManagement({
                             )}
                           </div>
                         )}
+
+                        <div>
+                          <Label htmlFor="firstGen">
+                            First Generation Student
+                          </Label>
+                          <Select
+                            value={participantData.firstGen || ""}
+                            onValueChange={(value) =>
+                              handleInputChange("firstGen", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select option" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Yes">Yes</SelectItem>
+                              <SelectItem value="No">No</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {errors.firstGen && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.firstGen}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </>
                   )}

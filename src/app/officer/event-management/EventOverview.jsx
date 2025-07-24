@@ -48,16 +48,14 @@ import {
   databases,
   databaseId,
   eventCollectionId,
-  studentsCollectionId,
+  studentCollectionId,
   getCurrentUser,
-  subscribeToRealTimeUpdates,
   getCurrentAcademicPeriod,
   academicPeriodCollectionId,
   notificationsCollectionId,
   staffFacultyCollectionId,
   communityCollectionId,
 } from "@/lib/appwrite";
-import { client } from "@/lib/appwrite";
 import { useRouter } from "next/navigation";
 import { useTabContext, TabProvider } from "@/context/TabContext";
 import { Query } from "appwrite";
@@ -183,7 +181,7 @@ export default function EventOverview({
       // Fetch participants for all events
       const [studentsResponse, staffFacultyResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
+          databases.listDocuments(databaseId, studentCollectionId, [
             Query.equal("eventId", eventIds),
             Query.equal("isArchived", false),
             Query.equal("createdBy", user.$id),
@@ -261,28 +259,6 @@ export default function EventOverview({
         if (user) {
           setCurrentUser(user);
           await fetchData();
-
-          // Set up real-time listeners
-          const unsubscribeEvents = subscribeToRealTimeUpdates(
-            eventCollectionId,
-            async (response) => {
-              console.log("Event update received:", response);
-              await fetchData();
-            }
-          );
-
-          const unsubscribeParticipants = subscribeToRealTimeUpdates(
-            studentsCollectionId,
-            async (response) => {
-              console.log("Participant update received:", response);
-              await fetchData();
-            }
-          );
-
-          return () => {
-            unsubscribeEvents();
-            unsubscribeParticipants();
-          };
         }
       } catch (error) {
         console.error("Error fetching current user:", error);
@@ -309,50 +285,6 @@ export default function EventOverview({
     loadNotifications();
   }, [user]);
 
-  useEffect(() => {
-    const unsubscribe = client.subscribe(
-      `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID}.documents`,
-      (response) => {
-        if (
-          response.events.includes(
-            "databases.*.collections.*.documents.*.update"
-          ) ||
-          response.events.includes(
-            "databases.*.collections.*.documents.*.create"
-          )
-        ) {
-          // Update the specific event in the local state
-          const updatedEvent = response.payload;
-          setEvents((prevEvents) => {
-            // Check if the event already exists
-            const eventExists = prevEvents.some(
-              (event) => event.$id === updatedEvent.$id
-            );
-
-            if (eventExists) {
-              // Update existing event
-              return prevEvents.map((event) =>
-                event.$id === updatedEvent.$id
-                  ? { ...event, ...updatedEvent }
-                  : event
-              );
-            } else {
-              // Add new event and maintain only 5 most recent
-              const newEvents = [updatedEvent, ...prevEvents]
-                .sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt))
-                .slice(0, 5);
-              return newEvents;
-            }
-          });
-        }
-      }
-    );
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
   const getParticipantCounts = (eventId) => {
     const eventParticipants = participants.filter((p) => p.eventId === eventId);
 
@@ -363,7 +295,7 @@ export default function EventOverview({
         p.participantType === "Student" ||
         p.type === "student" ||
         p.category === "student" ||
-        p.$collectionId === studentsCollectionId
+        p.$collectionId === studentCollectionId
     ).length;
 
     const staffFacultyCount = eventParticipants.filter(
