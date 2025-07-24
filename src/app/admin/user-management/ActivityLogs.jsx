@@ -61,7 +61,6 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { client } from "@/lib/appwrite";
 
 export default function ActivityLogs() {
   const [logs, setLogs] = useState([]);

@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 
 const styles = {
   container: {
@@ -126,9 +127,9 @@ const VMGO = () => {
       </button>
 
       <div style={styles.header}>
-        <img src="/logo/ascot.png" alt="ASCOT Logo" style={styles.logo} />
+        <Image src="/logo/ascot.png" alt="ASCOT Logo" width={80} height={80} style={styles.logo} />
         <h2 style={styles.title}>ASCOT-GAD VMGO</h2>
-        <img src="/logo/gad.png" alt="GAD Logo" style={styles.logo} />
+        <Image src="/logo/gad.png" alt="GAD Logo" width={80} height={80} style={styles.logo} />
       </div>
 
       <Section title="Vision" content={vmgoData.vision} />

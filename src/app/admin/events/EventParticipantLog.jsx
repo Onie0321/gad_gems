@@ -48,14 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ID } from "appwrite";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { Pagination } from "@/components/ui/pagination";
 
 import EditEvent from "@/app/officer/event-management/event-participant-log/EditEventDialog";
 import ViewParticipants from "@/app/officer/event-management/event-participant-log/view-participant-dialog/page";
@@ -215,7 +208,10 @@ export default function EventParticipantLog() {
               } catch (error) {
                 // Only log if it's not a 404 error (document not found)
                 if (error.code !== 404) {
-                  console.warn(`Error fetching creator for event ${event.$id}:`, error);
+                  console.warn(
+                    `Error fetching creator for event ${event.$id}:`,
+                    error
+                  );
                 }
                 creatorName = "Unknown User";
               }
@@ -649,34 +645,11 @@ export default function EventParticipantLog() {
               {Math.min(currentPage * rowsPerPage, sortedEvents.length)} of{" "}
               {sortedEvents.length} entries
             </div>
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  />
-                </PaginationItem>
-                {[...Array(totalPages)].map((_, i) => (
-                  <PaginationItem key={i + 1}>
-                    <PaginationLink
-                      onClick={() => setCurrentPage(i + 1)}
-                      isActive={currentPage === i + 1}
-                    >
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => setCurrentPage(page)}
+            />
           </div>
         </div>
       </CardContent>

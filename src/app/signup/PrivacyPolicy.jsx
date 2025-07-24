@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { X } from "lucide-react";
+import Image from "next/image";
 
 export default function PrivacyPolicy() {
   const router = useRouter();
@@ -27,9 +28,11 @@ export default function PrivacyPolicy() {
           <div className="grid grid-cols-3 items-center">
             {/* GAD Logo on the Left */}
             <div className="flex justify-center">
-              <img
-                src="/logo/gad.png" // Replace with actual GAD logo path
+              <Image
+                src="/logo/gad.png"
                 alt="GAD Office Logo"
+                width={88}
+                height={88}
                 className="w-22 h-22 object-contain"
               />
             </div>
@@ -46,9 +49,11 @@ export default function PrivacyPolicy() {
 
             {/* ASCOT Logo on the Right */}
             <div className="flex justify-center">
-              <img
-                src="/logo/ascot.png" // Replace with actual ASCOT logo path
+              <Image
+                src="/logo/ascot.png"
                 alt="ASCOT Logo"
+                width={88}
+                height={88}
                 className="w-22 h-22 object-contain"
               />
             </div>

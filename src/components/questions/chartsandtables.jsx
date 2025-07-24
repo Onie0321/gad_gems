@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Bar,
   BarChart,
@@ -27,11 +27,7 @@ export default function ChartsAndTables() {
   const [tableData, setTableData] = useState([]);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const responsesResponse = await listResponses();
       const questionsResponse = await listQuestions();
@@ -71,7 +67,11 @@ export default function ChartsAndTables() {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   return (
     <div>

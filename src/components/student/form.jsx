@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,15 +77,7 @@ export default function StudentInfoTabs() {
   const [errors, setErrors] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
-
-  useEffect(() => {
-    validateForm();
-  }, [validateForm]);
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       const response = await getStudents();
       setStudents(response.documents);
@@ -93,7 +85,27 @@ export default function StudentInfoTabs() {
       console.error("Error fetching students:", error);
       toast.error("Failed to fetch students. Please try again.");
     }
-  };
+  }, [toast]);
+
+  const validateForm = useCallback(() => {
+    const newErrors = {};
+    Object.keys(formData).forEach((key) => {
+      validateField(key, formData[key]);
+      if (errors[key]) {
+        newErrors[key] = errors[key];
+      }
+    });
+    setErrors(newErrors);
+    setIsFormValid(Object.keys(newErrors).length === 0);
+  }, [formData, errors]);
+
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
+
+  useEffect(() => {
+    validateForm();
+  }, [validateForm]);
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -203,18 +215,6 @@ export default function StudentInfoTabs() {
       "email",
     ];
     return requiredFields.includes(name);
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    Object.keys(formData).forEach((key) => {
-      validateField(key, formData[key]);
-      if (errors[key]) {
-        newErrors[key] = errors[key];
-      }
-    });
-    setErrors(newErrors);
-    setIsFormValid(Object.keys(newErrors).length === 0);
   };
 
   const handleSubmit = async () => {

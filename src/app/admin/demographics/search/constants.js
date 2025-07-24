@@ -19,6 +19,12 @@ export const schools = [
 
 export const ethnicGroups = sharedEthnicGroups;
 
+// Export an array of years for dropdowns/filters (last 10 years)
+export const years = Array.from({ length: 10 }, (_, i) => {
+  const year = new Date().getFullYear() - i;
+  return year.toString();
+});
+
 // Comprehensive Luzon provinces and cities mapping
 export const luzonLocations = {
   // National Capital Region (NCR)
