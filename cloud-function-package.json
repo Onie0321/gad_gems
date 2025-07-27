@@ -1,0 +1,15 @@
+{
+  "name": "gad-gems-cloud-function",
+  "version": "1.0.0",
+  "description": "Appwrite Cloud Function for GAD Gems application",
+  "main": "cloud-function.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "node-appwrite": "^13.0.1"
+  },
+  "keywords": ["appwrite", "cloud-function", "nodejs", "javascript"],
+  "author": "GAD Gems Team",
+  "license": "MIT"
+}
