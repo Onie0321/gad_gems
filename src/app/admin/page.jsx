@@ -16,7 +16,7 @@ import {
   Clock,
   Archive,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "./user-menu/UserMenu";
 import NotificationButton from "./Notifications";
@@ -58,7 +58,7 @@ import TimeoutWarningModal from "@/components/modals/TimeoutWarningModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardOverview from "./Dashboard";
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
   const [activeSection, setActiveSection] = React.useState("dashboard");
   const [isLocked, setIsLocked] = React.useState(false);
   const [inactivityTimeout, setInactivityTimeout] = React.useState(
@@ -513,5 +513,13 @@ export default function AdminDashboard() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }

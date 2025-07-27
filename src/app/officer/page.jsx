@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Calendar, PieChart, Settings, Menu, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 
 // Note: Update chart colors in respective components to use a mix of Blue (#2D89EF), Teal (#4DB6AC), Coral (#FF6F61), and Violet for visual clarity.
 
-export default function OfficerDashboard() {
+function OfficerDashboardContent() {
   const [activeTab, setActiveTab] = useState("event-management");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
@@ -249,5 +249,13 @@ export default function OfficerDashboard() {
         />
       )}
     </div>
+  );
+}
+
+export default function OfficerDashboard() {
+  return (
+    <Suspense fallback={<GADConnectSimpleLoader />}>
+      <OfficerDashboardContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import { account } from "@/lib/appwrite";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 
-export default function ResetPassword() {
+function ResetPasswordContent() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -76,7 +76,8 @@ export default function ResetPassword() {
 
       toast({
         title: "Success",
-        description: "Password reset successful. You can now log in with your new password.",
+        description:
+          "Password reset successful. You can now log in with your new password.",
         variant: "success",
       });
 
@@ -188,5 +189,13 @@ export default function ResetPassword() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ResetPassword() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
