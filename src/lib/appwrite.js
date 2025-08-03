@@ -12,9 +12,77 @@ import {
   RealtimeResponseEvent,
 } from "appwrite";
 
+// Debug logging for Appwrite configuration
+console.log("🔧 [Appwrite Config] Initializing client...");
+console.log(
+  "🔧 [Appwrite Config] Endpoint:",
+  process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT
+);
+console.log(
+  "🔧 [Appwrite Config] Project ID:",
+  process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
+);
+console.log(
+  "🔧 [Appwrite Config] Database ID:",
+  process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID
+);
+console.log(
+  "🔧 [Appwrite Config] Current URL:",
+  typeof window !== "undefined" ? window.location.origin : "Server-side"
+);
+
 const client = new Client()
   .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
-  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID)
+  .setKey(
+    "standard_55cece959adf094a28acadde6d691fd2edafd0ad4f970b59d4bc89dc933f8504c51f9dd485e1e65b8a6e088907e164149d04c448b2e953f12d6d57983ffb3905cf8e714af8f1fe3756f7d2091e28c77ce9808cda1694e376b61a23c95b6d3def7637c8cc91eedbf0d646f37a9e6c80fc6db9ecbfe9cdda3a6614b03c7d9e9bae"
+  );
+
+console.log("🔧 [Appwrite Config] Client initialized successfully");
+
+// Global debugging function for troubleshooting
+if (typeof window !== "undefined") {
+  window.debugAppwrite = async () => {
+    console.log("🔧 [Debug] Starting comprehensive Appwrite debug...");
+    console.log("🔧 [Debug] Environment variables:");
+    console.log(
+      "- NEXT_PUBLIC_APPWRITE_ENDPOINT:",
+      process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT
+    );
+    console.log(
+      "- NEXT_PUBLIC_APPWRITE_PROJECT_ID:",
+      process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
+    );
+    console.log(
+      "- NEXT_PUBLIC_APPWRITE_DATABASE_ID:",
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID
+    );
+    console.log(
+      "- NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID:",
+      process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID
+    );
+    console.log(
+      "- NEXT_PUBLIC_APPWRITE_NEWS_COLLECTION_ID:",
+      process.env.NEXT_PUBLIC_APPWRITE_NEWS_COLLECTION_ID
+    );
+
+    console.log("🔧 [Debug] Current URL:", window.location.origin);
+    console.log("🔧 [Debug] User Agent:", navigator.userAgent);
+
+    try {
+      console.log("🔧 [Debug] Testing connection...");
+      await testAppwriteConnection();
+    } catch (error) {
+      console.error("❌ [Debug] Connection test failed:", error);
+    }
+
+    console.log("🔧 [Debug] Debug complete. Check console for details.");
+  };
+
+  console.log(
+    "🔧 [Debug] Global debug function available: window.debugAppwrite()"
+  );
+}
 
 export const account = new Account(client);
 export const databases = new Databases(client);
@@ -166,20 +234,41 @@ export const checkAndRefreshSession = async () => {
 
 export async function getAccount() {
   try {
-    console.log("Fetching current account...");
+    console.log("🔍 [getAccount] Fetching current account...");
+    console.log(
+      "🔍 [getAccount] Current URL:",
+      typeof window !== "undefined" ? window.location.origin : "Server-side"
+    );
+    console.log(
+      "🔍 [getAccount] Project ID:",
+      process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
+    );
+
     const currentAccount = await account.get();
+    console.log("✅ [getAccount] Account fetched successfully:", {
+      id: currentAccount.$id,
+      email: currentAccount.email,
+      name: currentAccount.name,
+    });
     return currentAccount;
   } catch (error) {
+    console.error("❌ [getAccount] Error details:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+      response: error.response,
+    });
+
     if (
       error.message.includes("Missing scope") ||
       error.message.includes("unauthorized")
     ) {
       console.warn(
-        "User is not authenticated. Redirect to login or handle session."
+        "⚠️ [getAccount] User is not authenticated. Redirect to login or handle session."
       );
-      // Redirect to login page or handle session
       return null;
     } else {
+      console.error("❌ [getAccount] Unexpected error:", error);
       throw new Error(error.message || "Error fetching account");
     }
   }
@@ -1632,8 +1721,8 @@ export async function fetchNotifications(filters = []) {
 const calculateSexDistribution = (participants) => {
   console.log("Starting sex distribution calculation with participants:", {
     totalParticipants: participants.length,
-    participantTypes: participants.map(p => p.participantType),
-    sexValues: participants.map(p => p.sex)
+    participantTypes: participants.map((p) => p.participantType),
+    sexValues: participants.map((p) => p.sex),
   });
 
   // Count all participants by sex, including all participant types
@@ -1651,7 +1740,7 @@ const calculateSexDistribution = (participants) => {
     maleCount,
     femaleCount,
     total,
-    unaccountedFor: participants.length - total
+    unaccountedFor: participants.length - total,
   });
 
   // Calculate detailed breakdowns
@@ -1660,22 +1749,30 @@ const calculateSexDistribution = (participants) => {
       (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Student"
     ).length,
     staffFaculty: participants.filter(
-      (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Staff/Faculty"
+      (p) =>
+        p.sex?.toLowerCase() === "male" && p.participantType === "Staff/Faculty"
     ).length,
     community: participants.filter(
-      (p) => p.sex?.toLowerCase() === "male" && p.participantType === "Community Member"
+      (p) =>
+        p.sex?.toLowerCase() === "male" &&
+        p.participantType === "Community Member"
     ).length,
   };
 
   const femaleDetails = {
     students: participants.filter(
-      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Student"
+      (p) =>
+        p.sex?.toLowerCase() === "female" && p.participantType === "Student"
     ).length,
     staffFaculty: participants.filter(
-      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Staff/Faculty"
+      (p) =>
+        p.sex?.toLowerCase() === "female" &&
+        p.participantType === "Staff/Faculty"
     ).length,
     community: participants.filter(
-      (p) => p.sex?.toLowerCase() === "female" && p.participantType === "Community Member"
+      (p) =>
+        p.sex?.toLowerCase() === "female" &&
+        p.participantType === "Community Member"
     ).length,
   };
 
@@ -1685,8 +1782,8 @@ const calculateSexDistribution = (participants) => {
     totals: {
       students: maleDetails.students + femaleDetails.students,
       staffFaculty: maleDetails.staffFaculty + femaleDetails.staffFaculty,
-      community: maleDetails.community + femaleDetails.community
-    }
+      community: maleDetails.community + femaleDetails.community,
+    },
   });
 
   // Return the distribution with detailed counts and total
@@ -2673,7 +2770,16 @@ export const notifyOfficersAboutAcademicPeriod = async (type, periodData) => {
 export const createOAuthSession = async (provider) => {
   try {
     const currentUrl = window.location.origin;
-    return await account.createOAuth2Session(
+    console.log("🔐 [OAuth] Creating OAuth session for provider:", provider);
+    console.log("🔐 [OAuth] Current URL:", currentUrl);
+    console.log("🔐 [OAuth] Success URL:", `${currentUrl}/auth-callback`);
+    console.log("🔐 [OAuth] Failure URL:", currentUrl);
+    console.log(
+      "🔐 [OAuth] Project ID:",
+      process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
+    );
+
+    const result = await account.createOAuth2Session(
       provider,
       `${currentUrl}/auth-callback`,
       currentUrl,
@@ -2682,8 +2788,208 @@ export const createOAuthSession = async (provider) => {
         "https://www.googleapis.com/auth/userinfo.profile",
       ]
     );
+
+    console.log("✅ [OAuth] OAuth session created successfully:", result);
+    return result;
   } catch (error) {
-    console.error("OAuth session creation error:", error);
+    console.error("❌ [OAuth] OAuth session creation error:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+      response: error.response,
+      provider: provider,
+    });
     throw error;
   }
 };
+
+// Test function to verify Appwrite connection and account status
+export const testAppwriteConnection = async () => {
+  try {
+    console.log("🔍 Testing Appwrite connection...");
+
+    // Test 1: Check if client is properly configured
+    console.log("📋 Client Configuration:");
+    console.log("- Endpoint:", process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT);
+    console.log("- Project ID:", process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+    console.log("- Database ID:", process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID);
+
+    // Test 2: Check connection health
+    console.log("🏥 Testing connection health...");
+    const healthCheck = await client.health.get();
+    console.log("✅ Health check passed:", healthCheck);
+
+    // Test 3: Try to get current account (if logged in)
+    console.log("👤 Testing account access...");
+    try {
+      const currentAccount = await account.get();
+      console.log("✅ Account found:", {
+        id: currentAccount.$id,
+        email: currentAccount.email,
+        name: currentAccount.name,
+        createdAt: currentAccount.$createdAt,
+      });
+
+      // Test 4: Get current user document
+      console.log("👥 Testing user document access...");
+      const currentUser = await getCurrentUser();
+      if (currentUser) {
+        console.log("✅ User document found:", {
+          id: currentUser.$id,
+          name: currentUser.name,
+          email: currentUser.email,
+          role: currentUser.role,
+          approvalStatus: currentUser.approvalStatus,
+        });
+      } else {
+        console.log(
+          "⚠️ No user document found (this is normal for new accounts)"
+        );
+      }
+    } catch (accountError) {
+      console.log(
+        "ℹ️ No authenticated account found (this is normal if not logged in):",
+        accountError.message
+      );
+    }
+
+    // Test 5: Test database access (read-only operation)
+    console.log("🗄️ Testing database access...");
+    try {
+      const usersResponse = await databases.listDocuments(
+        databaseId,
+        userCollectionId,
+        [Query.limit(1)]
+      );
+      console.log("✅ Database access successful:", {
+        totalUsers: usersResponse.total,
+        canRead: true,
+      });
+    } catch (dbError) {
+      console.log("❌ Database access failed:", dbError.message);
+    }
+
+    console.log("🎉 Appwrite connection test completed!");
+    return {
+      success: true,
+      message: "Appwrite connection is working properly",
+    };
+  } catch (error) {
+    console.error("❌ Appwrite connection test failed:", error);
+    return {
+      success: false,
+      error: error.message,
+      details: error,
+    };
+  }
+};
+
+// Alternative test function using fetch API (for browser console testing)
+export const testAppwriteWithFetch = async () => {
+  try {
+    console.log("🔍 Testing Appwrite with fetch API...");
+
+    const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
+    const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT;
+
+    console.log("📋 Configuration:", { projectId, endpoint });
+
+    const response = await fetch(`${endpoint}/v1/account`, {
+      credentials: "include",
+      headers: {
+        "X-Appwrite-Project": projectId,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+    console.log("📊 Response:", data);
+
+    if (response.ok) {
+      console.log("✅ Fetch test successful");
+      return { success: true, data };
+    } else {
+      console.log("❌ Fetch test failed:", data);
+      return { success: false, error: data };
+    }
+  } catch (error) {
+    console.error("❌ Fetch test error:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Browser console test function (copy this to browser console)
+export const browserConsoleTest = `
+// Copy and paste this function into your browser console
+async function testAppwrite() {
+  try {
+    console.log('🔍 Testing Appwrite connection...');
+    
+    const response = await fetch('https://cloud.appwrite.io/v1/account', {
+      credentials: 'include',
+      headers: {
+        'X-Appwrite-Project': '686d14cb001ff8a18f19',
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    console.log('📊 Response:', data);
+    
+    if (response.ok) {
+      console.log('✅ Appwrite connection successful');
+      console.log('👤 Account data:', data);
+    } else {
+      console.log('❌ Appwrite connection failed:', data);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('❌ Test error:', error);
+    return null;
+  }
+}
+
+// Run the test
+testAppwrite();
+`;
+
+// Add CORS test function to window object
+if (typeof window !== "undefined") {
+  window.testCORS = async () => {
+    console.log("🔧 [CORS Test] Testing CORS configuration...");
+    console.log("🔧 [CORS Test] Current origin:", window.location.origin);
+
+    try {
+      const response = await fetch("https://cloud.appwrite.io/v1/account", {
+        method: "GET",
+        headers: {
+          "X-Appwrite-Project": process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID,
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      console.log("✅ [CORS Test] Response status:", response.status);
+      console.log(
+        "✅ [CORS Test] Response headers:",
+        Object.fromEntries(response.headers.entries())
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("✅ [CORS Test] Response data:", data);
+      } else {
+        console.error(
+          "❌ [CORS Test] Response not ok:",
+          response.status,
+          response.statusText
+        );
+      }
+    } catch (error) {
+      console.error("❌ [CORS Test] Error:", error);
+    }
+  };
+
+  console.log("🔧 [Debug] CORS test function available: window.testCORS()");
+}

@@ -148,7 +148,7 @@ Content-Type: application/json
 
 ### CORS Configuration
 
-- **Allowed Origin**: `https://gad-gems-646o-nm7coxs2d-onie0321s-projects.vercel.app`
+- **Allowed Origin**: `https://gad-gems-646o-kriew1qmt-onie0321s-projects.vercel.app`
 - **Allowed Methods**: GET, POST, OPTIONS
 - **Allowed Headers**: Authorization, Content-Type, X-Appwrite-Project
 

@@ -9,23 +9,36 @@ const account = new Account(client);
 const databases = new Databases(client);
 
 // CORS configuration
-const ALLOWED_ORIGIN =
-  "https://gad-gems-646o-nm7coxs2d-onie0321s-projects.vercel.app";
+const ALLOWED_ORIGINS = [
+  "https://gad-gems-646o-kriew1qmt-onie0321s-projects.vercel.app",
+  "https://gad-gems-646o-nm7coxs2d-onie0321s-projects.vercel.app",
+];
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || ALLOWED_ORIGINS[0];
 const ALLOWED_HEADERS = ["Authorization", "Content-Type", "X-Appwrite-Project"];
 
 // Helper function to set CORS headers
-function setCorsHeaders(res) {
-  res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+function setCorsHeaders(res, origin) {
+  const allowedOrigin =
+    origin && ALLOWED_ORIGINS.some((allowed) => origin.includes(allowed))
+      ? origin
+      : ALLOWED_ORIGIN;
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", ALLOWED_HEADERS.join(", "));
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
 // Helper function to send JSON response
-function sendJsonResponse(res, statusCode, data) {
-  setCorsHeaders(res);
+function sendJsonResponse(res, statusCode, data, origin) {
+  setCorsHeaders(res, origin);
   res.setHeader("Content-Type", "application/json");
   res.status(statusCode).json(data);
+}
+
+// Helper function to send JSON response with automatic origin detection
+function sendJsonResponseAuto(res, statusCode, data, req) {
+  const origin = req.headers.origin || req.headers.referer;
+  return sendJsonResponse(res, statusCode, data, origin);
 }
 
 // Helper function to validate JWT token
@@ -50,31 +63,42 @@ async function validateToken(authHeader) {
 }
 
 // Helper function to handle unauthorized access
-function handleUnauthorized(res) {
-  return sendJsonResponse(res, 401, {
-    success: false,
-    message: "Unauthorized access",
-    timestamp: new Date().toISOString(),
-  });
+function handleUnauthorized(res, origin) {
+  return sendJsonResponse(
+    res,
+    401,
+    {
+      success: false,
+      message: "Unauthorized access",
+      timestamp: new Date().toISOString(),
+    },
+    origin
+  );
 }
 
 // Main function handler
 module.exports = async (req, res) => {
   // Handle OPTIONS preflight requests
   if (req.method === "OPTIONS") {
-    setCorsHeaders(res);
+    const origin = req.headers.origin || req.headers.referer;
+    setCorsHeaders(res, origin);
     res.status(200).end();
     return;
   }
 
   // Validate origin
   const origin = req.headers.origin || req.headers.referer;
-  if (origin && !origin.includes(ALLOWED_ORIGIN)) {
-    return sendJsonResponse(res, 403, {
-      success: false,
-      message: "Access denied",
-      timestamp: new Date().toISOString(),
-    });
+  if (origin && !ALLOWED_ORIGINS.some((allowed) => origin.includes(allowed))) {
+    return sendJsonResponse(
+      res,
+      403,
+      {
+        success: false,
+        message: "Access denied",
+        timestamp: new Date().toISOString(),
+      },
+      origin
+    );
   }
 
   try {
@@ -90,19 +114,29 @@ module.exports = async (req, res) => {
         await handlePostRequest(req, res, authHeader);
         break;
       default:
-        sendJsonResponse(res, 405, {
-          success: false,
-          message: "Method not allowed",
-          timestamp: new Date().toISOString(),
-        });
+        sendJsonResponse(
+          res,
+          405,
+          {
+            success: false,
+            message: "Method not allowed",
+            timestamp: new Date().toISOString(),
+          },
+          origin
+        );
     }
   } catch (error) {
     console.error("Function error:", error);
-    sendJsonResponse(res, 500, {
-      success: false,
-      message: "Internal server error",
-      timestamp: new Date().toISOString(),
-    });
+    sendJsonResponse(
+      res,
+      500,
+      {
+        success: false,
+        message: "Internal server error",
+        timestamp: new Date().toISOString(),
+      },
+      origin
+    );
   }
 };
 
@@ -112,32 +146,42 @@ async function handleGetRequest(req, res, authHeader) {
 
   // Public endpoints (no authentication required)
   if (path === "/health" || path === "/status") {
-    return sendJsonResponse(res, 200, {
-      success: true,
-      message: "Service is running",
-      timestamp: new Date().toISOString(),
-    });
+    return sendJsonResponseAuto(
+      res,
+      200,
+      {
+        success: true,
+        message: "Service is running",
+        timestamp: new Date().toISOString(),
+      },
+      req
+    );
   }
 
   // Protected endpoints (authentication required)
   const user = await validateToken(authHeader);
   if (!user) {
-    return handleUnauthorized(res);
+    return handleUnauthorized(res, origin);
   }
 
   try {
     // Handle different GET endpoints
     if (path === "/user/profile") {
-      return sendJsonResponse(res, 200, {
-        success: true,
-        data: {
-          id: user.$id,
-          email: user.email,
-          name: user.name,
-          createdAt: user.$createdAt,
+      return sendJsonResponse(
+        res,
+        200,
+        {
+          success: true,
+          data: {
+            id: user.$id,
+            email: user.email,
+            name: user.name,
+            createdAt: user.$createdAt,
+          },
+          timestamp: new Date().toISOString(),
         },
-        timestamp: new Date().toISOString(),
-      });
+        origin
+      );
     }
 
     if (path === "/data/students") {
@@ -203,7 +247,7 @@ async function handlePostRequest(req, res, authHeader) {
     // Protected endpoints (authentication required)
     const user = await validateToken(authHeader);
     if (!user) {
-      return handleUnauthorized(res);
+      return handleUnauthorized(res, origin);
     }
 
     // Handle different POST endpoints

@@ -23,16 +23,35 @@ export default function NewsSection() {
 
   useEffect(() => {
     const fetchNews = async () => {
+      console.log("🔍 [News] Starting to fetch news...");
+      console.log("🔍 [News] Database ID:", databaseId);
+      console.log("🔍 [News] Collection ID:", newsCollectionId);
+      console.log(
+        "🔍 [News] Current URL:",
+        typeof window !== "undefined" ? window.location.origin : "Server-side"
+      );
+
       try {
+        console.log("🔍 [News] Making database query...");
         const response = await databases.listDocuments(
           databaseId,
           newsCollectionId,
           [Query.equal("showOnHomepage", true), Query.orderDesc("date")]
         );
 
+        console.log("✅ [News] Query successful:", {
+          total: response.total,
+          documents: response.documents.length,
+        });
+
         setNews(response.documents);
       } catch (error) {
-        console.error("Error fetching news:", error);
+        console.error("❌ [News] Error fetching news:", {
+          message: error.message,
+          code: error.code,
+          type: error.type,
+          response: error.response,
+        });
       }
     };
 
@@ -99,7 +118,7 @@ export default function NewsSection() {
       className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30"
     >
       <div className="container mx-auto px-4">
-        <motion.div 
+        <motion.div
           className="text-center mb-12"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}

@@ -10,7 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CalendarIcon, MapPinIcon, UsersIcon, Calendar, Sparkles } from "lucide-react";
+import {
+  CalendarIcon,
+  MapPinIcon,
+  UsersIcon,
+  Calendar,
+  Sparkles,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -47,12 +53,26 @@ export default function RecentEvents() {
 
   useEffect(() => {
     const fetchEvents = async () => {
+      console.log("🔍 [Events] Starting to fetch events...");
+      console.log("🔍 [Events] Database ID:", databaseId);
+      console.log("🔍 [Events] Collection ID:", eventCollectionId);
+      console.log(
+        "🔍 [Events] Current URL:",
+        typeof window !== "undefined" ? window.location.origin : "Server-side"
+      );
+
       try {
+        console.log("🔍 [Events] Making database query...");
         const response = await databases.listDocuments(
           databaseId,
           eventCollectionId,
           [Query.equal("showOnHomepage", true), Query.orderDesc("eventDate")]
         );
+
+        console.log("✅ [Events] Query successful:", {
+          total: response.total,
+          documents: response.documents.length,
+        });
 
         // Transform the data to match your component's expectations
         const formattedEvents = response.documents.map((event) => ({
@@ -64,9 +84,18 @@ export default function RecentEvents() {
           attendees: event.participants?.length || 0,
         }));
 
+        console.log(
+          "✅ [Events] Events formatted successfully:",
+          formattedEvents.length
+        );
         setEvents(formattedEvents);
       } catch (error) {
-        console.error("Error fetching events:", error);
+        console.error("❌ [Events] Error fetching events:", {
+          message: error.message,
+          code: error.code,
+          type: error.type,
+          response: error.response,
+        });
       }
     };
 
@@ -92,20 +121,24 @@ export default function RecentEvents() {
 
   const NoEventsDisplay = () => (
     <div className="min-h-[400px] flex flex-col items-center justify-center p-8 rounded-2xl">
-      <div className="relative w-24 h-24 mb-6">
-    
-      </div>
-      <h3 className="text-2xl font-semibold text-gray-700 mb-2">No Events Currently</h3>
+      <div className="relative w-24 h-24 mb-6"></div>
+      <h3 className="text-2xl font-semibold text-gray-700 mb-2">
+        No Events Currently
+      </h3>
       <p className="text-gray-500 text-center max-w-md">
-        Stay tuned! New events will be posted here soon. Check back later for upcoming activities and programs.
+        Stay tuned! New events will be posted here soon. Check back later for
+        upcoming activities and programs.
       </p>
     </div>
   );
 
   return (
-    <section className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30" id="events">
+    <section
+      className="py-16 bg-gradient-to-br from-white via-violet-50/30 to-blue-50/30"
+      id="events"
+    >
       <div className="container mx-auto px-4">
-        <motion.div 
+        <motion.div
           className="text-center mb-12"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -119,7 +152,8 @@ export default function RecentEvents() {
             </h2>
           </div>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Discover our latest activities and programs promoting gender equality and inclusive development.
+            Discover our latest activities and programs promoting gender
+            equality and inclusive development.
           </p>
         </motion.div>
 
@@ -152,7 +186,9 @@ export default function RecentEvents() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <p className="text-gray-600 line-clamp-3">{event.description}</p>
+                      <p className="text-gray-600 line-clamp-3">
+                        {event.description}
+                      </p>
                       <div className="space-y-2">
                         <div className="flex items-center text-violet-600">
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -164,15 +200,17 @@ export default function RecentEvents() {
                         </div>
                         <div className="flex items-center text-emerald-600">
                           <UsersIcon className="mr-2 h-4 w-4" />
-                          <span className="text-sm">{event.attendees} attendees</span>
+                          <span className="text-sm">
+                            {event.attendees} attendees
+                          </span>
                         </div>
                       </div>
                     </CardContent>
                     <CardFooter>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             className="w-full bg-gradient-to-r from-violet-50 to-blue-50 hover:from-violet-100 hover:to-blue-100 border-violet-200"
                           >
                             View Details
