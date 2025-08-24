@@ -249,10 +249,10 @@ export default function EventParticipantLog() {
       case "eventVenueDesc":
         return b.eventVenue.localeCompare(a.eventVenue);
              case "createdAt":
-         return new Date(a.createdAt) - new Date(b.createdAt);
+         return (a.createdAt?.toDate?.() || new Date(a.createdAt)) - (b.createdAt?.toDate?.() || new Date(b.createdAt));
        case "createdAtDesc":
        default:
-         return new Date(b.createdAt) - new Date(a.createdAt);
+         return (b.createdAt?.toDate?.() || new Date(b.createdAt)) - (a.createdAt?.toDate?.() || new Date(a.createdAt));
     }
   });
 
@@ -549,7 +549,9 @@ export default function EventParticipantLog() {
                      {event.createdAt ? 
                        (() => {
                          try {
-                           return format(new Date(event.createdAt), "MMM dd, yyyy h:mm a");
+                           // Handle Firestore Timestamp objects
+                           const date = event.createdAt.toDate ? event.createdAt.toDate() : new Date(event.createdAt);
+                           return format(date, "MMM dd, yyyy h:mm a");
                          } catch (error) {
                            console.warn("Invalid created date:", event.createdAt);
                            return "Invalid date";

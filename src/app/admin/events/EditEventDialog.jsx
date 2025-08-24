@@ -225,9 +225,12 @@ const EditEvent = ({ event, onUpdateEvent }) => {
                   type="time"
                   value={
                     editingEvent.eventTimeFrom
-                      ? new Date(editingEvent.eventTimeFrom)
-                          .toISOString()
-                          .substring(11, 16)
+                      ? (() => {
+                          const date = new Date(editingEvent.eventTimeFrom);
+                          return isNaN(date.getTime()) 
+                            ? "" 
+                            : date.toISOString().substring(11, 16);
+                        })()
                       : ""
                   }
                   onChange={(e) =>
@@ -248,9 +251,12 @@ const EditEvent = ({ event, onUpdateEvent }) => {
                   type="time"
                   value={
                     editingEvent.eventTimeTo
-                      ? new Date(editingEvent.eventTimeTo)
-                          .toISOString()
-                          .substring(11, 16)
+                      ? (() => {
+                          const date = new Date(editingEvent.eventTimeTo);
+                          return isNaN(date.getTime()) 
+                            ? "" 
+                            : date.toISOString().substring(11, 16);
+                        })()
                       : ""
                   }
                   onChange={(e) =>

@@ -252,6 +252,16 @@ export default function ParticipantManagement({
 
   const fetchParticipants = useCallback(async (eventId) => {
     try {
+      // Validate eventId before making queries
+      if (!eventId || typeof eventId !== 'string' || eventId.trim() === '') {
+        console.warn("fetchParticipants called with invalid eventId:", eventId);
+        setParticipants([]);
+        setTotalParticipants(0);
+        setTotalMaleParticipants(0);
+        setTotalFemaleParticipants(0);
+        return;
+      }
+
       // Fetch participants from all collections
       const [studentsResponse, staffResponse, communityResponse] =
         await Promise.all([
@@ -312,22 +322,51 @@ export default function ParticipantManagement({
         if (!events || events.length === 0) {
           setIsEventSelected(false);
           setCurrentEvent(null);
+          setParticipants([]);
+          setTotalParticipants(0);
+          setTotalMaleParticipants(0);
+          setTotalFemaleParticipants(0);
           return;
         }
 
         if (currentEventId) {
-          const event = events.find((e) => e.id === currentEventId);
-          if (event) {
+          console.log("Initializing with currentEventId:", currentEventId);
+          console.log("Available events:", events.map(e => ({ $id: e.$id, eventName: e.eventName })));
+          const event = events.find((e) => e.$id === currentEventId);
+          if (event && event.$id) {
+            console.log("Found event with ID:", event.$id);
             setCurrentEvent(event);
             setIsEventSelected(true);
-            await fetchParticipants(event.id);
+            await fetchParticipants(event.$id);
+          } else {
+            console.log("Invalid currentEventId, falling back to first event");
+            console.log("Events array:", events);
+            // Invalid currentEventId, fall back to first event
+            const firstEvent = events[0];
+            if (firstEvent && firstEvent.$id) {
+              console.log("Using first event with ID:", firstEvent.$id);
+              setCurrentEventId(firstEvent.$id);
+              setCurrentEvent(firstEvent);
+              setIsEventSelected(true);
+              await fetchParticipants(firstEvent.$id);
+            }
           }
         } else if (events.length > 0) {
+          console.log("No currentEventId, using first event");
           const firstEvent = events[0];
-          setCurrentEventId(firstEvent.id);
-          setCurrentEvent(firstEvent);
-          setIsEventSelected(true);
-          await fetchParticipants(firstEvent.id);
+          if (firstEvent && firstEvent.$id) {
+            console.log("Using first event with ID:", firstEvent.$id);
+            setCurrentEventId(firstEvent.$id);
+            setCurrentEvent(firstEvent);
+            setIsEventSelected(true);
+            await fetchParticipants(firstEvent.$id);
+          }
+        } else {
+          // No events available, clear participants
+          setParticipants([]);
+          setTotalParticipants(0);
+          setTotalMaleParticipants(0);
+          setTotalFemaleParticipants(0);
         }
       } catch (error) {
         console.error("Error initializing component:", error);
@@ -354,7 +393,7 @@ export default function ParticipantManagement({
   // Add this useEffect to handle automatic event selection after creation
   useEffect(() => {
     if (currentEventId && events.length > 0) {
-      const event = events.find((e) => e.id === currentEventId);
+      const event = events.find((e) => e.$id === currentEventId);
       if (event) {
         setCurrentEvent(event);
         setIsEventSelected(true);
@@ -372,7 +411,7 @@ export default function ParticipantManagement({
   };
 
   const isValidEvent = (event) => {
-    return event && event.id;
+    return event && event.$id;
   };
 
   const renderAutofillDialog = () => {
@@ -492,6 +531,15 @@ export default function ParticipantManagement({
         return;
       }
 
+      // Validate that currentEventId exists
+      if (!currentEventId) {
+        console.log("No event selected. currentEventId is undefined");
+        toast.error("No event selected. Please select an event first.");
+        setError("No event selected");
+        setLoading(false);
+        return;
+      }
+
       // Prepare the base participant data with only fields that exist in the schema
       const baseParticipantData = {
         // User input fields
@@ -571,7 +619,9 @@ export default function ParticipantManagement({
         toast.success("Participant added successfully!");
         setParticipantData(getInitialParticipantData(participantType));
         setErrors({});
-        await fetchParticipants(currentEventId);
+        if (currentEventId) {
+          await fetchParticipants(currentEventId);
+        }
 
         // Scroll to the tables section
         const tablesSection = document.querySelector("#participant-tables");
@@ -709,7 +759,9 @@ export default function ParticipantManagement({
       await deleteDoc(doc(db, collectionId, participantId));
 
       toast.success("Participant deleted successfully!");
-      await fetchParticipants(currentEventId);
+      if (currentEventId) {
+        await fetchParticipants(currentEventId);
+      }
     } catch (error) {
       console.error("Error deleting participant:", error);
       toast.error("Failed to delete participant");
@@ -744,8 +796,8 @@ export default function ParticipantManagement({
 
             // Debounced validation for student ID
             const debouncedValidation = debounce(async () => {
-              // Only check for duplicates if format is valid
-              if (isValidFormat) {
+              // Only check for duplicates if format is valid and currentEventId exists
+              if (isValidFormat && currentEventId) {
                 const { error: idError, participant: existingStudent } =
                   await checkDuplicates(
                     "studentId",
@@ -786,13 +838,14 @@ export default function ParticipantManagement({
             const formattedId = formatStaffFacultyId(value);
 
             const debouncedValidation = debounce(async () => {
-              const { error: idError, participant: existingStaff } =
-                await checkDuplicates(
-                  "staffFacultyId",
-                  formattedId,
-                  currentEventId,
-                  participantType
-                );
+              if (currentEventId) {
+                const { error: idError, participant: existingStaff } =
+                  await checkDuplicates(
+                    "staffFacultyId",
+                    formattedId,
+                    currentEventId,
+                    participantType
+                  );
 
               if (idError) {
                 setDuplicateErrors((prev) => ({
@@ -808,7 +861,8 @@ export default function ParticipantManagement({
                   staffFacultyId: "This Staff/Faculty ID is available",
                 }));
               }
-            }, 1000);
+            }
+          }, 1000);
 
             debouncedValidation();
             return () => debouncedValidation.cancel();
@@ -817,7 +871,7 @@ export default function ParticipantManagement({
       }
 
       // Handle name validation for all participant types
-      if (field === "name" && value.trim()) {
+      if (field === "name" && value.trim() && currentEventId) {
         const debouncedNameValidation = debounce(async () => {
           const { error: nameError } = await checkDuplicates(
             "name",
@@ -1192,7 +1246,7 @@ export default function ParticipantManagement({
         <NetworkStatus
           title="Connection Error"
           message={error}
-          onRetry={() => fetchParticipants(currentEventId)}
+          onRetry={() => currentEventId ? fetchParticipants(currentEventId) : null}
           isOffline={false}
         />
       );
@@ -1276,11 +1330,17 @@ export default function ParticipantManagement({
                   <div className="flex items-center gap-2">
                     <Select
                       value={currentEventId || ""}
-                      onValueChange={(value) => {
-                        const event = events.find((e) => e.id === value);
-                        setCurrentEventId(value);
-                        setCurrentEvent(event);
-                      }}
+                                             onValueChange={(value) => {
+                         if (value && value.trim() !== '') {
+                           const event = events.find((e) => e.$id === value);
+                           if (event) {
+                             setCurrentEventId(value);
+                             setCurrentEvent(event);
+                             // Fetch participants for the newly selected event
+                             fetchParticipants(value);
+                           }
+                         }
+                       }}
                     >
                       <SelectTrigger className="w-[300px]">
                         <SelectValue placeholder="Select an event" />
@@ -1295,13 +1355,13 @@ export default function ParticipantManagement({
                           </Tooltip>
                         </TooltipProvider>
                       </SelectTrigger>
-                      <SelectContent>
-                        {events.map((event) => (
-                          <SelectItem key={event.id} value={event.id}>
-                            {event.eventName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
+                                             <SelectContent>
+                         {events.map((event) => (
+                           <SelectItem key={event.$id} value={event.$id}>
+                             {event.eventName}
+                           </SelectItem>
+                         ))}
+                       </SelectContent>
                     </Select>
                   </div>
                 </div>
