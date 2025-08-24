@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 import React, { useMemo, useEffect, useState } from "react";
 import {
   Dialog,
@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import EditParticipantDialog from "./EditParticipantDialog";
-import AddParticipant from "../AddParticipantDialog";
+import EditParticipantDialog from "@/app/officer/event-management/event-participant-log/view-participant-dialog/EditParticipantDialog";
+import AddParticipant from "@/app/officer/event-management/event-participant-log/AddParticipantDialog";
 import {
   db,
   COLLECTIONS,
@@ -63,25 +63,28 @@ const ViewParticipants = ({
         return;
       }
 
-             try {
-         setLoading(true);
-         console.log("Selected event object:", selectedEvent);
-         console.log("Fetching participants for event:", selectedEvent.id);
+      try {
+        setLoading(true);
+        console.log("Selected event object:", selectedEvent);
+        console.log("Fetching participants for event:", selectedEvent.id);
 
-        // Fetch participants without the isArchived filter to include existing participants
+        // Fetch participants for the specific event
         const [studentsResponse, staffResponse, communityResponse] =
           await Promise.all([
             getDocs(query(
               collection(db, COLLECTIONS.STUDENTS),
-              where("eventId", "==", selectedEvent.id)
+              where("eventId", "==", selectedEvent.id),
+              where("isArchived", "==", false)
             )),
             getDocs(query(
               collection(db, COLLECTIONS.STAFF_FACULTY),
-              where("eventId", "==", selectedEvent.id)
+              where("eventId", "==", selectedEvent.id),
+              where("isArchived", "==", false)
             )),
             getDocs(query(
               collection(db, COLLECTIONS.COMMUNITY),
-              where("eventId", "==", selectedEvent.id)
+              where("eventId", "==", selectedEvent.id),
+              where("isArchived", "==", false)
             )),
           ]);
 

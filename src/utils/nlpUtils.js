@@ -1,4 +1,4 @@
-import { Query } from 'appwrite';
+import { query, collection, where, getDocs, db, COLLECTIONS } from '@/lib/firebase';
 
 export function parseNaturalLanguageQuery(input) {
   const query = {};
@@ -72,51 +72,74 @@ export function parseNaturalLanguageQuery(input) {
   return query;
 }
 
-export function buildAppwriteQueries(parsedQuery) {
-  const queries = [];
+export function buildFirebaseQueries(parsedQuery) {
+  const whereConditions = [];
 
   if (parsedQuery.gender) {
-    queries.push(Query.equal('sex', parsedQuery.gender));
+    whereConditions.push(where('sex', '==', parsedQuery.gender));
   }
 
   if (parsedQuery.dateRange) {
-    queries.push(Query.greaterThanEqual('eventDetails.eventDate', parsedQuery.dateRange.start));
-    queries.push(Query.lessThanEqual('eventDetails.eventDate', parsedQuery.dateRange.end));
+    whereConditions.push(where('eventDetails.eventDate', '>=', parsedQuery.dateRange.start));
+    whereConditions.push(where('eventDetails.eventDate', '<=', parsedQuery.dateRange.end));
   }
 
   if (parsedQuery.ageRange) {
     if (parsedQuery.ageRange.min) {
-      queries.push(Query.greaterThanEqual('age', parsedQuery.ageRange.min));
+      whereConditions.push(where('age', '>=', parsedQuery.ageRange.min));
     }
     if (parsedQuery.ageRange.max) {
-      queries.push(Query.lessThanEqual('age', parsedQuery.ageRange.max));
+      whereConditions.push(where('age', '<=', parsedQuery.ageRange.max));
     }
   }
 
   if (parsedQuery.eventNames) {
-    queries.push(Query.search('eventDetails.eventName', parsedQuery.eventNames[0]));
+    whereConditions.push(where('eventDetails.eventName', '==', parsedQuery.eventNames[0]));
   }
 
   if (parsedQuery.eventType) {
-    queries.push(Query.equal('eventDetails.eventType', parsedQuery.eventType));
+    whereConditions.push(where('eventDetails.eventType', '==', parsedQuery.eventType));
   }
 
   if (parsedQuery.eventCategory) {
-    queries.push(Query.equal('eventDetails.eventCategory', parsedQuery.eventCategory));
+    whereConditions.push(where('eventDetails.eventCategory', '==', parsedQuery.eventCategory));
   }
 
   if (parsedQuery.year) {
-    queries.push(Query.equal('year', parsedQuery.year.toString()));
+    whereConditions.push(where('year', '==', parsedQuery.year.toString()));
   }
 
   if (parsedQuery.section) {
-    queries.push(Query.equal('section', parsedQuery.section));
+    whereConditions.push(where('section', '==', parsedQuery.section));
   }
 
   if (parsedQuery.ethnicGroup) {
-    queries.push(Query.equal('ethnicGroup', parsedQuery.ethnicGroup));
+    whereConditions.push(where('ethnicGroup', '==', parsedQuery.ethnicGroup));
   }
 
-  return queries;
+  // Build a single query with all conditions
+  if (whereConditions.length > 0) {
+    return query(collection(db, COLLECTIONS.STUDENTS), ...whereConditions);
+  }
+
+  // Return a query for all students if no conditions
+  return query(collection(db, COLLECTIONS.STUDENTS));
+}
+
+// Helper function to execute the query and return results
+export async function executeNaturalLanguageQuery(input) {
+  try {
+    const parsedQuery = parseNaturalLanguageQuery(input);
+    const firebaseQuery = buildFirebaseQueries(parsedQuery);
+    const querySnapshot = await getDocs(firebaseQuery);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error executing natural language query:', error);
+    throw error;
+  }
 }
 

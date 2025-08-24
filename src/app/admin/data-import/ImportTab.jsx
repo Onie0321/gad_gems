@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import React, { useState } from "react";
 import { useDropzone } from "react-dropzone";
@@ -6,7 +6,7 @@ import Papa from "papaparse";
 import {
   importEmployeeDataInBatches,
   validateEmployeeData,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

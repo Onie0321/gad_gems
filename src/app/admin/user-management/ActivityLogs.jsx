@@ -1,5 +1,5 @@
 // src/app/admin/user-management/activity-logs/page.jsx
-"use client";
+"use auth";
 
 import { useEffect, useState } from "react";
 import {
@@ -22,7 +22,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { fetchActivityLogs, fetchUsers } from "@/lib/appwrite";
+import { fetchActivityLogs, fetchUsers } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import {
   format,
@@ -61,7 +61,7 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { client } from "@/lib/appwrite";
+import { auth } from "@/lib/firebase";
 
 export default function ActivityLogs() {
   const [logs, setLogs] = useState([]);
@@ -130,13 +130,13 @@ export default function ActivityLogs() {
     // Set up real-time subscription
     let unsubscribe;
     try {
-      // Use the pre-configured client
-      unsubscribe = client.subscribe(
-        `databases.${process.env.NEXT_PUBLIC_DATABASE_ID}.collections.activity_logs.documents`,
+      // Use the pre-configured auth
+      unsubscribe = auth.subscribe(
+        `db.${process.env.NEXT_PUBLIC_DATABASE_ID}.collections.activity_logs.documents`,
         (response) => {
           if (
             response.events.includes(
-              "databases.*.collections.*.documents.*.create"
+              "db.*.collections.*.documents.*.create"
             )
           ) {
             setLogs((prevLogs) => {
@@ -427,9 +427,24 @@ export default function ActivityLogs() {
   // Filter logs based on search criteria
   const filteredLogs = logs.filter((log) => {
     try {
-      const timestamp = log.timestamp
-        ? format(new Date(log.timestamp), "MMM d, yyyy HH:mm:ss").toLowerCase()
-        : "";
+      // Handle Firebase Timestamp objects and various date formats safely
+      let timestamp = "";
+      if (log.timestamp) {
+        try {
+          const dateValue = log.timestamp.seconds 
+            ? new Date(log.timestamp.seconds * 1000) 
+            : log.timestamp.nanoseconds 
+            ? new Date(log.timestamp.nanoseconds / 1000000)
+            : new Date(log.timestamp);
+          
+          if (!isNaN(dateValue.getTime())) {
+            timestamp = format(dateValue, "MMM d, yyyy HH:mm:ss").toLowerCase();
+          }
+        } catch (dateError) {
+          console.warn("Invalid timestamp format:", log.timestamp);
+        }
+      }
+      
       const userName = (users[log.userId] || "Unknown User").toLowerCase();
       const activity = (log.activityType || "").toLowerCase();
       const searchLower = searchTerm.toLowerCase();
@@ -741,9 +756,26 @@ export default function ActivityLogs() {
                 </TableRow>
               ) : (
                 paginatedLogs.map((log) => (
-                  <TableRow key={log.$id}>
+                  <TableRow key={log.id}>
                     <TableCell className="whitespace-nowrap">
-                      {format(new Date(log.timestamp), "MMM d, yyyy HH:mm:ss")}
+                      {(() => {
+                        try {
+                          if (!log.timestamp) return "No timestamp";
+                          const dateValue = log.timestamp.seconds 
+                            ? new Date(log.timestamp.seconds * 1000) 
+                            : log.timestamp.nanoseconds 
+                            ? new Date(log.timestamp.nanoseconds / 1000000)
+                            : new Date(log.timestamp);
+                          
+                          if (!isNaN(dateValue.getTime())) {
+                            return format(dateValue, "MMM d, yyyy HH:mm:ss");
+                          }
+                          return "Invalid timestamp";
+                        } catch (error) {
+                          console.warn("Error formatting timestamp:", error);
+                          return "Invalid timestamp";
+                        }
+                      })()}
                     </TableCell>
                     <TableCell>{users[log.userId] || "Unknown User"}</TableCell>
                     <TableCell>{log.activityType}</TableCell>

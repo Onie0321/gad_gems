@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { fetchReportData, calculateKPIs } from '@/lib/appwrite'
+import { fetchReportData, calculateKPIs } from '@/lib/firebase'
 import { Download } from 'lucide-react'
 
 export const Reports = () => {

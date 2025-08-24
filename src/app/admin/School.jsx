@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import React, { useState, useEffect } from 'react';
 import { motion } from "framer-motion";
@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search } from 'lucide-react';
-import { getEvents, getParticipants, databases, databaseId, eventCollectionId, studentsCollectionId } from "@/lib/appwrite";
-import { Query } from 'appwrite';
+import { getEvents, getParticipants, db, COLLECTIONS } from "@/lib/firebase";
+import { query, collection, where, getDocs } from '@/lib/firebase';
 
 const schools = [
   { name: "School of Accountancy and Business Management", logo: "/logos/sabm.png", color: "#4299E1", code: "SABM" },
@@ -41,24 +41,23 @@ export function SchoolsSection() {
     setLoading(true);
     try {
       // Fetch events for the selected school
-      const eventsResponse = await databases.listDocuments(
-        databaseId,
-        eventCollectionId, // your events collection ID
-      );
+      const eventsResponse = await getDocs(collection(db, COLLECTIONS.EVENTS));
 
       // Fetch participants for the selected school
-      const participantsResponse = await databases.listDocuments(
-        databaseId,
-        studentsCollectionId, // your participants collection ID
-        [Query.equal('school', schoolCode)]
+      const participantsQuery = query(
+        collection(db, COLLECTIONS.STUDENTS),
+        where('school', '==', schoolCode)
       );
+      const participantsResponse = await getDocs(participantsQuery);
 
+      const events = eventsResponse.docs.map(doc => ({ ...doc.data(), $id: doc.id }));
+      const participants = participantsResponse.docs.map(doc => ({ ...doc.data(), $id: doc.id }));
 
-      setEvents(eventsResponse.documents);
-      setParticipants(participantsResponse.documents);
+      setEvents(events);
+      setParticipants(participants);
 
       // Calculate statistics
-      const stats = calculateParticipantStats(participantsResponse.documents);
+      const stats = calculateParticipantStats(participants);
       setParticipantStats(stats);
 
     } catch (error) {

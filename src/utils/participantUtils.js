@@ -1,14 +1,15 @@
 import { debounce } from "lodash";
-import { Query } from "appwrite";
+// Query functionality is handled differently in Firebase;
 import {
   checkDuplicateParticipant,
   fetchParticipantData,
-  databases,
-  databaseId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  where,
+  getDocs,
+} from "@/lib/firebase";
 
 export const formatStudentId = (input) => {
   if (!input) return "";
@@ -203,102 +204,88 @@ export const schoolOptions = [
 
 export const checkDuplicates = async (field, value, currentEventId, participantType) => {
   if (!field || !value || !currentEventId || value.trim() === "") {
-    return { error: "", participant: null };
+    return { duplicateError: "", newEntryInfo: "" };
   }
 
   try {
     let collectionId;
-    let query;
 
     switch (participantType) {
       case "student":
-        collectionId = studentsCollectionId;
-        query = field === "studentId" ? 
-          Query.equal("studentId", value) : 
-          Query.equal("name", value);
+        collectionId = COLLECTIONS.STUDENTS;
         break;
       case "staff":
-        collectionId = staffFacultyCollectionId;
-        // For staff ID, ensure we're sending an integer
-        if (field === "staffFacultyId") {
-          const staffId = parseInt(value.replace(/\D/g, ''));
-          // Only proceed if we have a valid number
-          if (isNaN(staffId)) {
-            return { error: "", participant: null };
-          }
-          query = Query.equal("staffFacultyId", staffId);
-        } else {
-          query = Query.equal("name", value);
-        }
+        collectionId = COLLECTIONS.STAFF_FACULTY;
         break;
       case "community":
-        collectionId = communityCollectionId;
-        query = Query.equal("name", value);
+        collectionId = COLLECTIONS.COMMUNITY;
         break;
       default:
         throw new Error("Invalid participant type");
     }
 
-    const response = await databases.listDocuments(
-      databaseId,
-      collectionId,
-      [
-        Query.equal("eventId", currentEventId),
-        query
-      ]
+    // Check for duplicates in current event
+    const currentEventQuery = query(
+      collection(db, collectionId),
+      where("eventId", "==", currentEventId),
+      where(field, "==", value)
     );
 
-    if (response.documents.length > 0) {
+    const currentEventSnapshot = await getDocs(currentEventQuery);
+
+    if (!currentEventSnapshot.empty) {
       return {
-        error: `This ${field === "studentId" ? "Student ID" : 
+        duplicateError: `This ${field === "studentId" ? "Student ID" : 
                field === "staffFacultyId" ? "Staff/Faculty ID" : 
                "Name"} is already registered for this event.`,
-        participant: response.documents[0]
+        newEntryInfo: ""
       };
     }
 
     // Check in other events
-    const otherEventsResponse = await databases.listDocuments(
-      databaseId,
-      collectionId,
-      [
-        Query.notEqual("eventId", currentEventId),
-        query
-      ]
+    const otherEventsQuery = query(
+      collection(db, collectionId),
+      where("eventId", "!=", currentEventId),
+      where(field, "==", value)
     );
 
-    if (otherEventsResponse.documents.length > 0) {
+    const otherEventsSnapshot = await getDocs(otherEventsQuery);
+
+    if (!otherEventsSnapshot.empty) {
+      const participant = otherEventsSnapshot.docs[0].data();
       return {
-        error: "",
-        participant: otherEventsResponse.documents[0]
+        duplicateError: "",
+        newEntryInfo: `Found in event: ${participant.eventName || "Unknown Event"}`
       };
     }
 
-    return { error: "", participant: null };
+    return { duplicateError: "", newEntryInfo: "" };
   } catch (error) {
     console.error("Error checking duplicates:", error);
     return {
-      error: "Error checking for duplicates",
-      participant: null
+      duplicateError: "Error checking for duplicates",
+      newEntryInfo: ""
     };
   }
 };
 
-export const debouncedCheckDuplicates = (...args) =>
-  new Promise((resolve) => {
-    debounce(async () => {
-      try {
-        const result = await checkDuplicates(...args);
-        resolve(result);
-      } catch (error) {
-        console.error("Error in debouncedCheckDuplicates:", error);
-        resolve({
-          duplicateError: "Error checking duplicates",
-          newEntryInfo: "",
-        });
-      }
-    }, 300)();
-  });
+// Create a debounced version of checkDuplicates
+const debouncedCheckDuplicatesImpl = debounce(async (...args) => {
+  try {
+    const result = await checkDuplicates(...args);
+    return result;
+  } catch (error) {
+    console.error("Error in debouncedCheckDuplicates:", error);
+    return {
+      duplicateError: "Error checking duplicates",
+      newEntryInfo: "",
+    };
+  }
+}, 300);
+
+export const debouncedCheckDuplicates = (...args) => {
+  return debouncedCheckDuplicatesImpl(...args);
+};
 
 export const isIdComplete = (id, type) => {
   if (!id) return false;
@@ -568,9 +555,9 @@ export const checkDuplicateParticipantInEvent = async (
   if (!eventId || !identifier) return null;
 
   try {
-    const participants = await databases.listDocuments(
-      databaseId,
-      studentsCollectionId,
+    const participants = await db.listDocuments(
+      COLLECTIONS,
+      COLLECTIONS.STUDENTS,
       [
         Query.notEqual("eventId", eventId),
         type === "student"

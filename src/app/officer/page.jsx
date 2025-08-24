@@ -10,10 +10,11 @@ import { Notifications } from "./Notifications";
 import UserMenu from "./UserMenu";
 import {
   getCurrentUser,
-  databases,
-  databaseId,
-  userCollectionId,
-} from "@/lib/appwrite";
+  db,
+  COLLECTIONS,
+  updateDoc,
+  doc,
+} from "@/lib/firebase";
 import { useRouter, useSearchParams } from "next/navigation";
 import WelcomeModal from "@/components/modals/welcome";
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
@@ -128,7 +129,8 @@ export default function OfficerDashboard() {
 
   const updateUserFirstLogin = async (userId) => {
     try {
-      await databases.updateDocument(databaseId, userCollectionId, userId, {
+      const { updateDoc, doc, COLLECTIONS } = await import("@/lib/firebase");
+      await updateDoc(doc(db, COLLECTIONS.USERS, userId), {
         isFirstLogin: false,
       });
     } catch (error) {

@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import Image from "next/image";
 import { useState, useEffect } from "react";
@@ -11,8 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CalendarIcon } from "lucide-react";
-import { databases, databaseId, newsCollectionId } from "@/lib/appwrite";
-import { Query } from "appwrite";
+import { db, COLLECTIONS } from "@/lib/firebase";
+import { query, collection, where, orderBy, getDocs } from "@/lib/firebase";
 import { motion } from "framer-motion";
 import { Newspaper } from "lucide-react";
 
@@ -24,13 +24,20 @@ export default function NewsSection() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const response = await databases.listDocuments(
-          databaseId,
-          newsCollectionId,
-          [Query.equal("showOnHomepage", true), Query.orderDesc("date")]
+        const newsQuery = query(
+          collection(db, COLLECTIONS.NEWS),
+          where("showOnHomepage", "==", true),
+          orderBy("date", "desc")
         );
+        
+        const querySnapshot = await getDocs(newsQuery);
 
-        setNews(response.documents);
+        const newsData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        setNews(newsData);
       } catch (error) {
         console.error("Error fetching news:", error);
       }

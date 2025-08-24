@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ import {
   validateEditParticipantForm,
   schoolOptions,
 } from "../../../utils/participantUtils";
-import { updateParticipant } from "@/lib/appwrite"; // Adjust import based on your file structure
+import { updateParticipant } from "@/lib/firebase"; // Adjust import based on your file structure
 
 export default function EditParticipantDialog({
   participant,
@@ -54,7 +54,7 @@ export default function EditParticipantDialog({
 
     try {
       // Filter out system fields
-      const { $id, $databaseId, $collectionId, ...validData } =
+      const { $id, $COLLECTIONS, $collectionId, ...validData } =
         editedParticipant;
 
       // Update the participant in the database

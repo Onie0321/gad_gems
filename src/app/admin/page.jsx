@@ -28,18 +28,16 @@ import InactivityLock from "@/components/loading/InactivityLock";
 import DataImportAnalytics from "./DataImport";
 import {
   getCurrentUser,
-  getAccount,
-  databaseId,
-  databases,
-  userCollectionId,
-  eventCollectionId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
+  auth,
+  db,
+  COLLECTIONS,
   getCurrentAcademicPeriod,
-  signOut,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  signOutUser,
+  getDocs,
+  query,
+  collection,
+  limit,
+} from "@/lib/firebase";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import {
@@ -190,14 +188,14 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
         const user = await getCurrentUser();
-        const account = await getAccount();
-        if (user && account) {
-          setCurrentUser({ ...user, ...account });
+        if (user) {
+          setCurrentUser(user);
 
           // Get current academic period
           const currentPeriod = await getCurrentAcademicPeriod();
           if (!currentPeriod) {
-            throw new Error("No active academic period found");
+            console.warn("No academic period found. Some features may be limited.");
+            // Continue without academic period - data will still be loaded
           }
 
           // Fetch all data in parallel
@@ -208,46 +206,39 @@ export default function AdminDashboard() {
             fetchedCommunity,
             fetchedEvents,
           ] = await Promise.all([
-            databases.listDocuments(databaseId, userCollectionId, [
-              Query.limit(100),
-            ]),
+            getDocs(query(collection(db, COLLECTIONS.USERS), limit(100))),
             // Fetch students
-            databases.listDocuments(databaseId, studentsCollectionId, [
-              Query.limit(100),
-            ]),
+            getDocs(query(collection(db, COLLECTIONS.STUDENTS), limit(100))),
             // Fetch staff/faculty
-            databases.listDocuments(databaseId, staffFacultyCollectionId, [
-              Query.limit(100),
-            ]),
+            getDocs(query(collection(db, COLLECTIONS.STAFF_FACULTY), limit(100))),
             // Fetch community members
-            databases.listDocuments(databaseId, communityCollectionId, [
-              Query.limit(100),
-            ]),
+            getDocs(query(collection(db, COLLECTIONS.COMMUNITY), limit(100))),
             // Fetch events
-            databases.listDocuments(databaseId, eventCollectionId, [
-              Query.limit(100),
-            ]),
+            getDocs(query(collection(db, COLLECTIONS.EVENTS), limit(100))),
           ]);
 
           // Combine all participants with their respective types
           const allParticipants = [
-            ...fetchedStudents.documents.map((p) => ({
-              ...p,
+            ...fetchedStudents.docs.map((doc) => ({
+              ...doc.data(),
+              id: doc.id,
               participantType: "Student",
             })),
-            ...fetchedStaffFaculty.documents.map((p) => ({
-              ...p,
+            ...fetchedStaffFaculty.docs.map((doc) => ({
+              ...doc.data(),
+              id: doc.id,
               participantType: "Staff/Faculty",
             })),
-            ...fetchedCommunity.documents.map((p) => ({
-              ...p,
+            ...fetchedCommunity.docs.map((doc) => ({
+              ...doc.data(),
+              id: doc.id,
               participantType: "Community Member",
             })),
           ];
 
-          setUsers(fetchedUsers.documents);
+          setUsers(fetchedUsers.docs.map(doc => ({ ...doc.data(), id: doc.id })));
           setParticipants(allParticipants);
-          setEvents(fetchedEvents.documents);
+          setEvents(fetchedEvents.docs.map(doc => ({ ...doc.data(), id: doc.id })));
         }
       } catch (err) {
         console.error("Error fetching data:", err);

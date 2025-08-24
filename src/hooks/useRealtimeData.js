@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { subscribeToRealTimeUpdates } from "@/lib/appwrite";
+import { subscribeToCollection } from "@/lib/firebase";
 
 export const useRealtimeData = (
   initialData = [],
@@ -22,7 +22,7 @@ export const useRealtimeData = (
         }
 
         // Subscribe to real-time updates
-        const unsubscribe = await subscribeToRealTimeUpdates(
+        const unsubscribe = await subscribeToCollection(
           collectionId,
           (payload) => {
             if (!isMounted) return;

@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import {
@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listQuestions, listResponses } from "@/lib/appwrite";
+import { listQuestions, listResponses } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ChartsAndTables() {

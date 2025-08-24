@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import * as React from "react";
 import { useState, useEffect } from "react";
@@ -17,10 +17,10 @@ import {
 import {
   getCurrentUser,
   signOut,
-  account,
+  auth,
   logSignOutActivity,
   createNotification,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,10 +48,10 @@ export default function UserMenu() {
           setUser(currentUser);
         }
       } catch (error) {
-        console.error("Error fetching user account:", error);
+        console.error("Error fetching user auth:", error);
         toast({
           title: "Error",
-          description: "Failed to load user account. Please try again later.",
+          description: "Failed to load user auth. Please try again later.",
           variant: "destructive",
         });
       } finally {
@@ -72,7 +72,7 @@ export default function UserMenu() {
         // Create notification for admin
         await createNotification({
           userId: "admin",
-          type: "account",
+          type: "auth",
           title: "User Sign Out",
           message: `${currentUser.name} has signed out of the system.`,
           actionType: "user_signout",

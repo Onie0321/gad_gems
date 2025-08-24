@@ -1,12 +1,11 @@
-"use client";
+"use auth";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import EventAnalysis from "./events/Event-Analysis";
 import { SearchFilter } from "./events/Search";
 import { useState, useEffect } from "react";
-import { getCurrentAcademicPeriod, databases } from "@/lib/appwrite";
-import { Query } from "appwrite";
+import { getCurrentAcademicPeriod, db, COLLECTIONS, query, collection, where, getDocs } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import EventParticipantLog from "./events/EventParticipantLog";
 
@@ -31,14 +30,16 @@ export default function EventManagementSystem() {
   const fetchEvents = async () => {
     if (!currentPeriod) return;
 
-    const response = await databases.listDocuments(
-      databaseId,
-      eventCollectionId,
-      [
-        Query.equal("isArchived", false),
-        Query.equal("academicPeriodId", currentPeriod.$id),
-      ]
+    const eventsQuery = query(
+      collection(db, COLLECTIONS.EVENTS),
+      where("isArchived", "==", false),
+      where("academicPeriodId", "==", currentPeriod.id)
     );
+    const querySnapshot = await getDocs(eventsQuery);
+    const eventsList = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
     // Rest of your code...
   };
 

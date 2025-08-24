@@ -21,7 +21,7 @@ import {
   getParticipants,
   getStaffFaculty,
   getCommunityMembers,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import { exportEventsToExcel } from "@/utils/exportUtils";
 
 const formatDate = (dateString) => {

@@ -21,10 +21,10 @@ import { FcGoogle } from "react-icons/fc";
 import { useToast } from "@/hooks/use-toast";
 import {
   createUser,
-  account,
+  auth,
   createNotification,
   logActivity,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import dynamic from "next/dynamic";
 
 const MotionDiv = dynamic(

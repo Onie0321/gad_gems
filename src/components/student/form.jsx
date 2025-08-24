@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,7 +28,7 @@ import {
   getStudents,
   updateStudent,
   deleteStudent,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 

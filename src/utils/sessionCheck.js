@@ -1,35 +1,42 @@
-"use client";
+"use auth";
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentUser } from '@/lib/appwrite';
+import { getCurrentUser } from '@/lib/firebase';
 
-export function SessionCheck({ children }) {
-  const router = useRouter();
+export function useSessionCheck() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const user = await getCurrentUser();
-        if (!user || user.approvalStatus !== "approved") {
-          router.push('/sign-in');
+        const currentUser = await getCurrentUser();
+        if (currentUser) {
+          setIsAuthenticated(true);
+          setUser(currentUser);
+        } else {
+          setIsAuthenticated(false);
+          setUser(null);
         }
       } catch (error) {
-        console.error("Session check error:", error);
-        router.push('/sign-in');
+        console.error('Session check error:', error);
+        setIsAuthenticated(false);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     checkSession();
-  }, [router]);
+  }, []);
 
-  if (isLoading) {
-    return <div>Loading...</div>; // Or a more sophisticated loading component
-  }
+  const redirectToLogin = () => {
+    router.push('/sign-in');
+  };
 
-  return children;
+  return { isAuthenticated, isLoading, user, redirectToLogin };
 }
 

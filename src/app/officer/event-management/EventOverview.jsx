@@ -45,22 +45,21 @@ import {
 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import {
-  databases,
-  databaseId,
-  eventCollectionId,
-  studentsCollectionId,
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  where,
+  orderBy,
+  limit,
+  getDocs,
   getCurrentUser,
-  subscribeToRealTimeUpdates,
+  subscribeToCollection,
   getCurrentAcademicPeriod,
-  academicPeriodCollectionId,
-  notificationsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
-import { client } from "@/lib/appwrite";
+  onSnapshot,
+} from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { useTabContext, TabProvider } from "@/context/TabContext";
-import { Query } from "appwrite";
 import { ColorfulSpinner } from "@/components/ui/loader";
 import { toast } from "@/hooks/use-toast";
 
@@ -153,23 +152,27 @@ export default function EventOverview({
       setCurrentAcademicPeriod(currentPeriod);
 
       if (!currentPeriod) {
-        throw new Error("No active academic period found");
+        console.warn("No academic period found. Event data may be limited.");
+        setEvents([]);
+        setParticipants([]);
+        setAgeDistribution([]);
+        setLocationDistribution([]);
+        return; // Exit early but don't throw error
       }
 
       // First fetch events
-      const eventsResponse = await databases.listDocuments(
-        databaseId,
-        eventCollectionId,
-        [
-          Query.equal("createdBy", user.$id),
-          Query.equal("isArchived", false),
-          Query.equal("academicPeriodId", currentPeriod.$id),
-          Query.orderDesc("$createdAt"),
-          Query.limit(5),
-        ]
+      const eventsQuery = query(
+        collection(db, COLLECTIONS.EVENTS),
+        where("createdBy", "==", user.$id),
+        where("isArchived", "==", false),
+        where("academicPeriodId", "==", currentPeriod.id),
+        orderBy("createdAt", "desc"),
+        limit(5)
       );
+      const eventsSnapshot = await getDocs(eventsQuery);
+      const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      if (eventsResponse.documents.length === 0) {
+      if (eventsList.length === 0) {
         setEvents([]);
         setParticipants([]);
         setAgeDistribution([]);
@@ -178,40 +181,43 @@ export default function EventOverview({
       }
 
       // Get all event IDs
-      const eventIds = eventsResponse.documents.map((event) => event.$id);
+      const eventIds = eventsList.map((event) => event.id);
 
       // Fetch participants for all events
       const [studentsResponse, staffFacultyResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
-            Query.equal("eventId", eventIds),
-            Query.equal("isArchived", false),
-            Query.equal("createdBy", user.$id),
-          ]),
-          databases.listDocuments(databaseId, staffFacultyCollectionId, [
-            Query.equal("eventId", eventIds),
-            Query.equal("isArchived", false),
-            Query.equal("createdBy", user.$id),
-          ]),
-          databases.listDocuments(databaseId, communityCollectionId, [
-            Query.equal("eventId", eventIds),
-            Query.equal("isArchived", false),
-            Query.equal("createdBy", user.$id),
-          ]),
+          getDocs(query(
+            collection(db, COLLECTIONS.STUDENTS),
+            where("eventId", "in", eventIds),
+            where("isArchived", "==", false),
+            where("createdBy", "==", user.$id)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.STAFF_FACULTY),
+            where("eventId", "in", eventIds),
+            where("isArchived", "==", false),
+            where("createdBy", "==", user.$id)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.COMMUNITY),
+            where("eventId", "in", eventIds),
+            where("isArchived", "==", false),
+            where("createdBy", "==", user.$id)
+          )),
         ]);
 
       // Combine all participants
       const allParticipants = [
-        ...studentsResponse.documents,
-        ...staffFacultyResponse.documents,
-        ...communityResponse.documents,
+        ...studentsResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        ...staffFacultyResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        ...communityResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })),
       ];
 
       // Calculate demographics from all participants
       const { ageDistribution: ageDist, locationDistribution: locDist } =
         calculateDemographics(allParticipants);
 
-      setEvents(eventsResponse.documents);
+      setEvents(eventsList);
       setParticipants(allParticipants);
       setAgeDistribution(ageDist);
       setLocationDistribution(locDist);
@@ -226,21 +232,19 @@ export default function EventOverview({
   const fetchNotifications = async (userId) => {
     try {
       // First check if we have a valid collection ID
-      if (!notificationsCollectionId) {
+      if (!COLLECTIONS.NOTIFICATIONS) {
         console.warn("Notifications collection ID is not configured");
         return [];
       }
 
-      const response = await databases.listDocuments(
-        databaseId,
-        notificationsCollectionId,
-        [
-          Query.equal("userId", userId),
-          Query.orderDesc("$createdAt"),
-          Query.limit(5),
-        ]
+      const notificationsQuery = query(
+        collection(db, COLLECTIONS.NOTIFICATIONS),
+        where("userId", "==", userId),
+        orderBy("timestamp", "desc"),
+        limit(5)
       );
-      return response.documents;
+      const querySnapshot = await getDocs(notificationsQuery);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, $id: doc.id, ...doc.data() }));
     } catch (error) {
       // If collection doesn't exist, log warning and return empty array
       if (error.code === 404) {
@@ -263,16 +267,16 @@ export default function EventOverview({
           await fetchData();
 
           // Set up real-time listeners
-          const unsubscribeEvents = subscribeToRealTimeUpdates(
-            eventCollectionId,
+          const unsubscribeEvents = subscribeToCollection(
+            COLLECTIONS.EVENTS,
             async (response) => {
               console.log("Event update received:", response);
               await fetchData();
             }
           );
 
-          const unsubscribeParticipants = subscribeToRealTimeUpdates(
-            studentsCollectionId,
+          const unsubscribeParticipants = subscribeToCollection(
+            COLLECTIONS.STUDENTS,
             async (response) => {
               console.log("Participant update received:", response);
               await fetchData();
@@ -310,48 +314,29 @@ export default function EventOverview({
   }, [user]);
 
   useEffect(() => {
-    const unsubscribe = client.subscribe(
-      `databases.${process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID}.collections.${process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID}.documents`,
-      (response) => {
-        if (
-          response.events.includes(
-            "databases.*.collections.*.documents.*.update"
-          ) ||
-          response.events.includes(
-            "databases.*.collections.*.documents.*.create"
-          )
-        ) {
-          // Update the specific event in the local state
-          const updatedEvent = response.payload;
-          setEvents((prevEvents) => {
-            // Check if the event already exists
-            const eventExists = prevEvents.some(
-              (event) => event.$id === updatedEvent.$id
-            );
+    if (!user) return;
 
-            if (eventExists) {
-              // Update existing event
-              return prevEvents.map((event) =>
-                event.$id === updatedEvent.$id
-                  ? { ...event, ...updatedEvent }
-                  : event
-              );
-            } else {
-              // Add new event and maintain only 5 most recent
-              const newEvents = [updatedEvent, ...prevEvents]
-                .sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt))
-                .slice(0, 5);
-              return newEvents;
-            }
-          });
-        }
-      }
+    // Subscribe to real-time updates using Firebase onSnapshot
+    const eventsQuery = query(
+      collection(db, COLLECTIONS.EVENTS),
+      where("createdBy", "==", user.$id),
+      orderBy("updatedAt", "desc"),
+      limit(5)
     );
+
+    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
+      const eventsList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        $id: doc.id,
+        ...doc.data()
+      }));
+      setEvents(eventsList);
+    });
 
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [user]);
 
   const getParticipantCounts = (eventId) => {
     const eventParticipants = participants.filter((p) => p.eventId === eventId);
@@ -363,7 +348,7 @@ export default function EventOverview({
         p.participantType === "Student" ||
         p.type === "student" ||
         p.category === "student" ||
-        p.$collectionId === studentsCollectionId
+        p.participantType === "student"
     ).length;
 
     const staffFacultyCount = eventParticipants.filter(
@@ -425,13 +410,13 @@ export default function EventOverview({
     events.forEach((event) => {
       // Get all types of participants for this event
       const eventStudents = participants.filter(
-        (p) => p.eventId === event.$id && p.participantType === "student"
+        (p) => p.eventId === event.id && p.participantType === "student"
       );
       const eventStaff = participants.filter(
-        (p) => p.eventId === event.$id && p.participantType === "staff"
+        (p) => p.eventId === event.id && p.participantType === "staff"
       );
       const eventCommunity = participants.filter(
-        (p) => p.eventId === event.$id && p.participantType === "community"
+        (p) => p.eventId === event.id && p.participantType === "community"
       );
 
       // Combine all participants for this event
@@ -485,10 +470,12 @@ export default function EventOverview({
   const sortedEvents = useMemo(() => {
     return [...filteredEvents].sort((a, b) => {
       if (sortColumn === "updatedAt") {
-        // Sort by Appwrite's $updatedAt field
+        // Sort by Firebase's updatedAt field
+        const aDate = a.updatedAt?.toDate?.() || a.updatedAt || new Date(0);
+        const bDate = b.updatedAt?.toDate?.() || b.updatedAt || new Date(0);
         return sortDirection === "asc"
-          ? new Date(a.$updatedAt) - new Date(b.$updatedAt)
-          : new Date(b.$updatedAt) - new Date(a.$updatedAt);
+          ? new Date(aDate) - new Date(bDate)
+          : new Date(bDate) - new Date(aDate);
       } else if (sortColumn === "eventDate") {
         return sortDirection === "asc"
           ? new Date(a.eventDate) - new Date(b.eventDate)
@@ -498,14 +485,16 @@ export default function EventOverview({
           ? a.eventName.localeCompare(b.eventName)
           : b.eventName.localeCompare(a.eventName);
       } else if (sortColumn === "totalParticipants") {
-        const aCount = getParticipantCounts(a.$id).total;
-        const bCount = getParticipantCounts(b.$id).total;
+              const aCount = getParticipantCounts(a.id).total;
+      const bCount = getParticipantCounts(b.id).total;
         return sortDirection === "asc" ? aCount - bCount : bCount - aCount;
       }
       // Default to sorting by updatedAt
+      const aDate = a.updatedAt?.toDate?.() || a.updatedAt || new Date(0);
+      const bDate = b.updatedAt?.toDate?.() || b.updatedAt || new Date(0);
       return sortDirection === "asc"
-        ? new Date(a.$updatedAt) - new Date(b.$updatedAt)
-        : new Date(b.$updatedAt) - new Date(a.$updatedAt);
+        ? new Date(aDate) - new Date(bDate)
+        : new Date(bDate) - new Date(aDate);
     });
   }, [filteredEvents, sortColumn, sortDirection, participants]);
 
@@ -530,18 +519,17 @@ export default function EventOverview({
   useEffect(() => {
     const fetchAcademicPeriod = async () => {
       try {
-        const response = await databases.listDocuments(
-          databaseId,
-          academicPeriodCollectionId,
-          [
-            Query.equal("isActive", true),
-            Query.orderDesc("$createdAt"),
-            Query.limit(1),
-          ]
+        const academicPeriodsQuery = query(
+          collection(db, COLLECTIONS.ACADEMIC_PERIODS),
+          where("isActive", "==", true),
+          orderBy("createdAt", "desc"),
+          limit(1)
         );
+        const querySnapshot = await getDocs(academicPeriodsQuery);
 
-        if (response.documents.length > 0) {
-          setCurrentAcademicPeriod(response.documents[0]);
+        if (!querySnapshot.empty) {
+          const periodData = querySnapshot.docs[0];
+          setCurrentAcademicPeriod({ id: periodData.id, ...periodData.data() });
         }
       } catch (error) {
         setError("Failed to fetch academic period");
@@ -764,7 +752,7 @@ export default function EventOverview({
             <TableHead>Location</TableHead>
             <TableHead>Source</TableHead>
             <TableHead>
-              <Button variant="ghost" onClick={() => handleSort("$createdAt")}>
+              <Button variant="ghost" onClick={() => handleSort("createdAt")}>
                 Created At
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
@@ -789,10 +777,10 @@ export default function EventOverview({
               students: studentCount,
               staffFaculty: staffFacultyCount,
               community: communityCount,
-            } = getParticipantCounts(event.$id);
+            } = getParticipantCounts(event.id);
 
             return (
-              <TableRow key={event.$id}>
+                              <TableRow key={event.id}>
                 <TableCell className="font-medium">{event.eventName}</TableCell>
                 <TableCell>
                   {format(parseISO(event.eventDate), "MMMM d, yyyy")}
@@ -813,10 +801,10 @@ export default function EventOverview({
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="text-sm">
-                      {format(parseISO(event.$createdAt), "MMM d, yyyy h:mm a")}
+                      {format(new Date(event.createdAt?.toDate?.() || event.createdAt), "MMM d, yyyy h:mm a")}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(parseISO(event.$createdAt), {
+                      {formatDistanceToNow(new Date(event.createdAt?.toDate?.() || event.createdAt), {
                         addSuffix: true,
                       })}
                     </span>

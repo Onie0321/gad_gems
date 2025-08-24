@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import React, { useEffect, useState } from "react";
 import {
@@ -35,12 +35,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  databases,
-  databaseId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  getDocs,
+} from "@/lib/firebase";
 
 const genderColors = {
   male: "#2196F3",
@@ -82,15 +82,15 @@ export function DetailedAnalysis({
         try {
           const [participantsResponse, staffResponse, communityResponse] =
             await Promise.all([
-              databases.listDocuments(databaseId, studentsCollectionId),
-              databases.listDocuments(databaseId, staffFacultyCollectionId),
-              databases.listDocuments(databaseId, communityCollectionId),
+              getDocs(collection(db, COLLECTIONS.STUDENTS)),
+              getDocs(collection(db, COLLECTIONS.STAFF_FACULTY)),
+              getDocs(collection(db, COLLECTIONS.COMMUNITY)),
             ]);
 
           const allParticipants = [
-            ...participantsResponse.documents,
-            ...staffResponse.documents,
-            ...communityResponse.documents,
+            ...participantsResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+            ...staffResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+            ...communityResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })),
           ];
 
           if (allParticipants.length === 0) {

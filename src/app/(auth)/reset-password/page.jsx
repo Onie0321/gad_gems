@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useSearchParams } from "next/navigation";
-import { account } from "@/lib/appwrite";
+import { auth } from "@/lib/firebase";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 
@@ -72,7 +72,7 @@ export default function ResetPassword() {
     }
 
     try {
-      await account.updateRecovery(userId, secret, password, confirmPassword);
+      await auth.updateRecovery(userId, secret, password, confirmPassword);
 
       toast({
         title: "Success",

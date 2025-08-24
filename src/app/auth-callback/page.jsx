@@ -2,15 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Client, Account, Databases } from "appwrite";
+import { getCurrentUser, db, COLLECTIONS, doc, getDoc, setDoc, query, collection, where, getDocs } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
-
-const client = new Client()
-  .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
-  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
-
-const account = new Account(client);
-const databases = new Databases(client);
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -19,11 +12,11 @@ export default function AuthCallback() {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const user = await account.get();
+        const user = await getCurrentUser();
         console.log("User authenticated:", user);
 
         // Check if user exists in the users collection
-        const userExists = await checkUserInDatabase(user.$id);
+        const userExists = await checkUserInDatabase(user.uid);
 
         if (!userExists) {
           // If user doesn't exist, create a new document in the users collection
@@ -40,7 +33,7 @@ export default function AuthCallback() {
         }
 
         // Redirect based on user role
-        const userDoc = await getUserFromDatabase(user.$id);
+        const userDoc = await getUserFromDatabase(user.uid);
         if (userDoc) {
           switch (userDoc.role) {
             case "admin":
@@ -77,34 +70,24 @@ export default function AuthCallback() {
 
   const checkUserInDatabase = async (userId) => {
     try {
-      await databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
-        process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID,
-        userId
-      );
-      return true;
+      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId));
+      return userDoc.exists();
     } catch (error) {
-      if (error.code === 404) {
-        return false;
-      }
-      throw error;
+      console.error("Error checking user in database:", error);
+      return false;
     }
   };
 
   const createUserInDatabase = async (user) => {
     try {
-      await databases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
-        process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID,
-        user.$id,
-        {
-          name: user.name,
-          email: user.email,
-          role: "user", // Default role
-          accountId: user.$id,
-          approvalStatus: "pending", // Default approval status
-        }
-      );
+      await setDoc(doc(db, COLLECTIONS.USERS, user.uid), {
+        name: user.displayName || user.email,
+        email: user.email,
+        role: "user", // Default role
+        accountId: user.uid,
+        approvalStatus: "pending", // Default approval status
+        createdAt: new Date(),
+      });
     } catch (error) {
       console.error("Error creating user in database:", error);
       throw error;
@@ -113,11 +96,11 @@ export default function AuthCallback() {
 
   const getUserFromDatabase = async (userId) => {
     try {
-      return await databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
-        process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID,
-        userId
-      );
+      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId));
+      if (userDoc.exists()) {
+        return userDoc.data();
+      }
+      return null;
     } catch (error) {
       console.error("Error fetching user from database:", error);
       return null;

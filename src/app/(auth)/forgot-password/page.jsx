@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
 import { Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { account } from "@/lib/appwrite";
+import { auth } from "@/lib/firebase";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -31,7 +31,7 @@ export default function ForgotPassword() {
       const recoveryUrl = `${
         window.location.origin
       }/reset-password?email=${encodeURIComponent(email)}`;
-      await account.createRecovery(email, recoveryUrl);
+      await auth.createRecovery(email, recoveryUrl);
 
       setMessage("Recovery email sent. Please check your inbox.");
       toast({

@@ -36,7 +36,7 @@ import {
   schoolOptions,
   capitalizeWords,
 } from "../../../../utils/participantUtils";
-import { editEvent } from "@/lib/appwrite";
+import { editEvent } from "@/lib/firebase";
 
 const EditEvent = ({ event, onUpdateEvent }) => {
   const [editingEvent, setEditingEvent] = useState(() => ({
@@ -156,10 +156,10 @@ const EditEvent = ({ event, onUpdateEvent }) => {
       });
 
       // Update the event in the database
-      const response = await editEvent(editingEvent.$id, updatedEvent);
+      await editEvent(editingEvent.id || editingEvent.$id, updatedEvent);
 
       // Update the parent component or state with the updated event
-      onUpdateEvent(response);
+      onUpdateEvent({ ...editingEvent, ...updatedEvent });
 
       toast.success("Event updated successfully.");
       setIsDialogOpen(false); // Close dialog on success

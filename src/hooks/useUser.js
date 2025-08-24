@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Account, Client, Query } from 'appwrite'
-import { databases, databaseId, userCollectionId, account, client } from '@/lib/appwrite'
+import { getCurrentUser, db, COLLECTIONS, query, collection, where, getDocs } from '@/lib/firebase'
 
 export function useUser() {
   const [user, setUser] = useState(null)
@@ -9,22 +8,23 @@ export function useUser() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const currentAccount = await account.get()
-        if (currentAccount) {
+        const currentUser = await getCurrentUser()
+        if (currentUser) {
           // Fetch the user document from the database
-          const userDoc = await databases.listDocuments(
-            databaseId,
-            userCollectionId,
-            [Query.equal('accountId', currentAccount.$id)]
+          const q = query(
+            collection(db, COLLECTIONS.USERS),
+            where('accountId', '==', currentUser.uid)
           )
+          const userSnapshot = await getDocs(q)
 
-          if (userDoc.documents.length > 0) {
+          if (!userSnapshot.empty) {
+            const userDoc = userSnapshot.docs[0].data()
             setUser({
-              ...currentAccount,
-              ...userDoc.documents[0] // Merge the database user data with the account data
+              ...currentUser,
+              ...userDoc // Merge the database user data with the account data
             })
           } else {
-            setUser(currentAccount)
+            setUser(currentUser)
           }
         }
       } catch (error) {

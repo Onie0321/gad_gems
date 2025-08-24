@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,17 +29,19 @@ import { LoadingAnimation } from "@/components/loading/loading-animation";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import {
-  databases,
-  databaseId,
-  eventCollectionId,
-  studentsCollectionId,
-  userCollectionId,
+  db,
+  COLLECTIONS,
   getCurrentAcademicPeriod,
-  staffFacultyCollectionId,
-  communityCollectionId,
-  academicPeriodCollectionId,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  query,
+  collection,
+  where,
+  orderBy,
+  getDocs,
+  addDoc,
+  getDoc,
+  doc,
+  updateDoc,
+} from "@/lib/firebase";
 import { Eye, Edit, ArrowUpDown } from "lucide-react";
 import {
   Dialog,
@@ -47,7 +49,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ID } from "appwrite";
 import {
   Pagination,
   PaginationContent,
@@ -58,7 +59,7 @@ import {
 } from "@/components/ui/pagination";
 
 import EditEvent from "@/app/officer/event-management/event-participant-log/EditEventDialog";
-import ViewParticipants from "@/app/officer/event-management/event-participant-log/view-participant-dialog/page";
+import ViewParticipants from "./ViewParticipantsDialog";
 import ExportEventsButton from "@/app/officer/event-management/event-participant-log/ExportEvent";
 import GenerateReportButton from "@/app/officer/event-management/event-participant-log/ImportEvent";
 
@@ -85,48 +86,50 @@ export default function EventParticipantLog() {
       setLoading(true);
 
       // Fetch all events without academic period filter for admin
-      const response = await databases.listDocuments(
-        databaseId,
-        eventCollectionId,
-        [Query.equal("isArchived", false), Query.orderDesc("createdAt")]
+      const eventsQuery = query(
+        collection(db, COLLECTIONS.EVENTS),
+        where("isArchived", "==", false),
+        orderBy("createdAt", "desc")
       );
+      const eventsSnapshot = await getDocs(eventsQuery);
+      const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Get all unique academic period IDs from events
-      const academicPeriodIds = [
-        ...new Set(response.documents.map((event) => event.academicPeriodId)),
-      ];
+      // No need to filter by academic period IDs for admin view
 
-      // Fetch all participants across all periods
+      // Fetch all participants without academic period filter to include all participants
       const [studentsResponse, staffResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("academicPeriodId", academicPeriodIds),
-          ]),
-          databases.listDocuments(databaseId, staffFacultyCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("academicPeriodId", academicPeriodIds),
-          ]),
-          databases.listDocuments(databaseId, communityCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("academicPeriodId", academicPeriodIds),
-          ]),
+          getDocs(query(
+            collection(db, COLLECTIONS.STUDENTS),
+            where("isArchived", "==", false)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.STAFF_FACULTY),
+            where("isArchived", "==", false)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.COMMUNITY),
+            where("isArchived", "==", false)
+          )),
         ]);
 
       // Map participants with their specific fields
       const allParticipants = [
-        ...studentsResponse.documents.map((p) => ({
-          ...p,
+        ...studentsResponse.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
           participantType: "Student",
-          identifier: p.studentId || null,
+          identifier: doc.data().studentId || null,
         })),
-        ...staffResponse.documents.map((p) => ({
-          ...p,
+        ...staffResponse.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
           participantType: "Staff/Faculty",
-          identifier: p.staffFacultyId || null,
+          identifier: doc.data().staffFacultyId || null,
         })),
-        ...communityResponse.documents.map((p) => ({
-          ...p,
+        ...communityResponse.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
           participantType: "Community Member",
           identifier: null,
         })),
@@ -134,10 +137,10 @@ export default function EventParticipantLog() {
 
       // Process events with participants
       const eventsWithParticipants = await Promise.all(
-        response.documents.map(async (event) => {
+        eventsList.map(async (event) => {
           try {
             const eventParticipants = allParticipants.filter(
-              (p) => p.eventId === event.$id
+              (p) => p.eventId === event.id
             );
 
             // Calculate participant counts with proper type checking
@@ -161,21 +164,15 @@ export default function EventParticipantLog() {
             };
 
             // Fetch creator information
-            const creatorResponse = await databases.getDocument(
-              databaseId,
-              userCollectionId,
-              event.createdBy
-            );
+            const creatorDoc = await getDoc(doc(db, COLLECTIONS.USERS, event.createdBy));
+            const creatorResponse = creatorDoc.exists() ? creatorDoc.data() : null;
 
             // Get academic period info if available
             let academicPeriodInfo = null;
             if (event.academicPeriodId) {
               try {
-                academicPeriodInfo = await databases.getDocument(
-                  databaseId,
-                  academicPeriodCollectionId,
-                  event.academicPeriodId
-                );
+                const academicPeriodDoc = await getDoc(doc(db, COLLECTIONS.ACADEMIC_PERIODS, event.academicPeriodId));
+                academicPeriodInfo = academicPeriodDoc.exists() ? academicPeriodDoc.data() : null;
               } catch (error) {
                 console.error("Error fetching academic period:", error);
               }
@@ -196,7 +193,7 @@ export default function EventParticipantLog() {
             };
           } catch (error) {
             console.error(
-              `Error fetching details for event ${event.$id}:`,
+              `Error fetching details for event ${event.id}:`,
               error
             );
             return {
@@ -251,11 +248,11 @@ export default function EventParticipantLog() {
         return a.eventVenue.localeCompare(b.eventVenue);
       case "eventVenueDesc":
         return b.eventVenue.localeCompare(a.eventVenue);
-      case "createdAt":
-        return new Date(a.$createdAt) - new Date(b.$createdAt);
-      case "createdAtDesc":
-      default:
-        return new Date(b.$createdAt) - new Date(a.$createdAt);
+             case "createdAt":
+         return new Date(a.createdAt) - new Date(b.createdAt);
+       case "createdAtDesc":
+       default:
+         return new Date(b.createdAt) - new Date(a.createdAt);
     }
   });
 
@@ -268,12 +265,8 @@ export default function EventParticipantLog() {
 
   const handleUpdateEvent = async (updatedEvent) => {
     try {
-      await databases.updateDocument(
-        databaseId,
-        eventCollectionId,
-        updatedEvent.$id,
-        updatedEvent
-      );
+      const eventRef = doc(db, COLLECTIONS.EVENTS, updatedEvent.id || updatedEvent.$id);
+      await updateDoc(eventRef, updatedEvent);
 
       await fetchData(); // Refresh data
       toast.success("Event updated successfully");
@@ -286,16 +279,11 @@ export default function EventParticipantLog() {
   const handleAddParticipant = async (newParticipant) => {
     try {
       // Create the new participant document
-      const response = await databases.createDocument(
-        databaseId,
-        studentsCollectionId,
-        ID.unique(),
-        {
-          ...newParticipant,
-          eventId: selectedEvent.$id,
-          isArchived: false,
-        }
-      );
+      const response = await addDoc(collection(db, COLLECTIONS.STUDENTS), {
+        ...newParticipant,
+        eventId: selectedEvent.id || selectedEvent.$id,
+        isArchived: false,
+      });
 
       // Update the local state
       setParticipants((prevParticipants) => [...prevParticipants, response]);
@@ -317,7 +305,7 @@ export default function EventParticipantLog() {
       // Update the events list with new participant count
       setEvents(
         events.map((event) =>
-          event.$id === selectedEvent.$id ? updatedEvent : event
+          (event.id || event.$id) === (selectedEvent.id || selectedEvent.$id) ? updatedEvent : event
         )
       );
 
@@ -521,12 +509,22 @@ export default function EventParticipantLog() {
             </TableHeader>
             <TableBody>
               {paginatedEvents.map((event) => (
-                <TableRow key={event.$id}>
+                <TableRow key={event.id || event.$id}>
                   <TableCell className="font-medium">
                     {event.eventName}
                   </TableCell>
                   <TableCell>
-                    {format(new Date(event.eventDate), "MMM dd, yyyy")}
+                    {event.eventDate ? 
+                      (() => {
+                        try {
+                          return format(new Date(event.eventDate), "MMM dd, yyyy");
+                        } catch (error) {
+                          console.warn("Invalid event date:", event.eventDate);
+                          return "Invalid date";
+                        }
+                      })() : 
+                      "No date"
+                    }
                   </TableCell>
                   <TableCell>{event.eventVenue}</TableCell>
                   <TableCell className="text-center">
@@ -547,9 +545,19 @@ export default function EventParticipantLog() {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    {format(new Date(event.$createdAt), "MMM dd, yyyy h:mm a")}
-                  </TableCell>
+                                     <TableCell>
+                     {event.createdAt ? 
+                       (() => {
+                         try {
+                           return format(new Date(event.createdAt), "MMM dd, yyyy h:mm a");
+                         } catch (error) {
+                           console.warn("Invalid created date:", event.createdAt);
+                           return "Invalid date";
+                         }
+                       })() : 
+                       "No date"
+                     }
+                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-4">
                       <Button
@@ -666,7 +674,17 @@ const EventDetailsDialog = ({ event, isOpen, onClose }) => {
               Event Date
             </label>
             <p className="mt-1">
-              {format(new Date(event?.eventDate), "MMMM dd, yyyy")}
+              {event?.eventDate ? 
+                (() => {
+                  try {
+                    return format(new Date(event.eventDate), "MMMM dd, yyyy");
+                  } catch (error) {
+                    console.warn("Invalid event date:", event.eventDate);
+                    return "Invalid date";
+                  }
+                })() : 
+                "No date"
+              }
             </p>
           </div>
           <div>

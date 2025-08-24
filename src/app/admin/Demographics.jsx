@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,11 +13,13 @@ import { Loader2 } from "lucide-react";
 import { DemographicsOverview } from "./demographics/Overview";
 import { DetailedAnalysis } from "./demographics/DetailedAnalysis";
 import {
-  databases,
-  databaseId,
-  academicPeriodCollectionId,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  orderBy,
+  getDocs,
+} from "@/lib/firebase";
 import { ParticipantList } from "./demographics/ParticipantList";
 import { DemographicsSearch } from "./demographics/Search";
 
@@ -31,19 +33,23 @@ export default function DemographicAnalysis() {
   useEffect(() => {
     const initializeData = async () => {
       try {
-        const response = await databases.listDocuments(
-          databaseId,
-          academicPeriodCollectionId,
-          [Query.orderDesc("startDate")]
+        const academicPeriodsQuery = query(
+          collection(db, COLLECTIONS.ACADEMIC_PERIODS),
+          orderBy("startDate", "desc")
         );
-        setAcademicPeriods(response.documents);
+        const querySnapshot = await getDocs(academicPeriodsQuery);
+        const periodsList = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setAcademicPeriods(periodsList);
 
         // Set the current period as default
-        const currentPeriod = response.documents.find(
+        const currentPeriod = periodsList.find(
           (period) => period.isActive
         );
         if (currentPeriod) {
-          setSelectedPeriod(currentPeriod.$id);
+          setSelectedPeriod(currentPeriod.id);
         }
         setLoading(false);
       } catch (error) {
@@ -85,7 +91,7 @@ export default function DemographicAnalysis() {
           </SelectTrigger>
           <SelectContent>
             {academicPeriods.map((period) => (
-              <SelectItem key={period.$id} value={period.$id}>
+              <SelectItem key={period.id} value={period.id}>
                 {period.schoolYear} - {period.periodType}
                 {period.isActive && " (Current)"}
               </SelectItem>

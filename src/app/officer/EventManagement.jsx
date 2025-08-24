@@ -9,11 +9,12 @@ import CreateEvent from "./event-management/CreateEvent";
 import ParticipantManagement from "./event-management/ParticipantManagement";
 import EventParticipantLog from "./event-management/event-participant-log/EventParticipantLog";
 import {
-  subscribeToRealTimeUpdates,
+  subscribeToCollection,
   getCurrentUser,
   fetchOfficerEvents,
   getCurrentAcademicPeriod,
-} from "@/lib/appwrite";
+  COLLECTIONS,
+} from "@/lib/firebase";
 import { useTabContext, TabProvider } from "@/context/TabContext";
 import { checkNetworkStatus } from "@/utils/networkUtils";
 import { Button } from "@/components/ui/button";
@@ -200,7 +201,7 @@ export default function EventsManagement() {
   useEffect(() => {
     let unsubscribe;
     if (userIdRef.current && networkStatus.isOnline) {
-      unsubscribe = subscribeToRealTimeUpdates(() => {
+      unsubscribe = subscribeToCollection(COLLECTIONS.EVENTS, () => {
         if (userIdRef.current) {
           fetchEvents(userIdRef.current);
         } else {
@@ -270,7 +271,7 @@ export default function EventsManagement() {
     try {
       setLoading(true);
 
-      if (!currentAcademicPeriod || !currentAcademicPeriod.$id) {
+      if (!currentAcademicPeriod || !currentAcademicPeriod.id) {
         toast.error(
           "No active academic period found. Please set up an academic period first."
         );
@@ -279,7 +280,7 @@ export default function EventsManagement() {
 
       const result = await importEventAndParticipants(
         file,
-        currentAcademicPeriod.$id
+        currentAcademicPeriod.id
       );
 
       if (result.success) {

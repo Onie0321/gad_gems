@@ -19,12 +19,12 @@ import { FcGoogle } from "react-icons/fc";
 import { useToast } from "@/hooks/use-toast";
 import {
   getCurrentUser,
-  account,
-  SignIn,
-  createGoogleUser,
+  auth,
+  signIn,
+  signInWithGoogle,
   logActivity,
   createNotification,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";

@@ -1,4 +1,4 @@
-"use client";
+ "use auth";
 
 import React, { useEffect, useState, useCallback } from "react";
 import {
@@ -13,7 +13,7 @@ import {
   Tooltip,
 } from "recharts";
 import { Calendar, Users, PieChartIcon, Users2 } from "lucide-react";
-import { Query } from "appwrite";
+// Query functionality is handled differently in Firebase;
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -26,14 +26,17 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  userCollectionId,
-  databaseId,
-  databases,
+  COLLECTIONS,
+  db,
   fetchTotals,
-  eventCollectionId,
   participantCollectionId,
   getCurrentAcademicPeriod,
-} from "@/lib/appwrite";
+  query,
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+} from "@/lib/firebase";
 import { formatDistanceToNow } from "date-fns";
 
 export default function DashboardOverview({
@@ -75,24 +78,27 @@ export default function DashboardOverview({
       // Get current academic period
       const currentPeriod = await getCurrentAcademicPeriod();
       if (!currentPeriod) {
-        throw new Error("No active academic period found");
+        // Set default values when no academic period exists
+        setTotalEvents(0);
+        setAcademicEvents(0);
+        setNonAcademicEvents(0);
+        console.warn("No academic period found. Dashboard statistics will be limited.");
+        return; // Exit early but don't throw error
       }
 
       // Calculate statistics
       const { totalEvents, academicEvents, nonAcademicEvents } =
-        await fetchTotals(currentPeriod.$id);
+        await fetchTotals(currentPeriod.id);
 
       // Fetch user statistics
-      const usersResponse = await databases.listDocuments(
-        databaseId,
-        userCollectionId
-      );
+      const usersResponse = await getDocs(query(collection(db, COLLECTIONS.USERS)));
+      const allUsers = usersResponse.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
-      const pendingCount = usersResponse.documents.filter(
+      const pendingCount = allUsers.filter(
         (user) => user.approvalStatus === "pending"
       ).length;
 
-      const approvedCount = usersResponse.documents.filter(
+      const approvedCount = allUsers.filter(
         (user) => user.approvalStatus === "approved"
       ).length;
 
@@ -109,7 +115,7 @@ export default function DashboardOverview({
       setEthnicDistribution(ethnicDistribution);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
-      setError(error.message);
+      setError("Failed to load dashboard data. Please try again later.");
     } finally {
       setIsLoading(false);
     }
@@ -138,21 +144,32 @@ export default function DashboardOverview({
       try {
         const eventsWithDetails = await Promise.all(
           events
-            .sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt))
+            .sort((a, b) => {
+          try {
+            const aDate = a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000) : 
+                         a.timestamp?.seconds ? new Date(a.timestamp.seconds * 1000) : 
+                         a.createdAt ? new Date(a.createdAt) : 
+                         a.timestamp ? new Date(a.timestamp) : new Date(0);
+            const bDate = b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000) : 
+                         b.timestamp?.seconds ? new Date(b.timestamp.seconds * 1000) : 
+                         b.createdAt ? new Date(b.createdAt) : 
+                         b.timestamp ? new Date(b.timestamp) : new Date(0);
+            return bDate - aDate;
+          } catch (error) {
+            console.warn("Error sorting by date:", error);
+            return 0;
+          }
+        })
             .slice(0, 5)
             .map(async (event) => {
               try {
                 let creator = users.find(
-                  (user) => user.$id === event.createdBy
+                  (user) => user.id === event.createdBy
                 );
 
                 if (!creator && event.createdBy) {
-                  const response = await databases.getDocument(
-                    databaseId,
-                    userCollectionId,
-                    event.createdBy
-                  );
-                  creator = response;
+                  const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, event.createdBy));
+                  creator = userDoc.exists() ? { ...userDoc.data(), id: userDoc.id } : null;
                 }
 
                 return {
@@ -160,10 +177,10 @@ export default function DashboardOverview({
                   createdByName: creator?.name || "Unknown User",
                 };
               } catch (error) {
-                console.error(
-                  `Error fetching creator for event ${event.$id}:`,
-                  error
-                );
+                          console.error(
+            `Error fetching creator for event ${event.id}:`,
+            error
+          );
                 return {
                   ...event,
                   createdByName: "Unknown User",
@@ -186,18 +203,18 @@ export default function DashboardOverview({
   useEffect(() => {
     const fetchUserCounts = async () => {
       try {
-        const usersResponse = await databases.listDocuments(
-          databaseId,
-          userCollectionId
-        );
-        const allUsers = usersResponse.documents;
+        const usersResponse = await getDocs(query(collection(db, COLLECTIONS.USERS)));
+        const allUsers = usersResponse.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
         // Count active/inactive users (based on last login within 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
         const active = allUsers.filter(
-          (user) => new Date(user.lastLogin || user.$createdAt) > thirtyDaysAgo
+          (user) => {
+            const lastLogin = user.lastLogin ? new Date(user.lastLogin.seconds * 1000) : new Date(user.createdAt?.seconds * 1000);
+            return lastLogin > thirtyDaysAgo;
+          }
         ).length;
 
         setActiveUsers(active);
@@ -921,12 +938,27 @@ export default function DashboardOverview({
               <TableBody>
                 {eventsWithCreators
                   .sort(
-                    (a, b) => new Date(b.$createdAt) - new Date(a.$createdAt)
+                    (a, b) => {
+              try {
+                const aDate = a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000) : 
+                             a.timestamp?.seconds ? new Date(a.timestamp.seconds * 1000) : 
+                             a.createdAt ? new Date(a.createdAt) : 
+                             a.timestamp ? new Date(a.timestamp) : new Date(0);
+                const bDate = b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000) : 
+                             b.timestamp?.seconds ? new Date(b.timestamp.seconds * 1000) : 
+                             b.createdAt ? new Date(b.createdAt) : 
+                             b.timestamp ? new Date(b.timestamp) : new Date(0);
+                return bDate - aDate;
+              } catch (error) {
+                console.warn("Error sorting by date:", error);
+                return 0;
+              }
+            }
                   )
                   .slice(0, 5)
                   .map((event) => {
                     const eventParticipants = participants.filter(
-                      (p) => p.eventId === event.$id
+                      (p) => p.eventId === event.id
                     );
                     const counts = {
                       students: eventParticipants.filter(
@@ -941,7 +973,7 @@ export default function DashboardOverview({
                     };
 
                     return (
-                      <TableRow key={event.$id}>
+                      <TableRow key={event.id}>
                         <TableCell className="font-medium">
                           {event.eventName}
                         </TableCell>
@@ -981,22 +1013,43 @@ export default function DashboardOverview({
                         <TableCell>
                           <div className="flex flex-col">
                             <span>
-                              {new Date(event.$createdAt).toLocaleString(
-                                "en-US",
-                                {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                  hour12: true,
-                                }
-                              )}
+                              {(() => {
+                  try {
+                    const dateValue = event.createdAt?.seconds ? new Date(event.createdAt.seconds * 1000) : 
+                                     event.timestamp?.seconds ? new Date(event.timestamp.seconds * 1000) : 
+                                     event.createdAt ? new Date(event.createdAt) : 
+                                     event.timestamp ? new Date(event.timestamp) : new Date();
+                    return dateValue.toLocaleString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }
+                    );
+                  } catch (error) {
+                    console.warn("Error formatting date:", error);
+                    return "Invalid date";
+                  }
+                })()}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(event.$createdAt), {
-                                addSuffix: true,
-                              })}
+                              {(() => {
+                                try {
+                                  const dateValue = event.createdAt?.seconds ? new Date(event.createdAt.seconds * 1000) : 
+                                                   event.timestamp?.seconds ? new Date(event.timestamp.seconds * 1000) : 
+                                                   event.createdAt ? new Date(event.createdAt) : 
+                                                   event.timestamp ? new Date(event.timestamp) : new Date();
+                                  return formatDistanceToNow(dateValue, {
+                                    addSuffix: true,
+                                  });
+                                } catch (error) {
+                                  console.warn("Error formatting distance:", error);
+                                  return "Invalid date";
+                                }
+                              })()}
                             </span>
                           </div>
                         </TableCell>

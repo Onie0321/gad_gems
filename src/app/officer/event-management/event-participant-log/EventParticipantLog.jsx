@@ -29,18 +29,20 @@ import {
   updateParticipant,
   deleteParticipant,
   getCurrentAcademicPeriod,
-  databases,
-  databaseId,
-  eventCollectionId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  where,
+  orderBy,
+  getDocs,
+  updateDoc,
+  doc,
+} from "@/lib/firebase";
 import EditEvent from "./EditEventDialog";
 import ViewParticipants from "./view-participant-dialog/page";
 import ExportEventsButton from "./ExportEvent";
 import GenerateReportButton from "./ImportEvent";
-import { Query } from "appwrite";
 import { ColorfulSpinner } from "@/components/ui/loader";
 import { NetworkStatus } from "@/components/ui/network-status";
 
@@ -135,11 +137,13 @@ export default function EventParticipantLog() {
           return a.eventName.localeCompare(b.eventName);
         case "participantCount":
           return (
-            getParticipantCounts(b.$id).total -
-            getParticipantCounts(a.$id).total
+                    getParticipantCounts(b.id).total -
+        getParticipantCounts(a.id).total
           );
         default: // "createdAt"
-          return new Date(b.$createdAt) - new Date(a.$createdAt);
+          const aDate = a.createdAt?.toDate?.() || a.createdAt || new Date(0);
+        const bDate = b.createdAt?.toDate?.() || b.createdAt || new Date(0);
+        return new Date(bDate) - new Date(aDate);
       }
     });
   }, [filteredEvents, sortCriteria, getParticipantCounts]);
@@ -165,22 +169,30 @@ export default function EventParticipantLog() {
       setCurrentAcademicPeriod(currentPeriod);
 
       if (!currentPeriod) {
-        throw new Error("No active academic period found");
+        console.warn("No academic period found. Event data may be limited.");
+        setEvents([]);
+        setParticipants([]);
+        setStaffFaculty([]);
+        setCommunity([]);
+        return; // Exit early but don't throw error
       }
 
       // Fetch events
-      const eventsResponse = await databases.listDocuments(
-        databaseId,
-        eventCollectionId,
-        [
-          Query.equal("createdBy", user.$id),
-          Query.equal("isArchived", false),
-          Query.equal("academicPeriodId", currentPeriod.$id),
-          Query.orderDesc("$createdAt"),
-        ]
+      const eventsQuery = query(
+        collection(db, COLLECTIONS.EVENTS),
+        where("createdBy", "==", user.$id),
+        where("isArchived", "==", false),
+        where("academicPeriodId", "==", currentPeriod.id),
+        orderBy("createdAt", "desc")
       );
+      const eventsSnapshot = await getDocs(eventsQuery);
+      const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      if (eventsResponse.documents.length === 0) {
+      // Get all event IDs
+      const eventIds = eventsList.map((event) => event.id);
+
+      // If no events found, set empty arrays and return early
+      if (eventsList.length === 0) {
         setEvents([]);
         setParticipants([]);
         setStaffFaculty([]);
@@ -188,34 +200,34 @@ export default function EventParticipantLog() {
         return;
       }
 
-      // Get all event IDs
-      const eventIds = eventsResponse.documents.map((event) => event.$id);
-
       // Fetch participants for all events
       const [studentsResponse, staffFacultyResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
-            Query.equal("eventId", eventIds),
-            Query.equal("isArchived", false),
-            Query.equal("createdBy", user.$id),
-          ]),
-          databases.listDocuments(databaseId, staffFacultyCollectionId, [
-            Query.equal("eventId", eventIds),
-            Query.equal("isArchived", false),
-            Query.equal("createdBy", user.$id),
-          ]),
-          databases.listDocuments(databaseId, communityCollectionId, [
-            Query.equal("eventId", eventIds),
-            Query.equal("isArchived", false),
-            Query.equal("createdBy", user.$id),
-          ]),
+          getDocs(query(
+            collection(db, COLLECTIONS.STUDENTS),
+            where("eventId", "in", eventIds),
+            where("isArchived", "==", false),
+            where("createdBy", "==", user.$id)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.STAFF_FACULTY),
+            where("eventId", "in", eventIds),
+            where("isArchived", "==", false),
+            where("createdBy", "==", user.$id)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.COMMUNITY),
+            where("eventId", "in", eventIds),
+            where("isArchived", "==", false),
+            where("createdBy", "==", user.$id)
+          )),
         ]);
 
       // Set the state with the fetched data
-      setEvents(eventsResponse.documents);
-      setParticipants(studentsResponse.documents);
-      setStaffFaculty(staffFacultyResponse.documents);
-      setCommunity(communityResponse.documents);
+      setEvents(eventsList);
+      setParticipants(studentsResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setStaffFaculty(staffFacultyResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setCommunity(communityResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
       setError("Failed to fetch data. Please try again.");
     } finally {
@@ -288,13 +300,13 @@ export default function EventParticipantLog() {
   const handleUpdateEvent = async (updatedEvent) => {
     if (!currentUser) return;
     try {
-      const updated = await updateEvent(updatedEvent.$id, {
+      const updated = await updateEvent(updatedEvent.id, {
         ...updatedEvent,
         updatedBy: currentUser.id,
       });
       setEvents((prevEvents) =>
         prevEvents.map((event) =>
-          event.$id === updatedEvent.$id ? { ...event, ...updated } : event
+          event.id === updatedEvent.id ? { ...event, ...updated } : event
         )
       );
       toast.success("Event updated successfully");
@@ -326,7 +338,7 @@ export default function EventParticipantLog() {
     if (
       events.some(
         (e) =>
-          e.$id === newParticipant.eventId &&
+          e.id === newParticipant.eventId &&
           e.participants.some((p) => p.studentId === newParticipant.studentId)
       )
     ) {
@@ -337,9 +349,9 @@ export default function EventParticipantLog() {
     }
     try {
       const updatedEvent = await updateEvent(newParticipant.eventId, {
-        ...events.find((e) => e.$id === newParticipant.eventId),
+        ...events.find((e) => e.id === newParticipant.eventId),
         participants: [
-          ...events.find((e) => e.$id === newParticipant.eventId).participants,
+                      ...events.find((e) => e.id === newParticipant.eventId).participants,
           {
             ...newParticipant,
             sex: newParticipant.sex,
@@ -365,10 +377,10 @@ export default function EventParticipantLog() {
   const handleSaveParticipantEdit = async () => {
     if (!currentUser || !editingParticipant) return;
     try {
-      const updatedEvent = await updateEvent(selectedEvent.$id, {
+      const updatedEvent = await updateEvent(selectedEvent.id, {
         ...selectedEvent,
         participants: selectedEvent.participants.map((p) =>
-          p.$id === editingParticipant.$id ? editingParticipant : p
+          p.id === editingParticipant.id ? editingParticipant : p
         ),
         updatedBy: currentUser.id,
       });
@@ -394,16 +406,16 @@ export default function EventParticipantLog() {
       )
     ) {
       try {
-        const updatedEvent = await updateEvent(selectedEvent.$id, {
+        const updatedEvent = await updateEvent(selectedEvent.id, {
           ...selectedEvent,
           participants: selectedEvent.participants.filter(
-            (p) => p.$id !== participantId
+            (p) => p.id !== participantId
           ),
           updatedBy: currentUser.id,
         });
         setEvents((prevEvents) =>
           prevEvents.map((event) =>
-            event.$id === updatedEvent.$id ? updatedEvent : event
+            event.id === updatedEvent.id ? updatedEvent : event
           )
         );
         setSelectedEvent(null);
@@ -453,17 +465,15 @@ export default function EventParticipantLog() {
 
     try {
       // Update the participant in the database
-      const response = await databases.updateDocument(
-        databaseId,
-        studentsCollectionId,
-        editedParticipant.$id,
+      const response = await updateDoc(
+        doc(db, COLLECTIONS.STUDENTS, editedParticipant.id),
         editedParticipant
       );
 
       // Update local state
       setParticipants((prevParticipants) =>
         prevParticipants.map((p) =>
-          p.$id === editedParticipant.$id ? response : p
+          p.id === editedParticipant.id ? response : p
         )
       );
 
@@ -528,10 +538,10 @@ export default function EventParticipantLog() {
               </TableHeader>
               <TableBody>
                 {sortedEvents.map((event) => {
-                  const participantCounts = getParticipantCounts(event.$id);
+                  const participantCounts = getParticipantCounts(event.id);
 
                   return (
-                    <TableRow key={event.$id}>
+                    <TableRow key={event.id}>
                       <TableCell className="font-medium">
                         {event.eventName}
                       </TableCell>

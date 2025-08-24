@@ -31,7 +31,7 @@ import {
   validateEditParticipantForm,
   schoolOptions,
 } from "../../../../../utils/participantUtils";
-import { updateParticipant } from "@/lib/appwrite"; // Adjust import based on your file structure
+import { updateParticipant } from "@/lib/firebase"; // Adjust import based on your file structure
 
 export default function EditParticipantDialog({
   participant,
@@ -57,13 +57,13 @@ export default function EditParticipantDialog({
       const cleanParticipant = { ...editedParticipant };
       // Remove all Appwrite system fields
       delete cleanParticipant.$id;
-      delete cleanParticipant.$createdAt;
-      delete cleanParticipant.$updatedAt;
-      delete cleanParticipant.$permissions;
-      delete cleanParticipant.$collectionId;
-      delete cleanParticipant.$databaseId;
-      delete cleanParticipant.$read;
-      delete cleanParticipant.$write;
+          delete cleanParticipant.createdAt;
+    delete cleanParticipant.updatedAt;
+              // Remove Firebase-specific fields if needed
+        delete cleanParticipant.createdAt;
+        delete cleanParticipant.updatedAt;
+              // Remove any other system fields
+              // Remove any other system fields
 
       // Keep only the fields we want to update
       const updateData = {

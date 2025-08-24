@@ -187,42 +187,40 @@ export async function getAccount() {
 
 export async function getCurrentUser() {
   try {
-    // Ensure the user is authenticated before fetching account info
-    const currentAccount = await getAccount();
+      // Ensure the user is authenticated before fetching account info
+      const currentAccount = await getAccount()
 
-    if (!currentAccount || !currentAccount.$id) {
-      throw new Error("No account found.");
-    }
+      if (!currentAccount || !currentAccount.$id) {
+          throw new Error('No account found.')
+      }
 
-    // Query for the user document using the accountId
-    const currentUserResponse = await databases.listDocuments(
-      databaseId,
-      userCollectionId,
-      [Query.equal("accountId", currentAccount.$id)] // Ensure 'accountId' is the correct field name
-    );
+      // Query for the user document using the accountId
+      const currentUserResponse = await databases.listDocuments(
+          appwriteConfig.databaseId,
+          appwriteConfig.userCollectionId,
+          [Query.equal('accountId', currentAccount.$id)] // Ensure 'accountId' is the correct field name
+      )
 
-    console.log("Current user response:", currentUserResponse); // Add this log
+      if (
+          !currentUserResponse ||
+          !Array.isArray(currentUserResponse.documents) ||
+          currentUserResponse.total === 0
+      ) {
+          throw new Error('No user document found.')
+      }
 
-    if (
-      !currentUserResponse ||
-      !Array.isArray(currentUserResponse.documents) ||
-      currentUserResponse.total === 0
-    ) {
-      throw new Error("No user document found.");
-    }
+      const userDocument = currentUserResponse.documents[0] // Get the user document
 
-    const userDocument = currentUserResponse.documents[0]; // Get the user document
+      // Check if the role field exists in the document
+      if (!userDocument.role) {
+          // If the role field is missing, assign a default role (e.g., 'user')
+          userDocument.role = 'user'
+      }
 
-    // Check if the role field exists in the document
-    if (!userDocument.role) {
-      // If the role field is missing, assign a default role (e.g., 'user')
-      userDocument.role = "user";
-    }
-
-    console.log("Fetched User Document:", userDocument); // Log the fetched user document
-    return userDocument; // Return the user document which includes role
+      console.log('Fetched User Document:', userDocument) // Log the fetched user document
+      return userDocument // Return the user document which includes role
   } catch (error) {
-    return null; // Return null if there's an error
+      return null // Return null if there's an error
   }
 }
 
@@ -322,11 +320,11 @@ export async function getAllSessions() {
 // Sign Out
 export async function signOut() {
   try {
-    const session = await account.deleteSession("current");
-    return session;
+      const currentUser = await getCurrentUser()
+      const session = await account.deleteSession('current')
+      return session
   } catch (error) {
-    console.error("Error signing out:", error.message);
-    throw new Error(error);
+      throw error
   }
 }
 

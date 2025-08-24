@@ -1,13 +1,13 @@
-"use client";
+"use auth";
 import { useState } from "react";
 import {
-  databases,
-  databaseId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  where,
+  getDocs,
+} from "@/lib/firebase";
 
 export const useParticipantSearch = (selectedPeriod) => {
   const [loading, setLoading] = useState(false);
@@ -17,36 +17,36 @@ export const useParticipantSearch = (selectedPeriod) => {
     community: [],
   });
 
-  const buildQueries = (filters) => {
-    const queries = [Query.equal("academicPeriodId", selectedPeriod)];
+  const buildWhereConditions = (filters) => {
+    const conditions = [where("academicPeriodId", "==", selectedPeriod)];
 
     // Use equal for exact matches
     if (filters.name) {
-      queries.push(Query.equal("name", filters.name));
+      conditions.push(where("name", "==", filters.name));
     }
     if (filters.sex && filters.sex !== "all") {
-      queries.push(Query.equal("sex", filters.sex));
+      conditions.push(where("sex", "==", filters.sex));
     }
     if (filters.age) {
-      queries.push(Query.equal("age", parseInt(filters.age)));
+      conditions.push(where("age", "==", parseInt(filters.age)));
     }
     if (filters.ethnicGroup && filters.ethnicGroup !== "all") {
-      queries.push(Query.equal("ethnicGroup", filters.ethnicGroup));
+      conditions.push(where("ethnicGroup", "==", filters.ethnicGroup));
     }
     if (filters.address) {
-      queries.push(Query.equal("address", filters.address));
+      conditions.push(where("address", "==", filters.address));
     }
     if (filters.isArchived !== null) {
-      queries.push(Query.equal("isArchived", filters.isArchived));
+      conditions.push(where("isArchived", "==", filters.isArchived));
     }
 
-    return queries;
+    return conditions;
   };
 
   const handleSearch = async (filters) => {
     setLoading(true);
     try {
-      const queries = buildQueries(filters);
+      const baseConditions = buildWhereConditions(filters);
       const searchResults = {};
 
       if (
@@ -54,26 +54,23 @@ export const useParticipantSearch = (selectedPeriod) => {
         filters.participantType === "all" ||
         filters.participantType === "students"
       ) {
-        const studentQueries = [...queries];
+        const studentConditions = [...baseConditions];
         if (filters.school && filters.school !== "all") {
-          studentQueries.push(Query.equal("school", filters.school));
+          studentConditions.push(where("school", "==", filters.school));
         }
         if (filters.year && filters.year !== "all") {
-          studentQueries.push(Query.equal("year", filters.year));
+          studentConditions.push(where("year", "==", filters.year));
         }
         if (filters.section) {
-          studentQueries.push(Query.equal("section", filters.section));
+          studentConditions.push(where("section", "==", filters.section));
         }
         if (filters.id) {
-          studentQueries.push(Query.equal("studentId", filters.id));
+          studentConditions.push(where("studentId", "==", filters.id));
         }
 
-        const students = await databases.listDocuments(
-          databaseId,
-          studentsCollectionId,
-          studentQueries
-        );
-        searchResults.students = students.documents;
+        const studentsQuery = query(collection(db, COLLECTIONS.STUDENTS), ...studentConditions);
+        const studentsSnapshot = await getDocs(studentsQuery);
+        searchResults.students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
 
       if (
@@ -81,17 +78,14 @@ export const useParticipantSearch = (selectedPeriod) => {
         filters.participantType === "all" ||
         filters.participantType === "staffFaculty"
       ) {
-        const staffQueries = [...queries];
+        const staffConditions = [...baseConditions];
         if (filters.id) {
-          staffQueries.push(Query.equal("staffFacultyId", filters.id));
+          staffConditions.push(where("staffFacultyId", "==", filters.id));
         }
 
-        const staffFaculty = await databases.listDocuments(
-          databaseId,
-          staffFacultyCollectionId,
-          staffQueries
-        );
-        searchResults.staffFaculty = staffFaculty.documents;
+        const staffQuery = query(collection(db, COLLECTIONS.STAFF_FACULTY), ...staffConditions);
+        const staffSnapshot = await getDocs(staffQuery);
+        searchResults.staffFaculty = staffSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
 
       if (
@@ -99,12 +93,9 @@ export const useParticipantSearch = (selectedPeriod) => {
         filters.participantType === "all" ||
         filters.participantType === "community"
       ) {
-        const community = await databases.listDocuments(
-          databaseId,
-          communityCollectionId,
-          queries
-        );
-        searchResults.community = community.documents;
+        const communityQuery = query(collection(db, COLLECTIONS.COMMUNITY), ...baseConditions);
+        const communitySnapshot = await getDocs(communityQuery);
+        searchResults.community = communitySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
 
       setResults(searchResults);

@@ -1,17 +1,18 @@
-import { account, client } from "@/lib/appwrite";
-import { ID } from "appwrite";
+import { auth, addDoc, collection, db, COLLECTIONS } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 const getGoogleAccessToken = async () => {
   try {
+    // Only run on client side
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    
     const currentUrl = window.location.origin;
-    const session = await account.createOAuth2Session(
-      "google",
-      `${currentUrl}/auth-callback`,
-      currentUrl,
-      ["email", "profile"]
-    );
-    return session?.accessToken;
+    // Note: Firebase handles OAuth differently than Appwrite
+    // This function would need to be implemented differently for Firebase
+    console.warn('Google OAuth2 session creation not implemented for Firebase yet');
+    return null;
   } catch (error) {
     console.error("Error getting Google access token:", error);
     return null;
@@ -22,29 +23,16 @@ export const verifyGoogleEmail = async (email, password, name) => {
   try {
     console.log("Starting verification process for:", email);
 
-    // First create a temporary account
-    console.log("Creating temporary account...");
-    const tempAccount = await account.create(
-      ID.unique(),
-      email,
-      password,
-      name
-    );
-    console.log("Account created successfully:", tempAccount);
+    // Only run on client side
+    if (typeof window === 'undefined') {
+      throw new Error("This function can only be called on the client side");
+    }
 
-    // Create a session using email/password login
-    console.log("Creating session...");
-    const session = await account.createSession(email, password);
-    console.log("Session created successfully:", session);
-
-    // Then send verification email
-    console.log("Sending verification email...");
-    const verificationResponse = await account.createVerification(
-      `${window.location.origin}/verify-email`
-    );
-    console.log("Verification email sent:", verificationResponse);
-
-    // Log the URL we're redirecting to
+    // Note: This function needs to be reimplemented for Firebase
+    // Firebase handles email verification differently than Appwrite
+    console.warn('Email verification not implemented for Firebase yet');
+    
+    // For now, just redirect to verify-email page
     const redirectUrl = "/verify-email";
     console.log("Redirecting to:", redirectUrl);
 
@@ -61,23 +49,9 @@ export const verifyGoogleEmail = async (email, password, name) => {
     });
 
     // Handle specific error cases
-    if (error.code === 409) {
+    if (error.code === 'auth/email-already-in-use') {
       console.log("Account already exists error");
       throw new Error("This email is already registered");
-    }
-
-    // Log any cleanup attempts
-    if (error.code === 401) {
-      console.log("Authorization error, attempting cleanup...");
-      try {
-        // Try to delete the account if it was created
-        await account.deleteSessions();
-        await account.delete();
-        console.log("Account cleanup successful");
-      } catch (deleteError) {
-        console.error("Cleanup failed:", deleteError);
-      }
-      throw new Error("Account creation failed. Please try again.");
     }
 
     throw new Error("Failed to send verification email. Please try again.");

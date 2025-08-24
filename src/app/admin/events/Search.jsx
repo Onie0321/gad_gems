@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getAllEventsAndParticipants } from "@/lib/appwrite";
+import { getAllEventsAndParticipants } from "@/lib/firebase";
 import {
   BarChart,
   Bar,

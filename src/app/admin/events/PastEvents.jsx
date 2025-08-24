@@ -1,5 +1,5 @@
 // src/app/admin/events/past-events/page.jsx
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Edit, Trash2, Eye, Check, X } from "lucide-react";
-import { databases, getCurrentUser } from "@/lib/appwrite";
+import { db, getCurrentUser } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -80,7 +80,7 @@ export function PastEvents() {
 
   const fetchUserDetails = async (userId) => {
     try {
-      const response = await databases.getDocument(
+      const response = await db.getDocument(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_USER_COLLECTION_ID,
         userId
@@ -94,7 +94,7 @@ export function PastEvents() {
 
   const fetchEvents = async () => {
     try {
-      const response = await databases.listDocuments(
+      const response = await db.listDocuments(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID
       );
@@ -153,7 +153,7 @@ export function PastEvents() {
 
     try {
       // Update the document
-      await databases.updateDocument(
+      await db.updateDocument(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID,
         selectedEvent.$id,
@@ -209,7 +209,7 @@ export function PastEvents() {
 
   const confirmDelete = async () => {
     try {
-      await databases.deleteDocument(
+      await db.deleteDocument(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_EVENT_COLLECTION_ID,
         selectedEventForAction.$id

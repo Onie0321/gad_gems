@@ -18,7 +18,7 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material'
-import { getEvents, editEvent, createEvent, deleteEvent, subscribeToRealTimeUpdates, eventCollectionId } from '@/lib/appwrite'
+import { getEvents, editEvent, createEvent, deleteEvent, subscribeToRealTimeUpdates, COLLECTIONS } from '@/lib/firebase'
 
 const localizer = momentLocalizer(moment)
 
@@ -82,7 +82,7 @@ export function EventCalendar() {
 
   useEffect(() => {
     fetchEvents()
-    const unsubscribe = subscribeToRealTimeUpdates(eventCollectionId, fetchEvents)
+    const unsubscribe = subscribeToRealTimeUpdates(COLLECTIONS.EVENTS, fetchEvents)
     return () => unsubscribe()
   }, [])
 

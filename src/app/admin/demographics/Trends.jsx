@@ -4,8 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EventParticipationTrends } from "./trends/EventParticipation"
 import { DemographicTrends } from "./trends/DemographicTrends"
 import { ActionableInsights } from "./trends/ActionableInsights"
-import { databases, databaseId, studentsCollectionId, eventCollectionId } from '@/lib/appwrite'
-import { Query } from 'appwrite'
+import { db, COLLECTIONS, query, collection, where, orderBy, limit, getDocs } from '@/lib/firebase'
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading"
 
@@ -22,21 +21,21 @@ export const Trends = () => {
       setLoading(true);
       
       // Fetch participants within date range
-      const participantsResponse = await databases.listDocuments(
-        databaseId,
-        studentsCollectionId,
-        [
-          Query.greaterThanEqual('$createdAt', dateRange.from.toISOString()),
-          Query.lessThanEqual('$createdAt', dateRange.to.toISOString()),
-          Query.limit(1000)
-        ]
+      const participantsQuery = query(
+        collection(db, COLLECTIONS.STUDENTS),
+        where('createdAt', '>=', dateRange.from),
+        where('createdAt', '<=', dateRange.to),
+        limit(1000)
       );
+      const participantsResponse = await getDocs(participantsQuery);
+
+      const participants = participantsResponse.docs.map(doc => ({ ...doc.data(), $id: doc.id }));
 
       // Process data for different trend analyses
       const processedData = {
-        eventParticipation: processEventParticipation(participantsResponse.documents),
-        ageDistribution: processAgeDistribution(participantsResponse.documents),
-        ethnicDistribution: processEthnicDistribution(participantsResponse.documents)
+        eventParticipation: processEventParticipation(participants),
+        ageDistribution: processAgeDistribution(participants),
+        ethnicDistribution: processEthnicDistribution(participants)
       };
 
       setTrendData(processedData);

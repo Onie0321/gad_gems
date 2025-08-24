@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import {
@@ -26,13 +26,14 @@ import {
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import {
-  databases,
-  databaseId,
-  academicPeriodCollectionId,
-  eventCollectionId,
-  studentsCollectionId,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  db,
+  COLLECTIONS,
+  getDocs,
+  query,
+  collection,
+  where,
+  orderBy,
+} from "@/lib/firebase";
 
 export default function Archives() {
   const [loading, setLoading] = useState(true);
@@ -45,21 +46,24 @@ export default function Archives() {
   }, []);
 
   useEffect(() => {
-    if (selectedPeriod) {
-      fetchArchivedEvents(selectedPeriod.$id);
-    }
+          if (selectedPeriod) {
+        fetchArchivedEvents(selectedPeriod.id);
+      }
   }, [selectedPeriod]);
 
   const fetchAcademicPeriods = async () => {
     try {
-      const response = await databases.listDocuments(
-        databaseId,
-        academicPeriodCollectionId,
-        [Query.equal("isActive", false), Query.orderDesc("createdAt")]
+      const response = await getDocs(
+        query(
+          collection(db, COLLECTIONS.ACADEMIC_PERIODS),
+          where("isActive", "==", false),
+          orderBy("createdAt", "desc")
+        )
       );
-      setAcademicPeriods(response.documents);
-      if (response.documents.length > 0) {
-        setSelectedPeriod(response.documents[0]);
+      const periods = response.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setAcademicPeriods(periods);
+      if (periods.length > 0) {
+        setSelectedPeriod(periods[0]);
       }
     } catch (error) {
       console.error("Error fetching academic periods:", error);
@@ -71,32 +75,34 @@ export default function Archives() {
   const fetchArchivedEvents = async (periodId) => {
     try {
       setLoading(true);
-      const eventsResponse = await databases.listDocuments(
-        databaseId,
-        eventCollectionId,
-        [
-          Query.equal("academicPeriodId", periodId),
-          Query.equal("isArchived", true),
-          Query.orderDesc("eventDate"),
-        ]
+      const eventsResponse = await getDocs(
+        query(
+          collection(db, COLLECTIONS.EVENTS),
+          where("academicPeriodId", "==", periodId),
+          where("isArchived", "==", true),
+          orderBy("eventDate", "desc")
+        )
       );
+
+      const events = eventsResponse.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
       // Fetch participants for each event
       const eventsWithParticipants = await Promise.all(
-        eventsResponse.documents.map(async (event) => {
-          const participantsResponse = await databases.listDocuments(
-            databaseId,
-            studentsCollectionId,
-            [
-              Query.equal("eventId", event.$id),
-              Query.equal("isArchived", true),
-              Query.equal("academicPeriodId", periodId),
-            ]
+        events.map(async (event) => {
+          const participantsResponse = await getDocs(
+            query(
+              collection(db, COLLECTIONS.STUDENTS),
+              where("eventId", "==", event.id),
+              where("isArchived", "==", true),
+              where("academicPeriodId", "==", periodId)
+            )
           );
+
+          const participants = participantsResponse.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
           return {
             ...event,
-            participants: participantsResponse.documents,
+            participants: participants,
           };
         })
       );
@@ -129,9 +135,9 @@ export default function Archives() {
         <CardContent>
           <div className="mb-6">
             <Select
-              value={selectedPeriod?.$id}
+              value={selectedPeriod?.id}
               onValueChange={(value) => {
-                const period = academicPeriods.find((p) => p.$id === value);
+                const period = academicPeriods.find((p) => p.id === value);
                 setSelectedPeriod(period);
               }}
             >
@@ -140,7 +146,7 @@ export default function Archives() {
               </SelectTrigger>
               <SelectContent>
                 {academicPeriods.map((period) => (
-                  <SelectItem key={period.$id} value={period.$id}>
+                  <SelectItem key={period.id} value={period.id}>
                     {period.schoolYear} - {period.periodType}
                   </SelectItem>
                 ))}
@@ -170,7 +176,7 @@ export default function Archives() {
                   </TableHeader>
                   <TableBody>
                     {archivedEvents.map((event) => (
-                      <TableRow key={event.$id}>
+                      <TableRow key={event.id}>
                         <TableCell>{event.eventName}</TableCell>
                         <TableCell>
                           {format(new Date(event.eventDate), "MMM dd, yyyy")}

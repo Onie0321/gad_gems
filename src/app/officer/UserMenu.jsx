@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getCurrentUser, signOut, account, logSignOutActivity } from "@/lib/appwrite";
+import { getCurrentUser, signOut, auth, logSignOutActivity } from "@/lib/firebase";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,10 +42,10 @@ export default function UserMenu() {
           setUser(currentUser);
         }
       } catch (error) {
-        console.error("Error fetching user account:", error);
+        console.error("Error fetching user auth:", error);
         toast({
           title: "Error",
-          description: "Failed to load user account. Please try again later.",
+          description: "Failed to load user auth. Please try again later.",
           variant: "destructive",
         });
       } finally {

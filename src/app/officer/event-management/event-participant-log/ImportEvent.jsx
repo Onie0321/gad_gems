@@ -17,8 +17,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { getCurrentAcademicPeriod } from "@/lib/appwrite";
-import { createNotification } from "@/lib/appwrite";
+import { getCurrentAcademicPeriod } from "@/lib/firebase";
+import { createNotification } from "@/lib/firebase";
 
 export default function ImportEventData({ onSuccess }) {
   const [file, setFile] = useState(null);

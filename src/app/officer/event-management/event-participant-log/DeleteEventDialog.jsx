@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Trash2, Loader2 } from "lucide-react";
-import { deleteEvent } from "@/lib/appwrite"; // Import the deleteEvent function
+import { deleteEvent } from "@/lib/firebase"; // Import the deleteEvent function
 import { toast } from "react-toastify";
 
 const DeleteEvent = ({ eventId, onDeleteEvent }) => {

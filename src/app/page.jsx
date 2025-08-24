@@ -11,7 +11,7 @@ import RecentEvents from "./homepage/event-section/page";
 import NewsSection from "./homepage/news-section/page";
 import FeedbackSection from "./homepage/feedback-section/page";
 import FAQSection from "./homepage/faq-section/page";
-import { getCurrentUser } from "@/lib/appwrite";
+import { getCurrentUser } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 

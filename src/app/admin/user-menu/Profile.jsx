@@ -1,8 +1,8 @@
-'use client'
+'use auth'
 
 import { useState, useEffect } from "react"
 import { User, Mail, Camera } from 'lucide-react'
-import { getCurrentUser } from "@/lib/appwrite" // Adjust the import path as needed
+import { getCurrentUser } from "@/lib/firebase" // Adjust the import path as needed
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"

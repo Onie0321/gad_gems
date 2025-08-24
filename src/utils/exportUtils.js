@@ -5,7 +5,7 @@ import {
   getParticipants,
   getStaffFaculty,
   getCommunityMembers,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);

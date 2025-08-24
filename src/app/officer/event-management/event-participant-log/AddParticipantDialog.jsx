@@ -41,15 +41,18 @@ import {
   capitalizeWords,
   formatStudentId,
   schoolOptions,
-  isStudentIdComplete
+  isStudentIdComplete,
+  debouncedCheckDuplicates,
+  handleAutofill
 } from "@/utils/participantUtils";
 import {
   createParticipant,
-} from "@/lib/appwrite";
+  checkDuplicateParticipant,
+} from "@/lib/firebase";
 import { toast } from "react-toastify";
 import { debounce } from 'lodash';
-import { databases, databaseId, studentsCollectionId } from "@/lib/appwrite";
-import { Query } from "appwrite";
+import { db, COLLECTIONS } from "@/lib/firebase";
+// Query functionality is handled differently in Firebase;
 
 const AddParticipant = ({
   onAddParticipant,
@@ -111,7 +114,7 @@ const AddParticipant = ({
     setShowAutofillDialog(false);
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = async (field, value) => {
     let processedValue = value;
     
     // Special handling for different fields
@@ -119,8 +122,16 @@ const AddParticipant = ({
       case "studentId":
         processedValue = formatStudentId(value);
         if (isStudentIdComplete(processedValue)) {
-          debouncedCheckDuplicates(processedValue, eventId, setDuplicateErrors);
-          handleAutofill(processedValue, setAutofillData, setShowAutofillDialog);
+          const result = await debouncedCheckDuplicates("studentId", processedValue, eventId, "student");
+          if (result) {
+            setDuplicateErrors(prev => ({ ...prev, studentId: result.duplicateError }));
+            setNewEntryInfo(prev => ({ ...prev, studentId: result.newEntryInfo }));
+          }
+          const autofillData = await handleAutofill(processedValue, eventId, "student");
+          if (autofillData) {
+            setAutofillData(autofillData);
+            setShowAutofillDialog(true);
+          }
         }
         break;
       case "staffFacultyId":

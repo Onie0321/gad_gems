@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ import {
   PERIOD_TYPES,
   validateAcademicPeriod,
   createNewAcademicPeriod,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 function cn(...classes) {

@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,13 +12,15 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  databases,
-  databaseId,
-  eventCollectionId,
-  studentsCollectionId,
+  db,
+  COLLECTIONS,
   getCurrentAcademicPeriod,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  query,
+  collection,
+  where,
+  orderBy,
+  getDocs,
+} from "@/lib/firebase";
 import {
   Table,
   TableBody,
@@ -99,6 +101,11 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function EventAnalysis() {
   const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [genderStats, setGenderStats] = useState({ male: 0, female: 0 });
+  const [basicStats, setBasicStats] = useState({ totalEvents: 0, totalParticipants: 0, averageParticipants: 0 });
+  const [participantsByEvent, setParticipantsByEvent] = useState([]);
   const [stats, setStats] = useState({
     totalParticipants: 0,
     averageParticipants: 0,
@@ -167,9 +174,9 @@ export default function EventAnalysis() {
         };
       }
 
-      const eventParticipants = participants.filter(
-        (p) => p.eventId === event.$id
-      );
+             const eventParticipants = participants.filter(
+         (p) => p.eventId === event.id
+       );
       acc[monthYear].events += 1;
       acc[monthYear].participants += eventParticipants.length;
       acc[monthYear].male += eventParticipants.filter(
@@ -218,60 +225,82 @@ export default function EventAnalysis() {
       // Get current academic period
       const period = await getCurrentAcademicPeriod();
       if (!period) {
-        throw new Error("No active academic period found");
+        console.warn("No active academic period found. Event data may be limited.");
+        setCurrentPeriod(null);
+        setEvents([]);
+        setParticipants([]);
+        setGenderStats({ male: 0, female: 0 });
+        setBasicStats({ totalEvents: 0, totalParticipants: 0, averageParticipants: 0 });
+        setParticipantsByEvent([]);
+        return; // Exit early but don't throw error
       }
       setCurrentPeriod(period);
 
       // First fetch all events
-      const eventsResponse = await databases.listDocuments(
-        databaseId,
-        eventCollectionId,
-        [
-          Query.equal("isArchived", false),
-          Query.equal("academicPeriodId", period.$id),
-        ]
+      const eventsQuery = query(
+        collection(db, COLLECTIONS.EVENTS),
+        where("isArchived", "==", false),
+        where("academicPeriodId", "==", period.id)
       );
+      const eventsSnapshot = await getDocs(eventsQuery);
+      const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Get all event IDs
-      const eventIds = eventsResponse.documents.map((event) => event.$id);
+      const eventIds = eventsList.map((event) => event.id);
+
+      // If no events found, set empty arrays and return early
+      if (eventsList.length === 0) {
+        setEvents([]);
+        setParticipants([]);
+        setGenderStats({ male: 0, female: 0 });
+        setBasicStats({ totalEvents: 0, totalParticipants: 0, averageParticipants: 0 });
+        setParticipantsByEvent([]);
+        return;
+      }
 
       // Fetch all types of participants in parallel
       const [studentsResponse, staffResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("eventId", eventIds),
-          ]),
-          databases.listDocuments(databaseId, staffFacultyCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("eventId", eventIds),
-          ]),
-          databases.listDocuments(databaseId, communityCollectionId, [
-            Query.equal("isArchived", false),
-            Query.equal("eventId", eventIds),
-          ]),
+          getDocs(query(
+            collection(db, COLLECTIONS.STUDENTS),
+            where("isArchived", "==", false),
+            where("eventId", "in", eventIds)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.STAFF_FACULTY),
+            where("isArchived", "==", false),
+            where("eventId", "in", eventIds)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.COMMUNITY),
+            where("isArchived", "==", false),
+            where("eventId", "in", eventIds)
+          )),
         ]);
 
       // Combine all participants with their types
       const allParticipants = [
-        ...studentsResponse.documents.map((p) => ({
-          ...p,
+        ...studentsResponse.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
           participantType: "Student",
         })),
-        ...staffResponse.documents.map((p) => ({
-          ...p,
+        ...staffResponse.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
           participantType: "Staff/Faculty",
         })),
-        ...communityResponse.documents.map((p) => ({
-          ...p,
+        ...communityResponse.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
           participantType: "Community Member",
         })),
       ];
 
       // Map events with their participants
-      const events = eventsResponse.documents.map((event) => ({
+      const eventsWithParticipants = eventsList.map((event) => ({
         ...event,
-        participants: allParticipants.filter((p) => p.eventId === event.$id),
+        participants: allParticipants.filter((p) => p.eventId === event.id),
       }));
 
       // Calculate gender counts across all participants
@@ -285,13 +314,19 @@ export default function EventAnalysis() {
       );
 
       // Calculate basic stats
-      const totalEvents = events.length;
+      const totalEvents = eventsWithParticipants.length;
       const totalParticipants = allParticipants.length;
       const averageParticipants =
         totalEvents > 0 ? (totalParticipants / totalEvents).toFixed(1) : 0;
 
+      // Update individual state variables
+      setEvents(eventsWithParticipants);
+      setParticipants(allParticipants);
+      setGenderStats(genderStats);
+      setBasicStats({ totalEvents, totalParticipants, averageParticipants });
+
       // Process participants by event with detailed breakdown
-      const participantsByEvent = events.map((event) => {
+      const participantsByEvent = eventsWithParticipants.map((event) => {
         const eventParticipants = event.participants || [];
         const breakdown = {
           name: event.eventName,
@@ -314,6 +349,9 @@ export default function EventAnalysis() {
         };
         return breakdown;
       });
+
+      // Update participantsByEvent state
+      setParticipantsByEvent(participantsByEvent);
 
       // Process school distribution
       const schoolData = allParticipants.reduce((acc, participant) => {
@@ -340,7 +378,7 @@ export default function EventAnalysis() {
         .sort((a, b) => b.total - a.total);
 
       // Process event types
-      const eventTypeCount = events.reduce((acc, event) => {
+      const eventTypeCount = eventsWithParticipants.reduce((acc, event) => {
         const type = event.eventType || "Not Specified";
         acc[type] = (acc[type] || 0) + 1;
         return acc;
@@ -351,11 +389,11 @@ export default function EventAnalysis() {
         .sort((a, b) => b.value - a.value);
 
       // Calculate trend data
-      const trendData = calculateTrendData(events, allParticipants);
+      const trendData = calculateTrendData(eventsWithParticipants, allParticipants);
       setTrendData(trendData);
 
       // Calculate summary metrics
-      const summaryMetrics = calculateSummary(events, allParticipants);
+      const summaryMetrics = calculateSummary(eventsWithParticipants, allParticipants);
       setSummary(summaryMetrics);
 
       setStats({

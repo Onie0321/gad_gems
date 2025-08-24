@@ -20,12 +20,19 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import {
-  databases,
-  databaseId,
-  notificationsCollectionId,
-  client,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  updateDoc,
+  doc,
+  deleteDoc,
+  onSnapshot,
+} from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -41,18 +48,21 @@ export function Notifications() {
     try {
       if (!user) return;
 
-      const response = await databases.listDocuments(
-        databaseId,
-        notificationsCollectionId,
-        [
-          Query.equal("userId", user.$id),
-          Query.orderDesc("$createdAt"),
-          Query.limit(100),
-        ]
+      const notificationsQuery = query(
+        collection(db, COLLECTIONS.NOTIFICATIONS),
+        where("userId", "==", user.$id),
+        orderBy("timestamp", "desc"),
+        limit(100)
       );
+      const querySnapshot = await getDocs(notificationsQuery);
+      const notificationsList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        $id: doc.id,
+        ...doc.data()
+      }));
 
-      setNotifications(response.documents);
-      setUnreadCount(response.documents.filter((n) => !n.read).length);
+      setNotifications(notificationsList);
+      setUnreadCount(notificationsList.filter((n) => !n.read).length);
     } catch (error) {
       console.error("Error fetching notifications:", error);
       toast({
@@ -67,27 +77,24 @@ export function Notifications() {
     if (user) {
       fetchNotifications();
 
-      // Subscribe to real-time updates
-      const unsubscribe = client.subscribe(
-        `databases.${databaseId}.collections.${notificationsCollectionId}.documents`,
-        (response) => {
-          if (
-            response.events.includes(
-              "databases.*.collections.*.documents.*.create"
-            )
-          ) {
-            // Add new notification to the list
-            setNotifications((prev) => [response.payload, ...prev]);
-            setUnreadCount((prev) => prev + 1);
-            // Show toast for new notification
-            toast({
-              title: response.payload.title,
-              description: response.payload.message,
-              duration: 5000,
-            });
-          }
-        }
+      // Subscribe to real-time updates using Firebase onSnapshot
+      const notificationsQuery = query(
+        collection(db, COLLECTIONS.NOTIFICATIONS),
+        where("userId", "==", user.$id),
+        orderBy("timestamp", "desc"),
+        limit(100)
       );
+
+      const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+        const notificationsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          $id: doc.id,
+          ...doc.data()
+        }));
+
+        setNotifications(notificationsList);
+        setUnreadCount(notificationsList.filter((n) => !n.read).length);
+      });
 
       return () => {
         unsubscribe();
@@ -99,7 +106,7 @@ export function Notifications() {
     try {
       // Mark as read if unread
       if (!notification.read) {
-        await markAsRead(notification.$id);
+        await markAsRead(notification.id);
       }
 
       // Handle navigation based on notification type and action
@@ -132,16 +139,13 @@ export function Notifications() {
 
   const markAsRead = async (notificationId) => {
     try {
-      await databases.updateDocument(
-        databaseId,
-        notificationsCollectionId,
-        notificationId,
-        { read: true }
-      );
+      await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notificationId), {
+        read: true
+      });
 
       setNotifications(
         notifications.map((n) =>
-          n.$id === notificationId ? { ...n, read: true } : n
+          n.id === notificationId ? { ...n, read: true } : n
         )
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
@@ -161,12 +165,9 @@ export function Notifications() {
         notifications
           .filter((n) => !n.read)
           .map((n) =>
-            databases.updateDocument(
-              databaseId,
-              notificationsCollectionId,
-              n.$id,
-              { read: true }
-            )
+            updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, n.$id), {
+              read: true
+            })
           )
       );
       setNotifications(notifications.map((n) => ({ ...n, read: true })));
@@ -188,16 +189,12 @@ export function Notifications() {
   const deleteNotification = async (notificationId, e) => {
     e.stopPropagation();
     try {
-      await databases.deleteDocument(
-        databaseId,
-        notificationsCollectionId,
-        notificationId
-      );
+      await deleteDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notificationId));
 
-      setNotifications(notifications.filter((n) => n.$id !== notificationId));
+      setNotifications(notifications.filter((n) => n.id !== notificationId));
       setUnreadCount(
         (prev) =>
-          notifications.filter((n) => !n.read && n.$id !== notificationId)
+          notifications.filter((n) => !n.read && n.id !== notificationId)
             .length
       );
 
@@ -219,11 +216,7 @@ export function Notifications() {
     try {
       await Promise.all(
         notifications.map((notification) =>
-          databases.deleteDocument(
-            databaseId,
-            notificationsCollectionId,
-            notification.$id
-          )
+          deleteDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notification.$id))
         )
       );
 
@@ -256,7 +249,7 @@ export function Notifications() {
       case "password_reset_complete":
         return "🔑";
       default:
-        return type === "account" ? "👤" : "ℹ️";
+        return type === "auth" ? "👤" : "ℹ️";
     }
   };
 
@@ -348,7 +341,7 @@ export function Notifications() {
                     {notification.message}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {format(new Date(notification.$createdAt), "PPp")}
+                    {format(new Date(notification.timestamp?.toDate?.() || notification.timestamp), "PPp")}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -359,7 +352,7 @@ export function Notifications() {
                       className="ml-2"
                       onClick={(e) => {
                         e.stopPropagation();
-                        markAsRead(notification.$id);
+                        markAsRead(notification.id);
                       }}
                     >
                       <Check className="h-4 w-4" />
@@ -369,7 +362,7 @@ export function Notifications() {
                     variant="ghost"
                     size="sm"
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    onClick={(e) => deleteNotification(notification.$id, e)}
+                    onClick={(e) => deleteNotification(notification.id, e)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -409,7 +402,7 @@ export function Notifications() {
                 </DialogDescription>
                 <div className="text-xs text-gray-500">
                   Created:{" "}
-                  {format(new Date(selectedNotification.$createdAt), "PPpp")}
+                  {format(new Date(selectedNotification.timestamp?.toDate?.() || selectedNotification.timestamp), "PPpp")}
                 </div>
               </div>
               <DialogFooter>

@@ -21,7 +21,7 @@ import {
   getParticipants,
   getCurrentUser,
   getCurrentAcademicPeriod,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import GenderBreakdown from "./demographic-analysis/GenderBreakdown";
 import AgeDistribution from "./demographic-analysis/AgeDistribution";
 import EducationLevel from "./demographic-analysis/EducationalLevel";
@@ -52,15 +52,14 @@ import { toast } from "react-toastify";
 import { checkNetworkStatus } from "@/utils/networkUtils";
 import { format } from "date-fns";
 import {
-  databases,
-  databaseId,
-  eventCollectionId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-  academicPeriodCollectionId,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  where,
+  orderBy,
+  getDocs,
+} from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 
 const getEventNames = async (eventIds) => {
@@ -69,13 +68,14 @@ const getEventNames = async (eventIds) => {
   }
 
   try {
-    const response = await databases.listDocuments(
-      databaseId,
-      eventCollectionId,
-      [Query.equal("$id", eventIds), Query.equal("isArchived", false)]
+    const eventsQuery = query(
+      collection(db, COLLECTIONS.EVENTS),
+      where("__name__", "in", eventIds),
+      where("isArchived", "==", false)
     );
+    const querySnapshot = await getDocs(eventsQuery);
 
-    return response.documents.map((event) => event.eventName);
+    return querySnapshot.docs.map((doc) => doc.data().eventName);
   } catch (error) {
     return eventIds.map((id) => `Event ${id}`); // Fallback names
   }
@@ -191,21 +191,23 @@ export default function DemographicAnalysis() {
 
         // Fetch all required data in parallel
         const [eventsResponse, academicPeriodsResponse] = await Promise.all([
-          databases.listDocuments(databaseId, eventCollectionId, [
-            Query.equal("createdBy", user.$id),
-            Query.equal("academicPeriodId", academicPeriod.$id),
-            Query.equal("isArchived", false),
-            Query.orderDesc("$createdAt"),
-          ]),
-          databases.listDocuments(databaseId, academicPeriodCollectionId, [
-            Query.orderDesc("startDate"),
-          ]),
+          getDocs(query(
+            collection(db, COLLECTIONS.EVENTS),
+            where("createdBy", "==", user.$id),
+            where("academicPeriodId", "==", academicPeriod.id),
+            where("isArchived", "==", false),
+            orderBy("createdAt", "desc")
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.ACADEMIC_PERIODS),
+            orderBy("startDate", "desc")
+          )),
         ]);
 
-        setEvents(eventsResponse.documents);
+        setEvents(eventsResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setFilterOptions((prev) => ({
           ...prev,
-          academicPeriod: academicPeriodsResponse.documents,
+          academicPeriod: academicPeriodsResponse.docs.map(doc => ({ id: doc.id, ...doc.data() })),
         }));
 
         setSelectedEvents(["all"]);
@@ -288,17 +290,17 @@ export default function DemographicAnalysis() {
 
       setLoadingMessage("Fetching demographic data...");
 
-      // Add academic period filtering to the query
-      const [participantsData, eventNames] = await Promise.all([
-        eventIds.includes("all")
-          ? getParticipants(null, currentUser.$id, currentAcademicPeriod.$id)
-          : getParticipants(
-              eventIds,
-              currentUser.$id,
-              currentAcademicPeriod.$id
-            ),
-        getEventNames(eventIds),
-      ]);
+              // Add academic period filtering to the query
+        const [participantsData, eventNames] = await Promise.all([
+          eventIds.includes("all")
+            ? getParticipants(null, currentUser.$id, currentAcademicPeriod.id)
+            : getParticipants(
+                eventIds,
+                currentUser.$id,
+                currentAcademicPeriod.id
+              ),
+          getEventNames(eventIds),
+        ]);
 
       // Apply semester filter if selected
       const filteredParticipants = participantsData.filter((participant) => {

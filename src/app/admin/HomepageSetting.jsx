@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -26,13 +26,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import {
-  databases,
-  databaseId,
-  eventCollectionId,
-  newsCollectionId,
+  db,
+  COLLECTIONS,
   getCurrentUser,
-} from "@/lib/appwrite";
-import { ID } from "appwrite";
+  addDoc,
+  collection,
+  getDocs,
+  updateDoc,
+  doc,
+} from "@/lib/firebase";
 
 // Form schema for news creation
 const newsFormSchema = z.object({
@@ -78,16 +80,13 @@ function ContentManagementClient() {
 
   const fetchEvents = async () => {
     try {
-      const response = await databases.listDocuments(
-        databaseId,
-        eventCollectionId
-      );
-      const events = response.documents;
+      const response = await getDocs(collection(db, COLLECTIONS.EVENTS));
+      const events = response.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       setEvents(events);
 
       // Set initially selected events (those with showOnHomepage = true)
       setSelectedEvents(
-        events.filter((event) => event.showOnHomepage).map((event) => event.$id)
+        events.filter((event) => event.showOnHomepage).map((event) => event.id)
       );
 
       return true;
@@ -104,17 +103,15 @@ function ContentManagementClient() {
 
   const fetchNewsItems = async () => {
     try {
-      const response = await databases.listDocuments(
-        databaseId,
-        newsCollectionId
-      );
-      setNewsItems(response.documents);
+      const response = await getDocs(collection(db, COLLECTIONS.NEWS));
+      const newsItems = response.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setNewsItems(newsItems);
 
       // Set initially selected news items
       setSelectedNews(
-        response.documents
+        newsItems
           .filter((news) => news.showOnHomepage)
-          .map((news) => news.$id)
+          .map((news) => news.id)
       );
 
       return true;
@@ -136,7 +133,7 @@ function ContentManagementClient() {
         : [...selectedEvents, eventId];
 
       // Update the event in the database
-      await databases.updateDocument(databaseId, eventCollectionId, eventId, {
+      await updateDoc(doc(db, COLLECTIONS.EVENTS, eventId), {
         showOnHomepage: !selectedEvents.includes(eventId),
       });
 
@@ -163,7 +160,7 @@ function ContentManagementClient() {
         : [...selectedNews, newsId];
 
       // Update the news item in the database
-      await databases.updateDocument(databaseId, newsCollectionId, newsId, {
+      await updateDoc(doc(db, COLLECTIONS.NEWS, newsId), {
         showOnHomepage: !selectedNews.includes(newsId),
       });
 
@@ -195,12 +192,7 @@ function ContentManagementClient() {
         delete newsData.imageUrl; // Remove the imageUrl field if it's empty
       }
 
-      await databases.createDocument(
-        databaseId,
-        newsCollectionId,
-        ID.unique(),
-        newsData
-      );
+      await addDoc(collection(db, COLLECTIONS.NEWS), newsData);
 
       toast({
         title: "Success",
@@ -263,7 +255,7 @@ function ContentManagementClient() {
   // Add bulk selection handlers
   const handleSelectAllEvents = () => {
     const currentPageEvents = paginateItems(events, currentEventsPage);
-    const currentPageIds = currentPageEvents.map((event) => event.$id);
+            const currentPageIds = currentPageEvents.map((event) => event.id);
 
     const allSelected = currentPageIds.every((id) =>
       selectedEvents.includes(id)
@@ -275,7 +267,7 @@ function ContentManagementClient() {
         selectedEvents.filter((id) => !currentPageIds.includes(id))
       );
       currentPageIds.forEach(async (eventId) => {
-        await databases.updateDocument(databaseId, eventCollectionId, eventId, {
+        await updateDoc(doc(db, COLLECTIONS.EVENTS, eventId), {
           showOnHomepage: false,
         });
       });
@@ -284,7 +276,7 @@ function ContentManagementClient() {
       const newSelected = [...new Set([...selectedEvents, ...currentPageIds])];
       setSelectedEvents(newSelected);
       currentPageIds.forEach(async (eventId) => {
-        await databases.updateDocument(databaseId, eventCollectionId, eventId, {
+        await updateDoc(doc(db, COLLECTIONS.EVENTS, eventId), {
           showOnHomepage: true,
         });
       });
@@ -293,7 +285,7 @@ function ContentManagementClient() {
 
   const handleSelectAllNews = () => {
     const currentPageNews = paginateItems(newsItems, currentNewsPage);
-    const currentPageIds = currentPageNews.map((news) => news.$id);
+            const currentPageIds = currentPageNews.map((news) => news.id);
 
     const allSelected = currentPageIds.every((id) => selectedNews.includes(id));
 
@@ -303,7 +295,7 @@ function ContentManagementClient() {
         selectedNews.filter((id) => !currentPageIds.includes(id))
       );
       currentPageIds.forEach(async (newsId) => {
-        await databases.updateDocument(databaseId, newsCollectionId, newsId, {
+        await updateDoc(doc(db, COLLECTIONS.NEWS, newsId), {
           showOnHomepage: false,
         });
       });
@@ -312,7 +304,7 @@ function ContentManagementClient() {
       const newSelected = [...new Set([...selectedNews, ...currentPageIds])];
       setSelectedNews(newSelected);
       currentPageIds.forEach(async (newsId) => {
-        await databases.updateDocument(databaseId, newsCollectionId, newsId, {
+        await updateDoc(doc(db, COLLECTIONS.NEWS, newsId), {
           showOnHomepage: true,
         });
       });
@@ -347,13 +339,13 @@ function ContentManagementClient() {
                 >
                   <Checkbox
                     checked={paginateItems(events, currentEventsPage).every(event => 
-                      selectedEvents.includes(event.$id))}
+                      selectedEvents.includes(event.id))}
                     onCheckedChange={handleSelectAllEvents}
                   />
                   <div className="flex-1">
                     <h4 className="font-semibold">
-                      {paginateItems(events, currentEventsPage).every(event => 
-                        selectedEvents.includes(event.$id)) ? 'Deselect All Events' : 'Select All Events'}
+                                          {paginateItems(events, currentEventsPage).every(event =>
+                      selectedEvents.includes(event.id)) ? 'Deselect All Events' : 'Select All Events'}
                     </h4>
                   </div>
                 </div>
@@ -361,13 +353,13 @@ function ContentManagementClient() {
                 {/* Event Cards */}
                 {paginateItems(events, currentEventsPage).map((event) => (
                   <div
-                    key={event.$id}
+                    key={event.id}
                     className="flex items-center space-x-4 p-4 border rounded cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleEventSelection(event.$id)}
+                                          onClick={() => handleEventSelection(event.id)}
                   >
                     <Checkbox
-                      checked={selectedEvents.includes(event.$id)}
-                      onCheckedChange={() => handleEventSelection(event.$id)}
+                      checked={selectedEvents.includes(event.id)}
+                      onCheckedChange={() => handleEventSelection(event.id)}
                     />
                     <div className="flex-1">
                       <h4 className="font-semibold">{event.eventName}</h4>
@@ -443,13 +435,13 @@ function ContentManagementClient() {
                 >
                   <Checkbox
                     checked={paginateItems(newsItems, currentNewsPage).every(news => 
-                      selectedNews.includes(news.$id))}
+                      selectedNews.includes(news.id))}
                     onCheckedChange={handleSelectAllNews}
                   />
                   <div className="flex-1">
                     <h4 className="font-semibold">
-                      {paginateItems(newsItems, currentNewsPage).every(news => 
-                        selectedNews.includes(news.$id)) ? 'Deselect All News' : 'Select All News'}
+                                          {paginateItems(newsItems, currentNewsPage).every(news =>
+                      selectedNews.includes(news.id)) ? 'Deselect All News' : 'Select All News'}
                     </h4>
                   </div>
                 </div>
@@ -457,13 +449,13 @@ function ContentManagementClient() {
                 {/* News Cards */}
                 {paginateItems(newsItems, currentNewsPage).map((item) => (
                   <div
-                    key={item.$id}
+                    key={item.id}
                     className="flex items-center space-x-4 p-4 border rounded cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleNewsSelection(item.$id)}
+                                          onClick={() => handleNewsSelection(item.id)}
                   >
                     <Checkbox
-                      checked={selectedNews.includes(item.$id)}
-                      onCheckedChange={() => handleNewsSelection(item.$id)}
+                      checked={selectedNews.includes(item.id)}
+                      onCheckedChange={() => handleNewsSelection(item.id)}
                     />
                     <div className="flex-1">
                       <h4 className="font-semibold">{item.title}</h4>
@@ -672,7 +664,7 @@ function ContentManagementClient() {
   );
 }
 
-// Default export is now a server component that renders the client component
+// Default export is now a server component that renders the auth component
 export default function ContentManagement() {
   return <ContentManagementClient />;
 }

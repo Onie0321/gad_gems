@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,13 +36,15 @@ import {
   Edit2,
 } from "lucide-react";
 import {
-  databases,
-  databaseId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  getDocs,
+  updateDoc,
+  doc,
+  where,
+} from "@/lib/firebase";
 import {
   Select,
   SelectContent,
@@ -131,25 +133,42 @@ export function ParticipantList({ selectedPeriod }) {
 
   useEffect(() => {
     const fetchParticipants = async () => {
-      if (!selectedPeriod) return;
+      console.log("ParticipantList: selectedPeriod =", selectedPeriod);
+      
+      if (!selectedPeriod) {
+        console.log("ParticipantList: No selectedPeriod, setting loading to false");
+        setLoading(false);
+        return;
+      }
 
       try {
+        console.log("ParticipantList: Fetching participants for period:", selectedPeriod);
+        
         const [students, staffFaculty, community] = await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
-            Query.equal("academicPeriodId", selectedPeriod),
-          ]),
-          databases.listDocuments(databaseId, staffFacultyCollectionId, [
-            Query.equal("academicPeriodId", selectedPeriod),
-          ]),
-          databases.listDocuments(databaseId, communityCollectionId, [
-            Query.equal("academicPeriodId", selectedPeriod),
-          ]),
+          getDocs(query(
+            collection(db, COLLECTIONS.STUDENTS),
+            where("academicPeriodId", "==", selectedPeriod)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.STAFF_FACULTY),
+            where("academicPeriodId", "==", selectedPeriod)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.COMMUNITY),
+            where("academicPeriodId", "==", selectedPeriod)
+          )),
         ]);
 
+        console.log("ParticipantList: Fetched data:", {
+          students: students.docs.length,
+          staffFaculty: staffFaculty.docs.length,
+          community: community.docs.length
+        });
+
         setParticipants({
-          students: students.documents,
-          staffFaculty: staffFaculty.documents,
-          community: community.documents,
+          students: students.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+          staffFaculty: staffFaculty.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+          community: community.docs.map(doc => ({ id: doc.id, ...doc.data() })),
         });
         setLoading(false);
       } catch (error) {
@@ -216,6 +235,14 @@ export function ParticipantList({ selectedPeriod }) {
     return (
       <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!selectedPeriod) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center text-gray-500">
+        <p className="text-lg">Please select an academic period to view participants</p>
       </div>
     );
   }
@@ -309,7 +336,7 @@ export function ParticipantList({ selectedPeriod }) {
                   </TableHeader>
                   <TableBody>
                     {getPaginatedData(participants.students).map((student) => (
-                      <TableRow key={student.$id}>
+                      <TableRow key={student.id}>
                         <TableCell>{student.studentId}</TableCell>
                         <TableCell>{truncateText(student.name)}</TableCell>
                         <TableCell>{student.sex}</TableCell>
@@ -449,7 +476,7 @@ export function ParticipantList({ selectedPeriod }) {
                   <TableBody>
                     {getPaginatedData(participants.staffFaculty).map(
                       (staff) => (
-                        <TableRow key={staff.$id}>
+                        <TableRow key={staff.id}>
                           <TableCell>{staff.staffFacultyId}</TableCell>
                           <TableCell>{truncateText(staff.name)}</TableCell>
                           <TableCell>{staff.sex}</TableCell>
@@ -579,7 +606,7 @@ export function ParticipantList({ selectedPeriod }) {
                   </TableHeader>
                   <TableBody>
                     {getPaginatedData(participants.community).map((member) => (
-                      <TableRow key={member.$id}>
+                      <TableRow key={member.id}>
                         <TableCell>{truncateText(member.name)}</TableCell>
                         <TableCell>{member.sex}</TableCell>
                         <TableCell>{member.age}</TableCell>

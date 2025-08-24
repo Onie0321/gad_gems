@@ -42,12 +42,11 @@ import {
   schoolOptions,
 } from "@/utils/participantUtils";
 import {
-  databases,
-  databaseId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
+  db,
+  COLLECTIONS,
+  updateDoc,
+  doc,
+} from "@/lib/firebase";
 
 export default function EditParticipantDialog({
   participant,
@@ -128,15 +127,15 @@ export default function EditParticipantDialog({
       let collectionId;
       switch (participantType) {
         case "student":
-          collectionId = studentsCollectionId;
+          collectionId = COLLECTIONS.STUDENTS;
           console.log("Selected student collection:", collectionId);
           break;
         case "staff":
-          collectionId = staffFacultyCollectionId;
+          collectionId = COLLECTIONS.STAFF_FACULTY;
           console.log("Selected staff collection:", collectionId);
           break;
         case "community":
-          collectionId = communityCollectionId;
+          collectionId = COLLECTIONS.COMMUNITY;
           console.log("Selected community collection:", collectionId);
           break;
         default:
@@ -183,17 +182,15 @@ export default function EditParticipantDialog({
       }
 
       console.log("Final update data:", {
-        databaseId,
+        COLLECTIONS,
         collectionId,
-        participantId: editedParticipant.$id,
+        participantId: editedParticipant.id,
         updateData,
       });
 
       // Update the participant in the database
-      const response = await databases.updateDocument(
-        databaseId,
-        collectionId,
-        editedParticipant.$id,
+      const response = await updateDoc(
+        doc(db, collectionId, editedParticipant.id),
         updateData
       );
 
@@ -207,7 +204,7 @@ export default function EditParticipantDialog({
       console.error("Error updating participant:", {
         error: error.message,
         stack: error.stack,
-        participantId: editedParticipant.$id,
+        participantId: editedParticipant.id,
         participantType,
         editedParticipant,
         fullError: error,

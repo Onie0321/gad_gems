@@ -41,8 +41,7 @@ import {
   checkDuplicateEvent,
   checkTimeConflict,
   getCurrentAcademicPeriod,
-  studentsCollectionId,
-} from "@/lib/appwrite";
+} from "@/lib/firebase";
 import { schoolOptions, getNonAcademicCategories } from "@/utils/eventUtils";
 import { useTabContext } from "@/context/TabContext"; // Import the context hook
 import {
@@ -74,7 +73,6 @@ import {
   STORAGE_KEYS,
 } from "@/utils/formPersistence";
 import { importEventAndParticipants } from "@/utils/importUtils";
-import { createNotification } from "@/lib/appwrite";
 import {
   Tooltip,
   TooltipContent,
@@ -82,27 +80,30 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  databases,
-  databaseId,
-  eventCollectionId,
-  client,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  db,
+  COLLECTIONS,
+  auth,
+  query,
+  collection,
+  where,
+  getDocs,
+  createNotification
+} from "@/lib/firebase";
+// Query functionality is handled differently in Firebase;
 
 const checkForDuplicateEvent = async (eventData) => {
   try {
     // Check for exact match of name, date, and venue combination
-    const response = await databases.listDocuments(
-      databaseId,
-      eventCollectionId,
-      [
-        Query.equal("eventName", eventData.eventName),
-        Query.equal("eventDate", eventData.eventDate),
-        Query.equal("eventVenue", eventData.eventVenue),
-      ]
+    const eventsQuery = query(
+      collection(db, COLLECTIONS.EVENTS),
+      where("eventName", "==", eventData.eventName),
+      where("eventDate", "==", eventData.eventDate),
+      where("eventVenue", "==", eventData.eventVenue)
     );
+    
+    const querySnapshot = await getDocs(eventsQuery);
 
-    if (response.documents.length > 0) {
+    if (!querySnapshot.empty) {
       return {
         isDuplicate: true,
         message: "An event with the same name, date, and venue already exists.",
@@ -334,7 +335,7 @@ export default function CreateEvent({
         createdBy: user.$id,
         showOnHomepage: false,
         isArchived: false,
-        academicPeriodId: currentAcademicPeriod.$id,
+        academicPeriodId: currentAcademicPeriod.id,
         archivedAt: "",
         createdAt: new Date().toISOString(),
         source: "created",
@@ -546,16 +547,16 @@ export default function CreateEvent({
   useEffect(() => {
     const checkAcademicPeriod = async () => {
       try {
-        ("Checking academic period...");
+        console.log("Checking academic period...");
         const period = await getCurrentAcademicPeriod();
-        "Retrieved academic period:", period;
+        console.log("Retrieved academic period:", period);
         if (!period) {
-          ("No active academic period found");
+          console.log("No active academic period found");
           // You might want to show a toast here
           toast.error("No active academic period found");
         }
       } catch (error) {
-        "Error checking academic period:", error;
+        console.log("Error checking academic period:", error);
       }
     };
 
@@ -570,7 +571,7 @@ export default function CreateEvent({
   };
 
   // Early return for invalid academic period
-  if (!currentAcademicPeriod || !currentAcademicPeriod.$id) {
+        if (!currentAcademicPeriod || !currentAcademicPeriod.id) {
     return (
       <Card>
         <CardHeader>

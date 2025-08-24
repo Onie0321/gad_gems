@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,11 +64,11 @@ import {
   isStudentIdComplete,
   checkDuplicates,
 } from "@/utils/participantUtils";
-import { createParticipant } from "@/lib/appwrite";
+import { createParticipant } from "@/lib/firebase";
 import EditParticipantDialog from "./EditParticipantDialog";
 import DeleteParticipantDialog from "./DeleteParticipantLog";
 import { debounce } from "lodash";
-import ViewParticipants from "@/app/officer/event-management/event-participant-log/view-participant-dialog/page";
+import ViewParticipants from "./ViewParticipantsDialog";
 
 export default function ParticipantManagement({
   events,
@@ -166,15 +166,7 @@ export default function ParticipantManagement({
     }
   };
 
-  const debouncedCheckDuplicates = debounce(async (field, value) => {
-    const { duplicateError, newEntryInfo } = await checkDuplicates(
-      field,
-      value,
-      currentEventId
-    );
-    setDuplicateErrors((prev) => ({ ...prev, [field]: duplicateError }));
-    setNewEntryInfo((prev) => ({ ...prev, [field]: newEntryInfo }));
-  }, 500);
+
 
   const handleAutofillConfirm = () => {
     setParticipantData((prev) => ({

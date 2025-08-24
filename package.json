@@ -6,7 +6,10 @@
     "dev": "next dev --turbo",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:firebase": "node src/utils/firebase-test.js",
+    "migrate": "node migration-runner.js",
+    "update-imports": "node update-imports.js"
   },
   "dependencies": {
     "@auth/core": "^0.34.2",
@@ -47,8 +50,8 @@
     "@react-three/fiber": "^8.17.10",
     "@tanstack/react-query": "^5.66.0",
     "@tanstack/react-table": "^8.20.6",
+    "@tremor/react": "^3.4.0",
     "@tsparticles/react": "^3.0.0",
-    "appwrite": "^16.1.0",
     "bcryptjs": "^2.4.3",
     "chart.js": "^4.4.7",
     "class-variance-authority": "^0.7.0",
@@ -59,6 +62,7 @@
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "filesaver": "^0.0.13",
+    "firebase": "^12.1.0",
     "framer-motion": "^11.14.4",
     "fullcalendar": "^6.1.15",
     "json2csv": "^6.0.0-alpha.2",
@@ -97,8 +101,7 @@
     "tailwindcss-animate": "^1.0.7",
     "three-mesh-bvh": "^0.8.0",
     "xlsx": "^0.18.5",
-    "zod": "^3.23.8",
-    "@tremor/react": "^3.4.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "eslint-config-next": "14.2.6",

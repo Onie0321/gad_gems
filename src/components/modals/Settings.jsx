@@ -1,124 +1,104 @@
 'use client'
 
-import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { updateUser, changePassword } from '@/lib/appwrite'
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { updateUser, changePassword } from '@/lib/firebase';
 
 export default function SettingsModal({ isOpen, onClose, user }) {
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [emailNotifications, setEmailNotifications] = useState(user.emailNotifications || false)
-  const [inAppNotifications, setInAppNotifications] = useState(user.inAppNotifications || false)
-  const [dataSharing, setDataSharing] = useState(user.dataSharing || false)
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handlePasswordChange = async (e) => {
-    e.preventDefault()
-    if (newPassword !== confirmPassword) {
-      alert('New passwords do not match')
-      return
-    }
-    try {
-      await changePassword(currentPassword, newPassword)
-      alert('Password changed successfully')
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-    } catch (error) {
-      console.error('Error changing password:', error)
-      alert('Failed to change password')
-    }
-  }
+    e.preventDefault();
+    setIsLoading(true);
 
-  const handleSettingsChange = async () => {
     try {
-      await updateUser(user.$id, {
-        emailNotifications,
-        inAppNotifications,
-        dataSharing,
-      })
-      alert('Settings updated successfully')
+      if (newPassword !== confirmPassword) {
+        throw new Error('New passwords do not match');
+      }
+
+      if (newPassword.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+
+      await changePassword(currentPassword, newPassword);
+
+      toast({
+        title: "Success",
+        description: "Password changed successfully!",
+      });
+
+      // Reset form
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      onClose();
     } catch (error) {
-      console.error('Error updating settings:', error)
-      alert('Failed to update settings')
+      console.error('Error changing password:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
+          <DialogTitle>Change Password</DialogTitle>
         </DialogHeader>
-        <div className="space-y-6">
-          <form onSubmit={handlePasswordChange} className="space-y-4">
-            <h3 className="text-lg font-medium">Change Password</h3>
-            <div>
-              <Label htmlFor="currentPassword">Current Password</Label>
-              <Input
-                id="currentPassword"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="newPassword">New Password</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-            <Button type="submit">Change Password</Button>
-          </form>
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Notification Preferences</h3>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="emailNotifications">Email Notifications</Label>
-              <Switch
-                id="emailNotifications"
-                checked={emailNotifications}
-                onCheckedChange={setEmailNotifications}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="inAppNotifications">In-App Notifications</Label>
-              <Switch
-                id="inAppNotifications"
-                checked={inAppNotifications}
-                onCheckedChange={setInAppNotifications}
-              />
-            </div>
+        <form onSubmit={handlePasswordChange} className="space-y-4">
+          <div>
+            <Label htmlFor="currentPassword">Current Password</Label>
+            <Input
+              id="currentPassword"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
           </div>
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Privacy Settings</h3>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="dataSharing">Data Sharing</Label>
-              <Switch
-                id="dataSharing"
-                checked={dataSharing}
-                onCheckedChange={setDataSharing}
-              />
-            </div>
+          <div>
+            <Label htmlFor="newPassword">New Password</Label>
+            <Input
+              id="newPassword"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
           </div>
-          <Button onClick={handleSettingsChange}>Save Settings</Button>
-        </div>
+          <div>
+            <Label htmlFor="confirmPassword">Confirm New Password</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Changing..." : "Change Password"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

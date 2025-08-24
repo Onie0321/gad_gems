@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 import { useState, useEffect, useCallback } from "react";
 import {
   Card,
@@ -10,13 +10,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  databases,
-  databaseId,
-  studentsCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
-} from "@/lib/appwrite";
-import { Query } from "appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  where,
+  getDocs,
+} from "@/lib/firebase";
 import debounce from "lodash/debounce";
 import GADConnectSimpleLoader from "@/components/loading/simpleLoading";
 import {

@@ -1,7 +1,13 @@
 "use client";
 
 import React, { createContext, useState, useEffect, useContext } from "react";
-import { account, databases, getCurrentUser, SignOut } from "@/lib/appwrite";
+import { 
+  auth, 
+  getCurrentUser, 
+  signIn, 
+  signOutUser, 
+  onAuthStateChanged 
+} from "@/lib/firebase";
 
 // Create AuthContext with initial values
 const AuthContext = createContext({
@@ -33,14 +39,34 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    checkUser();
+    // Set up Firebase auth state listener
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const currentUser = await getCurrentUser();
+          setUser(currentUser);
+          setError(null);
+        } catch (error) {
+          console.error("Error getting current user:", error);
+          setUser(null);
+          setError("Failed to get user data");
+        }
+      } else {
+        setUser(null);
+        setError(null);
+      }
+      setLoading(false);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, []);
 
   const login = async (email, password) => {
     try {
       setLoading(true);
-      await account.createEmailSession(email, password);
-      await checkUser(); // Refresh user data after login
+      await signIn(email, password);
+      // The auth state listener will handle updating the user state
       return true;
     } catch (error) {
       console.error("Login error:", error);
@@ -54,9 +80,8 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setLoading(true);
-      await account.deleteSession("current");
-      setUser(null);
-      setError(null);
+      await signOutUser();
+      // The auth state listener will handle updating the user state
     } catch (error) {
       console.error("Error signing out:", error);
       setError("Failed to sign out");

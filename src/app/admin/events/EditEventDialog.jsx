@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -45,7 +45,7 @@ import {
   schoolOptions,
   capitalizeWords,
 } from "../../../../utils/participantUtils";
-import { editEvent, updateEvent } from "@/lib/appwrite";
+import { editEvent, updateEvent } from "@/lib/firebase";
 
 const EditEvent = ({ event, onUpdateEvent }) => {
   const [editingEvent, setEditingEvent] = useState(() => ({

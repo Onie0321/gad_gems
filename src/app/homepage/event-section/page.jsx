@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
@@ -36,8 +36,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { databases, databaseId, eventCollectionId } from "@/lib/appwrite";
-import { Query } from "appwrite";
+import { db, COLLECTIONS } from "@/lib/firebase";
+import { query, collection, where, orderBy, getDocs } from "@/lib/firebase";
 import { motion } from "framer-motion";
 
 export default function RecentEvents() {
@@ -48,21 +48,26 @@ export default function RecentEvents() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const response = await databases.listDocuments(
-          databaseId,
-          eventCollectionId,
-          [Query.equal("showOnHomepage", true), Query.orderDesc("eventDate")]
+        const eventsQuery = query(
+          collection(db, COLLECTIONS.EVENTS),
+          where("showOnHomepage", "==", true),
+          orderBy("eventDate", "desc")
         );
+        
+        const querySnapshot = await getDocs(eventsQuery);
 
         // Transform the data to match your component's expectations
-        const formattedEvents = response.documents.map((event) => ({
-          id: event.$id,
-          name: event.eventName,
-          description: event.eventDescription || "",
-          date: event.eventDate,
-          location: event.eventVenue,
-          attendees: event.participants?.length || 0,
-        }));
+        const formattedEvents = querySnapshot.docs.map((doc) => {
+          const event = doc.data();
+          return {
+            id: doc.id,
+            name: event.eventName,
+            description: event.eventDescription || "",
+            date: event.eventDate,
+            location: event.eventVenue,
+            attendees: event.participants?.length || 0,
+          };
+        });
 
         setEvents(formattedEvents);
       } catch (error) {

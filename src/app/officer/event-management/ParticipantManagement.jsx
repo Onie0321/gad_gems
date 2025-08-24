@@ -86,16 +86,20 @@ import {
   createParticipant,
   getCurrentUser,
   checkDuplicateParticipant,
-  databases,
-  databaseId,
-  studentsCollectionId,
-  eventCollectionId,
-  staffFacultyCollectionId,
-  communityCollectionId,
+  db,
+  COLLECTIONS,
   updateParticipant,
-} from "@/lib/appwrite";
+  addDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  getDoc,
+  doc,
+  updateDoc,
+  deleteDoc,
+} from "@/lib/firebase";
 import { usePathname, useRouter } from "next/navigation";
-import { ID } from "appwrite";
 import ParticipantTables from "./participant-management/ParticipantTables";
 import {
   saveFormData,
@@ -103,7 +107,7 @@ import {
   clearFormData,
   STORAGE_KEYS,
 } from "@/utils/formPersistence";
-import { Query } from "appwrite";
+// Query functionality is handled differently in Firebase;
 import { debounce } from "lodash";
 import { cn } from "@/lib/utils";
 import { ColorfulSpinner } from "@/components/ui/loader";
@@ -251,23 +255,27 @@ export default function ParticipantManagement({
       // Fetch participants from all collections
       const [studentsResponse, staffResponse, communityResponse] =
         await Promise.all([
-          databases.listDocuments(databaseId, studentsCollectionId, [
-            Query.equal("eventId", eventId),
-          ]),
-          databases.listDocuments(databaseId, staffFacultyCollectionId, [
-            Query.equal("eventId", eventId),
-          ]),
-          databases.listDocuments(databaseId, communityCollectionId, [
-            Query.equal("eventId", eventId),
-          ]),
+          getDocs(query(
+            collection(db, COLLECTIONS.STUDENTS),
+            where("eventId", "==", eventId)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.STAFF_FACULTY),
+            where("eventId", "==", eventId)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.COMMUNITY),
+            where("eventId", "==", eventId)
+          )),
         ]);
 
       // Combine all participants with their types
       const allParticipants = [
-        ...studentsResponse.documents.map((p) => ({ ...p, type: "student" })),
-        ...staffResponse.documents.map((p) => ({ ...p, type: "staff" })),
-        ...communityResponse.documents.map((p) => ({
-          ...p,
+        ...studentsResponse.docs.map(doc => ({ id: doc.id, ...doc.data(), type: "student" })),
+        ...staffResponse.docs.map(doc => ({ id: doc.id, ...doc.data(), type: "staff" })),
+        ...communityResponse.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
           type: "community",
         })),
       ];
@@ -308,18 +316,18 @@ export default function ParticipantManagement({
         }
 
         if (currentEventId) {
-          const event = events.find((e) => e.$id === currentEventId);
+          const event = events.find((e) => e.id === currentEventId);
           if (event) {
             setCurrentEvent(event);
             setIsEventSelected(true);
-            await fetchParticipants(event.$id);
+            await fetchParticipants(event.id);
           }
         } else if (events.length > 0) {
           const firstEvent = events[0];
-          setCurrentEventId(firstEvent.$id);
+          setCurrentEventId(firstEvent.id);
           setCurrentEvent(firstEvent);
           setIsEventSelected(true);
-          await fetchParticipants(firstEvent.$id);
+          await fetchParticipants(firstEvent.id);
         }
       } catch (error) {
         console.error("Error initializing component:", error);
@@ -346,7 +354,7 @@ export default function ParticipantManagement({
   // Add this useEffect to handle automatic event selection after creation
   useEffect(() => {
     if (currentEventId && events.length > 0) {
-      const event = events.find((e) => e.$id === currentEventId);
+      const event = events.find((e) => e.id === currentEventId);
       if (event) {
         setCurrentEvent(event);
         setIsEventSelected(true);
@@ -364,7 +372,7 @@ export default function ParticipantManagement({
   };
 
   const isValidEvent = (event) => {
-    return event && event.$id;
+    return event && event.id;
   };
 
   const renderAutofillDialog = () => {
@@ -510,7 +518,7 @@ export default function ParticipantManagement({
 
       switch (participantType) {
         case "student":
-          collectionId = studentsCollectionId;
+          collectionId = COLLECTIONS.STUDENTS;
           participantToAdd = {
             ...baseParticipantData,
             studentId: cleanedData.studentId || "",
@@ -521,7 +529,7 @@ export default function ParticipantManagement({
           break;
 
         case "staff":
-          collectionId = staffFacultyCollectionId;
+          collectionId = COLLECTIONS.STAFF_FACULTY;
           participantToAdd = {
             ...baseParticipantData,
             staffFacultyId: cleanedData.staffFacultyId,
@@ -529,7 +537,7 @@ export default function ParticipantManagement({
           break;
 
         case "community":
-          collectionId = communityCollectionId;
+          collectionId = COLLECTIONS.COMMUNITY;
           participantToAdd = baseParticipantData;
           break;
 
@@ -541,37 +549,24 @@ export default function ParticipantManagement({
       console.log("Using collection ID:", collectionId);
 
       // Create the participant document
-      const participantId = ID.unique();
-      const response = await databases.createDocument(
-        databaseId,
-        collectionId,
-        participantId,
-        participantToAdd
-      );
+      const response = await addDoc(collection(db, collectionId), participantToAdd);
+      const participantId = response.id;
 
       if (response) {
         // Format the participant ID with type prefix
         const formattedParticipantId = `${participantType}_${participantId}`;
 
         // Get current event
-        const event = await databases.getDocument(
-          databaseId,
-          eventCollectionId,
-          currentEventId
-        );
+        const eventDoc = await getDoc(doc(db, COLLECTIONS.EVENTS, currentEventId));
+        const event = eventDoc.data();
 
         // Update event's participants array
-        await databases.updateDocument(
-          databaseId,
-          eventCollectionId,
-          currentEventId,
-          {
-            participants: [
-              ...(event.participants || []),
-              formattedParticipantId,
-            ],
-          }
-        );
+        await updateDoc(doc(db, COLLECTIONS.EVENTS, currentEventId), {
+          participants: [
+            ...(event.participants || []),
+            formattedParticipantId,
+          ],
+        });
 
         toast.success("Participant added successfully!");
         setParticipantData(getInitialParticipantData(participantType));
@@ -617,7 +612,7 @@ export default function ParticipantManagement({
   const handleUpdateParticipant = async (editedParticipant) => {
     try {
       console.log("Attempting to update participant:", {
-        id: editedParticipant.$id,
+        id: editedParticipant.id,
         updateData: {
           name: editedParticipant.name,
           sex: editedParticipant.sex,
@@ -639,13 +634,13 @@ export default function ParticipantManagement({
       let collectionId;
       switch (editedParticipant.type) {
         case "student":
-          collectionId = studentsCollectionId;
+          collectionId = COLLECTIONS.STUDENTS;
           break;
         case "staff":
-          collectionId = staffFacultyCollectionId;
+          collectionId = COLLECTIONS.STAFF_FACULTY;
           break;
         case "community":
-          collectionId = communityCollectionId;
+          collectionId = COLLECTIONS.COMMUNITY;
           break;
         default:
           throw new Error("Invalid participant type");
@@ -670,17 +665,15 @@ export default function ParticipantManagement({
       };
 
       // Update the participant in the database
-      const response = await databases.updateDocument(
-        databaseId,
-        collectionId,
-        editedParticipant.$id,
+      const response = await updateDoc(
+        doc(db, collectionId, editedParticipant.id),
         updateData
       );
 
       // Update the local state
       setParticipants((prevParticipants) =>
         prevParticipants.map((p) =>
-          p.$id === editedParticipant.$id ? response : p
+          p.id === editedParticipant.id ? { ...p, ...updateData } : p
         )
       );
 
@@ -689,7 +682,7 @@ export default function ParticipantManagement({
       console.error("Error updating participant:", {
         error: error.message,
         stack: error.stack,
-        participantId: editedParticipant.$id,
+        participantId: editedParticipant.id,
         type: editedParticipant.type,
       });
       toast.error("Failed to update participant. Please try again.");
@@ -701,19 +694,19 @@ export default function ParticipantManagement({
       let collectionId;
       switch (participantType) {
         case "student":
-          collectionId = studentsCollectionId;
+          collectionId = COLLECTIONS.STUDENTS;
           break;
         case "staff":
-          collectionId = staffFacultyCollectionId;
+          collectionId = COLLECTIONS.STAFF_FACULTY;
           break;
         case "community":
-          collectionId = communityCollectionId;
+          collectionId = COLLECTIONS.COMMUNITY;
           break;
         default:
           throw new Error("Invalid participant type");
       }
 
-      await databases.deleteDocument(databaseId, collectionId, participantId);
+      await deleteDoc(doc(db, collectionId, participantId));
 
       toast.success("Participant deleted successfully!");
       await fetchParticipants(currentEventId);
@@ -1284,7 +1277,7 @@ export default function ParticipantManagement({
                     <Select
                       value={currentEventId || ""}
                       onValueChange={(value) => {
-                        const event = events.find((e) => e.$id === value);
+                        const event = events.find((e) => e.id === value);
                         setCurrentEventId(value);
                         setCurrentEvent(event);
                       }}
@@ -1304,7 +1297,7 @@ export default function ParticipantManagement({
                       </SelectTrigger>
                       <SelectContent>
                         {events.map((event) => (
-                          <SelectItem key={event.$id} value={event.$id}>
+                          <SelectItem key={event.id} value={event.id}>
                             {event.eventName}
                           </SelectItem>
                         ))}

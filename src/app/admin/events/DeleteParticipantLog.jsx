@@ -1,4 +1,4 @@
-"use client";
+"use auth";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
-import { deleteParticipant } from "@/lib/appwrite";
+import { deleteParticipant } from "@/lib/firebase";
 
 export default function DeleteParticipantDialog({
   participant,

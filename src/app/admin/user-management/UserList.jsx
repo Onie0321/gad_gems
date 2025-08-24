@@ -1,5 +1,5 @@
 // src/app/admin/user-management/user-list/page.jsx
-"use client";
+"use auth";
 
 import { useState, useEffect } from "react";
 import {
@@ -37,12 +37,16 @@ import {
   fetchUsers,
   updateUserStatus,
   logActivity,
-  databases,
-  databaseId,
-  userCollectionId,
-  activityLogsCollectionId,
-} from "@/lib/appwrite";
-import { Query, ID } from "appwrite";
+  db,
+  COLLECTIONS,
+  query,
+  collection,
+  where,
+  getDocs,
+  updateDoc,
+  doc,
+  addDoc,
+} from "@/lib/firebase";
 import { Label } from "@/components/ui/label";
 import { SelectStatus } from "@/components/ui/selectStatus";
 import { Badge } from "@/components/ui/badge";
@@ -118,18 +122,13 @@ export default function UserList() {
   const handleUpdate = async (e) => {
     e.preventDefault();
     try {
-      const updated = await databases.updateDocument(
-        databaseId,
-        userCollectionId,
-        selectedUser.$id,
-        editForm
-      );
+      const updated = await updateDoc(doc(db, COLLECTIONS.USERS, selectedUser.id), editForm);
 
-      await logActivity(selectedUser.$id, "User profile updated");
+      await logActivity(selectedUser.id, "User profile updated");
 
       setUsers(
         users.map((user) =>
-          user.$id === selectedUser.$id ? { ...user, ...editForm } : user
+          user.id === selectedUser.id ? { ...user, ...editForm } : user
         )
       );
 
@@ -158,7 +157,7 @@ export default function UserList() {
       // Update local state
       setUsers((prevUsers) =>
         prevUsers.map((user) =>
-          user.$id === userId ? { ...user, approvalStatus: newStatus } : user
+          user.id === userId ? { ...user, approvalStatus: newStatus } : user
         )
       );
 
@@ -190,10 +189,24 @@ export default function UserList() {
     const email = user.email?.toLowerCase() || "";
     const role = user.role?.toLowerCase() || "";
     const status = user.approvalStatus?.toLowerCase() || "";
-    const joinDate = format(
-      new Date(user.$createdAt),
-      "MMM d, yyyy"
-    ).toLowerCase();
+    
+    // Handle date formatting safely for Firebase data
+    let joinDate = "";
+    try {
+      if (user.createdAt) {
+        // Handle Firebase Timestamp objects
+        const dateValue = user.createdAt.seconds ? new Date(user.createdAt.seconds * 1000) : new Date(user.createdAt);
+        joinDate = format(dateValue, "MMM d, yyyy").toLowerCase();
+      } else if (user.timestamp) {
+        // Handle timestamp field
+        const dateValue = user.timestamp.seconds ? new Date(user.timestamp.seconds * 1000) : new Date(user.timestamp);
+        joinDate = format(dateValue, "MMM d, yyyy").toLowerCase();
+      }
+    } catch (error) {
+      console.warn("Error formatting date for user:", user.$id, error);
+      joinDate = "";
+    }
+    
     const searchLower = searchTerm.toLowerCase();
 
     // Search based on selected column
@@ -252,8 +265,23 @@ export default function UserList() {
         bValue = b.emailVerification ? 1 : 0;
         break;
       case "joined":
-        aValue = new Date(a.$createdAt).getTime();
-        bValue = new Date(b.$createdAt).getTime();
+        // Handle date sorting safely for Firebase data
+        try {
+          const aDate = a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000) : 
+                       a.timestamp?.seconds ? new Date(a.timestamp.seconds * 1000) : 
+                       a.createdAt ? new Date(a.createdAt) : 
+                       a.timestamp ? new Date(a.timestamp) : new Date(0);
+          const bDate = b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000) : 
+                       b.timestamp?.seconds ? new Date(b.timestamp.seconds * 1000) : 
+                       b.createdAt ? new Date(b.createdAt) : 
+                       b.timestamp ? new Date(b.timestamp) : new Date(0);
+          aValue = aDate.getTime();
+          bValue = bDate.getTime();
+        } catch (error) {
+          console.warn("Error sorting by date:", error);
+          aValue = 0;
+          bValue = 0;
+        }
         break;
       default:
         return 0;
@@ -448,7 +476,7 @@ export default function UserList() {
               </TableRow>
             ) : (
               paginatedUsers.map((user) => (
-                <TableRow key={user.$id}>
+                <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell className="capitalize">{user.role}</TableCell>
@@ -456,7 +484,7 @@ export default function UserList() {
                     <SelectStatus
                       status={user.approvalStatus}
                       onStatusChange={(newStatus) =>
-                        handleUpdateStatus(user.$id, newStatus)
+                        handleUpdateStatus(user.id, newStatus)
                       }
                       className="text-xs"
                     />
@@ -474,10 +502,21 @@ export default function UserList() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {format(
-                      new Date(user.$createdAt),
-                      "MMMM d, yyyy 'at' h:mm aaa"
-                    )}
+                    {(() => {
+                      try {
+                        if (user.createdAt) {
+                          const dateValue = user.createdAt.seconds ? new Date(user.createdAt.seconds * 1000) : new Date(user.createdAt);
+                          return format(dateValue, "MMMM d, yyyy 'at' h:mm aaa");
+                        } else if (user.timestamp) {
+                          const dateValue = user.timestamp.seconds ? new Date(user.timestamp.seconds * 1000) : new Date(user.timestamp);
+                          return format(dateValue, "MMMM d, yyyy 'at' h:mm aaa");
+                        }
+                        return "Date not available";
+                      } catch (error) {
+                        console.warn("Error formatting date for display:", error);
+                        return "Invalid date";
+                      }
+                    })()}
                   </TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button

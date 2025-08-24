@@ -92,16 +92,32 @@ export default function UserProfileDialog({ isOpen, onClose, user }) {
         {
           icon: <Calendar className="h-4 w-4" />,
           label: "Joined Date",
-          value: user.$createdAt,
-          format: (value) =>
-            format(new Date(value), "MMMM d, yyyy 'at' h:mm aaa"),
+          value: user.createdAt || user.timestamp,
+          format: (value) => {
+            try {
+              if (!value) return "Date not available";
+              const dateValue = value.seconds ? new Date(value.seconds * 1000) : new Date(value);
+              return format(dateValue, "MMMM d, yyyy 'at' h:mm aaa");
+            } catch (error) {
+              console.warn("Error formatting joined date:", error);
+              return "Invalid date";
+            }
+          },
         },
         {
           icon: <Clock className="h-4 w-4" />,
           label: "Last Active",
-          value: user.lastLogin || user.$updatedAt,
-          format: (value) =>
-            format(new Date(value), "MMMM d, yyyy 'at' h:mm aaa"),
+          value: user.lastLogin || user.updatedAt || user.timestamp,
+          format: (value) => {
+            try {
+              if (!value) return "Not available";
+              const dateValue = value.seconds ? new Date(value.seconds * 1000) : new Date(value);
+              return format(dateValue, "MMMM d, yyyy 'at' h:mm aaa");
+            } catch (error) {
+              console.warn("Error formatting last active date:", error);
+              return "Invalid date";
+            }
+          },
         },
       ],
     },
